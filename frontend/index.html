@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <title>NYVRON – Personal OS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Main stylesheet -->
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app" id="app-root">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="logo">N</div>
+          <div class="name">NYVRON</div>
+        </div>
+
+        <div class="sidebar-nav">
+          <div class="sidebar-section-label">Main</div>
+
+          <div class="nav-item active" data-screen-target="screen-dashboard">
+            <span class="icon">🏠</span>
+            <span>Dashboard</span>
+          </div>
+
+          <div class="nav-item" data-screen-target="screen-today">
+            <span class="icon">📅</span>
+            <span>Today</span>
+          </div>
+
+          <div class="nav-item" data-screen-target="screen-chat">
+            <span class="icon">💬</span>
+            <span>Chat</span>
+          </div>
+
+          <div class="nav-item" data-screen-target="screen-calendar">
+            <span class="icon">📆</span>
+            <span>Calendar</span>
+          </div>
+
+          <div class="nav-item" data-screen-target="screen-time">
+            <span class="icon">⏱</span>
+            <span>Time</span>
+          </div>
+
+          <div class="nav-item" data-screen-target="screen-analytics">
+            <span class="icon">📊</span>
+            <span>Analytics</span>
+          </div>
+
+          <div class="nav-item" data-screen-target="screen-profile">
+            <span class="icon">👤</span>
+            <span>Profile</span>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="status">
+            <span class="status-dot"></span>
+            <span id="ai-status-label">AI online</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN AREA -->
+      <main class="main">
+        <!-- TOP BAR -->
+        <header class="topbar">
+          <div class="topbar-title">NYVRON</div>
+
+          <div class="topbar-clock" id="topbar-clock"></div>
+
+          <div class="topbar-search" id="commandbar-trigger">
+            <span>Search or run command</span>
+            <kbd>⌘K</kbd>
+          </div>
+
+          <div class="topbar-actions">
+            <button class="topbar-btn" id="theme-toggle-btn" title="Toggle theme">
+              🌗
+            </button>
+          </div>
+        </header>
+
+        <!-- SCREENS CONTAINER -->
+        <section class="screens">
+          <!-- DASHBOARD SCREEN -->
+          <section
+            id="screen-dashboard"
+            class="screen active"
+            aria-label="Dashboard"
+          >
+            <div class="dash-greeting">
+              <h1>Welcome back, Commander.</h1>
+              <p class="dash-greeting-sub">
+                Align your day with your North Star.
+              </p>
+            </div>
+
+            <div class="grid grid-dashboard">
+              <div class="card north-star-card">
+                <div class="north-star-label">North Star</div>
+                <div class="north-star-phase" id="north-star-phase">
+                  Focus: Deep Work
+                </div>
+                <div class="north-star-direction" id="north-star-direction">
+                  Ship one meaningful outcome today. Protect your focus windows.
+                </div>
+                <div class="north-star-edit" id="north-star-edit">
+                  Edit north star
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <div class="card-title">Energy</div>
+                </div>
+                <div class="energy-selector" id="energy-selector">
+                  <button
+                    class="energy-btn active"
+                    data-energy="high"
+                  >
+                    High
+                  </button>
+                  <button
+                    class="energy-btn"
+                    data-energy="steady"
+                  >
+                    Steady
+                  </button>
+                  <button
+                    class="energy-btn"
+                    data-energy="low"
+                  >
+                    Low
+                  </button>
+                </div>
+                <div class="low-energy-banner" id="low-energy-banner">
+                  <div class="low-energy-content">
+                    <div class="low-energy-icon">⚡️</div>
+                    <div class="low-energy-text">
+                      You’re in low‑energy mode. NYVRON will simplify your
+                      workload and reduce context switching.
+                    </div>
+                    <div
+                      class="low-energy-action"
+                      id="low-energy-dismiss"
+                    >
+                      Dismiss
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <div class="card-title">Stats</div>
+                </div>
+                <div class="stat-number" id="stat-focus-min">
+                  120
+                </div>
+                <div class="stat-label">Focus minutes today</div>
+                <div class="stat-change" id="stat-focus-change">
+                  +24 vs. yesterday
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TODAY SCREEN -->
+          <section
+            id="screen-today"
+            class="screen"
+            aria-label="Today"
+          >
+            <div class="today-container">
+              <div class="today-header">
+                <div class="today-time" id="today-time">
+                  09:41
+                </div>
+                <div class="today-timezone" id="today-timezone">
+                  IST · Auto‑detected
+                </div>
+                <div class="today-greeting" id="today-greeting">
+                  Good morning.
+                </div>
+                <div class="today-date" id="today-date">
+                  Wednesday, June 24, 2026
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- CHAT SCREEN -->
+          <section
+            id="screen-chat"
+            class="screen"
+            aria-label="Chat"
+          >
+            <!-- Optional thinking status bar -->
+            <div
+              class="chat-thinking-status hidden"
+              id="chat-thinking-status"
+            >
+              <div class="thinking-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="thinking-text">
+                NYVRON is thinking...
+              </div>
+            </div>
+
+            <!-- Optional chat mode switcher -->
+            <div class="chat-mode-switcher">
+              <button
+                class="chat-mode-btn active"
+                data-chat-mode="default"
+              >
+                Default
+              </button>
+              <button
+                class="chat-mode-btn"
+                data-chat-mode="planner"
+              >
+                Planner
+              </button>
+              <button
+                class="chat-mode-btn"
+                data-chat-mode="coder"
+              >
+                Coder
+              </button>
+            </div>
+
+            <div class="chat-container">
+              <div class="chat-main">
+                <div class="chat-messages" id="chat-messages"></div>
+
+                <div class="chat-quick-actions">
+                  <button
+                    class="chat-quick-action"
+                    data-prompt="Summarize my day in 3 bullets."
+                  >
+                    Summarize my day
+                  </button>
+                  <button
+                    class="chat-quick-action"
+                    data-prompt="Plan my next 90 minutes for deep work."
+                  >
+                    Plan 90‑min sprint
+                  </button>
+                </div>
+
+                <div class="chat-input-area">
+                  <div class="chat-input-wrap">
+                    <textarea
+                      id="chat-input"
+                      class="chat-input"
+                      placeholder="Ask NYVRON anything..."
+                      rows="1"
+                    ></textarea>
+                  </div>
+                  <button
+                    id="chat-send-btn"
+                    class="chat-send-btn"
+                    title="Send"
+                  >
+                    ➤
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- CALENDAR SCREEN -->
+          <section
+            id="screen-calendar"
+            class="screen"
+            aria-label="Calendar"
+          >
+            <div class="calendar-views">
+              <button class="calendar-view-btn active">
+                Month
+              </button>
+              <button class="calendar-view-btn">
+                Week
+              </button>
+              <button class="calendar-view-btn">
+                Day
+              </button>
+            </div>
+            <div class="calendar-container">
+              <div class="calendar-header">
+                <div class="calendar-title" id="calendar-title">
+                  June 2026
+                </div>
+              </div>
+              <div class="calendar-month-grid" id="calendar-grid">
+                <!-- Calendar cells rendered by AI/JS later -->
+              </div>
+            </div>
+            <div class="calendar-events-section">
+              <div class="section-title">
+                Today’s events
+              </div>
+              <div
+                class="calendar-events-list"
+                id="calendar-events"
+              ></div>
+            </div>
+          </section>
+
+          <!-- TIME TRACKING SCREEN -->
+          <section
+            id="screen-time"
+            class="screen"
+            aria-label="Time"
+          >
+            <div class="timer-container">
+              <div class="timer-display" id="timer-display">
+                00:00:00
+              </div>
+              <div class="timer-mode" id="timer-mode-label">
+                Focus session
+              </div>
+              <div class="timer-controls">
+                <button
+                  class="btn btn-primary btn-elastic"
+                  id="timer-start-btn"
+                >
+                  Start
+                </button>
+                <button
+                  class="btn btn-outline btn-elastic"
+                  id="timer-stop-btn"
+                >
+                  Stop
+                </button>
+                <button
+                  class="btn btn-ghost btn-elastic"
+                  id="timer-reset-btn"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ANALYTICS SCREEN -->
+          <section
+            id="screen-analytics"
+            class="screen"
+            aria-label="Analytics"
+          >
+            <div class="analytics-period">
+              <button class="period-btn active">
+                7 days
+              </button>
+              <button class="period-btn">
+                30 days
+              </button>
+            </div>
+            <div class="analytics-card">
+              <div class="card-title">
+                Focus distribution
+              </div>
+              <div class="mode-bars" id="analytics-mode-bars">
+                <!-- Mode bars populated by AI/JS -->
+              </div>
+            </div>
+          </section>
+
+          <!-- PROFILE SCREEN -->
+          <section
+            id="screen-profile"
+            class="screen"
+            aria-label="Profile"
+          >
+            <div class="profile-header">
+              <div class="profile-avatar">
+                N
+              </div>
+              <div class="profile-info">
+                <h2 id="profile-name">
+                  NYVRON Pilot
+                </h2>
+                <p id="profile-tagline">
+                  Operating system for your mind.
+                </p>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <!-- MOBILE BOTTOM NAV -->
+        <nav class="bottomnav">
+          <button
+            class="bottom-nav-item active"
+            data-screen-target="screen-dashboard"
+          >
+            <span class="icon">🏠</span>
+            <span>Home</span>
+          </button>
+          <button
+            class="bottom-nav-item"
+            data-screen-target="screen-today"
+          >
+            <span class="icon">📅</span>
+            <span>Today</span>
+          </button>
+          <button
+            class="bottom-nav-item"
+            data-screen-target="screen-chat"
+          >
+            <span class="icon">💬</span>
+            <span>Chat</span>
+          </button>
+        </nav>
+      </main>
+    </div>
+
+    <!-- Optional offline badge -->
+    <div class="offline-badge hidden" id="offline-badge">
+      OFFLINE · AI not reachable
+    </div>
+
+    <!-- Command bar overlay (hidden by default) -->
+    <div
+      class="commandbar-overlay hidden"
+      id="commandbar-overlay"
+    >
+      <div class="commandbar">
+        <input
+          type="text"
+          class="commandbar-input"
+          id="commandbar-input"
+          placeholder="Type a command or search..."
+        />
+        <div
+          class="commandbar-results"
+          id="commandbar-results"
+        ></div>
+        <div class="commandbar-hint">
+          <span>↑↓ to navigate</span>
+          <span>Enter to run</span>
+          <span>Esc to close</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main script -->
+    <script src="app.js"></script>
+  </body>
+</html>
