@@ -1,4 +1,121 @@
 // =========================
+// FIREBASE SYNC INTEGRATION
+// =========================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAW71Yvb9X5iigyEu6e9m2p19N54q9I52Y",
+  authDomain: "nyvron-sync.firebaseapp.com",
+  projectId: "nyvron-sync",
+  storageBucket: "nyvron-sync.firebasestorage.app",
+  messagingSenderId: "484077527702",
+  appId: "1:484077527702:web:5c98ec95e9f412959f18b7"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+
+let currentUser = null;
+let isSyncing = false;
+
+// Initialize UI
+const authOverlay = document.getElementById("auth-overlay");
+const authEmail = document.getElementById("auth-email");
+const authPassword = document.getElementById("auth-password");
+const authError = document.getElementById("auth-error");
+const authLoginBtn = document.getElementById("auth-login-btn");
+const authSignupBtn = document.getElementById("auth-signup-btn");
+
+if (authLoginBtn) {
+  authLoginBtn.addEventListener("click", () => {
+    signInWithEmailAndPassword(auth, authEmail.value, authPassword.value)
+      .catch(err => { authError.innerText = err.message; authError.style.display = 'block'; });
+  });
+}
+
+if (authSignupBtn) {
+  authSignupBtn.addEventListener("click", () => {
+    createUserWithEmailAndPassword(auth, authEmail.value, authPassword.value)
+      .catch(err => { authError.innerText = err.message; authError.style.display = 'block'; });
+  });
+}
+
+onAuthStateChanged(auth, user => {
+  if (user) {
+    currentUser = user;
+    if (authOverlay) authOverlay.style.display = 'none';
+    setupFirestoreSync();
+  } else {
+    currentUser = null;
+    if (authOverlay) authOverlay.style.display = 'flex';
+  }
+});
+
+function setupFirestoreSync() {
+  const keys = [
+    "nyvron_today", "nyvron_calendar", "nyvron_timer", "nyvron_schedule", 
+    "nyvron_memory", "nyvron_reflection", "nyvron_profile", "nyvron_chat"
+  ];
+  
+  keys.forEach(key => {
+    onSnapshot(doc(db, "users", currentUser.uid, "data", key), (docSnap) => {
+      if (docSnap.exists()) {
+        const cloudData = docSnap.data().data;
+        if (JSON.stringify(cloudData) !== localStorage.getItem(key)) {
+           isSyncing = true;
+           localStorage.setItem(key, JSON.stringify(cloudData));
+           
+           if (key === "nyvron_today") Object.assign(todayState, cloudData);
+           if (key === "nyvron_calendar") Object.assign(calendarState, cloudData);
+           if (key === "nyvron_timer") Object.assign(timerState, cloudData);
+           if (key === "nyvron_schedule") Object.assign(scheduleState, cloudData);
+           if (key === "nyvron_memory") Object.assign(memoryState, cloudData);
+           if (key === "nyvron_reflection") Object.assign(reflectionState, cloudData);
+           if (key === "nyvron_profile") Object.assign(profileState, cloudData);
+           if (key === "nyvron_chat") Object.assign(chatState, cloudData);
+           
+           reRenderAll();
+           isSyncing = false;
+        }
+      }
+    });
+  });
+}
+
+function reRenderAll() {
+  try {
+    renderTodayPriorities();
+    renderTodaySchedule();
+    renderTodayReminders();
+    renderEnergy();
+    renderQuickNotes();
+    renderCountdown();
+    renderNorthStar();
+    renderDashboard();
+    renderCalendarMonth();
+    renderCalendarDayDetails();
+    updateTimerDisplay();
+    renderSessions();
+    renderObserve();
+    renderScheduleAll();
+    renderMemories();
+    renderKnowledgeBaseUI();
+    renderReflections();
+    renderProfile();
+    ensureActiveChat();
+    renderChatHistory();
+    loadChatSessionToUI();
+    renderTimeCalendar();
+    renderTimeCalendarSessions();
+  } catch(e) {
+    console.error("Error during re-render sync:", e);
+  }
+}
+
+// =========================
 // Utilities
 // =========================
 
@@ -16,6 +133,10 @@ function loadJSON(key, fallback) {
 function saveJSON(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    if (currentUser && !isSyncing && key.startsWith("nyvron_")) {
+      setDoc(doc(db, "users", currentUser.uid, "data", key), { data: value }, { merge: true })
+        .catch(err => console.error("Firestore sync error:", err));
+    }
   } catch (e) {
     console.error("saveJSON error", key, e);
   }

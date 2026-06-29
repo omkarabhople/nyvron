@@ -908,6 +908,22 @@
 
 </div><!-- end .app -->
 
-<script src="app.js"></script>
+<!-- ░░ AUTHENTICATION OVERLAY ░░ -->
+<div id="auth-overlay" class="cmdbar-overlay" style="display:flex; justify-content:center; align-items:center; z-index:9999; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);">
+  <div class="glass-card" style="width: 100%; max-width: 350px; padding: 30px; text-align: center;">
+    <h2 style="margin-bottom: 10px; font-weight: 600;">NYVRON</h2>
+    <p style="margin-bottom: 25px; opacity: 0.7; font-size: 14px;">Sign in to sync your universe.</p>
+    
+    <input type="email" id="auth-email" class="glass-textarea" placeholder="Email" style="height:40px; margin-bottom: 10px; padding: 10px;" />
+    <input type="password" id="auth-password" class="glass-textarea" placeholder="Password" style="height:40px; margin-bottom: 15px; padding: 10px;" />
+    
+    <div id="auth-error" style="color: #ff5e5e; font-size: 12px; margin-bottom: 15px; display: none;"></div>
+    
+    <button id="auth-login-btn" class="ios-action-btn" style="margin-bottom: 10px; width: 100%;">Log In</button>
+    <button id="auth-signup-btn" class="focus-secondary" style="width: 100%;">Create Account</button>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
 </body>
 </html>
