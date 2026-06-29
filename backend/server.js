@@ -46,6 +46,10 @@ function getApiKey() {
     path.join(process.cwd(), "backend", "insert api key here"),
   ];
 
+  if (process.resourcesPath) {
+    possiblePaths.push(path.join(process.resourcesPath, "insert api key here"));
+  }
+
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) {
       try {
@@ -505,6 +509,10 @@ Write the briefing now:`;
   }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`NYVRON backend running on http://localhost:${PORT}`);
+});
+
+server.on('error', (err) => {
+  console.error('Express server failed to start:', err);
 });

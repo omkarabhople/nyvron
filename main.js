@@ -1,24 +1,17 @@
 const { app, BrowserWindow } = require('electron');
-const { fork } = require('child_process');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
-let serverProcess = null;
 let mainWindow = null;
 
-function startBackend() {
-  // Spawn backend server as a child process
+async function startBackend() {
   const serverPath = path.join(__dirname, 'backend', 'server.js');
-  serverProcess = fork(serverPath, [], {
-    env: { ...process.env, PORT: 3000 }
-  });
-
-  serverProcess.on('error', (err) => {
+  try {
+    await import(pathToFileURL(serverPath).href);
+    console.log('Backend server started successfully in main process.');
+  } catch (err) {
     console.error('Failed to start backend server:', err);
-  });
-
-  serverProcess.on('exit', (code, signal) => {
-    console.log(`Backend server exited with code ${code} and signal ${signal}`);
-  });
+  }
 }
 
 function createWindow() {
@@ -62,17 +55,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  // Close the backend Express process when the window closes
-  if (serverProcess) {
-    serverProcess.kill();
-  }
   if (process.platform !== 'darwin') {
     app.quit();
-  }
-});
-
-app.on('will-quit', () => {
-  if (serverProcess) {
-    serverProcess.kill();
   }
 });

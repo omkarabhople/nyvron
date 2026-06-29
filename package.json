@@ -23,7 +23,9 @@
     "files": [
       "main.js",
       "frontend/**/*",
-      "backend/**/*",
+      "backend/**/*"
+    ],
+    "extraResources": [
       "insert api key here"
     ],
     "mac": {
