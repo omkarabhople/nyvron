@@ -38,6 +38,8 @@ app.get("/", (req, res) => {
 function getApiKey() {
   // Try environment variables first
   if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY.trim();
+  if (process.env.GROQ_API_KEY) return process.env.GROQ_API_KEY.trim();
+  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY.trim();
   if (process.env.HF_TOKEN) return process.env.HF_TOKEN.trim();
 
   const possiblePaths = [
