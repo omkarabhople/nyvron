@@ -1,2640 +1,913 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#000000">
-<title>NYVRON</title>
-
-<!-- 
-  ╔════════════════════════════════════════════════════════════════╗
-  ║  NYVRON — Personal Assistant UI                              ║
-  ║  Version: 2.0 (iOS-inspired)                                 ║
-  ║  Platform: MacBook (primary) + iPhone (secondary)            ║
-  ║  Design: iOS 26 glass, Apple Notes, Raycast, Linear          ║
-  ║  Status: Frontend shell — ready for backend wiring           ║
-  ╚════════════════════════════════════════════════════════════════╝
--->
-
-<!-- 
-  📍 LOGO PLACEHOLDER:
-  To add your logo, replace the .sidebar-brand .logo div with:
-  <img src="logo.png" alt="NYVRON" class="logo-img">
-  And add CSS: .logo-img { width: 32px; height: 32px; border-radius: 8px; }
--->
-
-<!-- iOS System Fonts + Beautiful Alternatives -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&family=SF+Pro+Text:wght@300;400;500;600&family=New+York:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css">
+  <meta charset="UTF-8" />
+  <title>NYVRON</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="NYVRON — Personal command center. iOS-inspired productivity dashboard." />
+  <meta name="theme-color" content="#000000" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<!-- ═══════════════════════════════════════════════════════════
-     NYVRON — APP SHELL
-     Structure: Sidebar + Main + Bottom Nav (mobile)
-     ═══════════════════════════════════════════════════════════ -->
-<div id="app" class="app">
+<div class="app" id="app">
 
-  <!-- ═══════════ SIDEBAR (Desktop) ═══════════ -->
-  <nav id="sidebar" class="sidebar">
-    <div class="sidebar-brand">
-      <!-- 📍 LOGO: Replace this div with <img src="logo.png" class="logo-img"> -->
-      <div class="logo">N</div>
-      <span class="name">NYVRON</span>
-    </div>
-    
-    <div class="sidebar-nav">
-      <div class="sidebar-section-label">Main</div>
-      <div class="nav-item active" data-screen="today">
-        <span class="icon">☀️</span> Today
-      </div>
-      <div class="nav-item" data-screen="dashboard">
-        <span class="icon">🏠</span> Dashboard
-      </div>
-      <div class="nav-item" data-screen="chat">
-        <span class="icon">💬</span> Chat
-      </div>
-      <div class="nav-item" data-screen="calendar">
-        <span class="icon">📅</span> Calendar
-      </div>
-      <div class="nav-item" data-screen="time-tracking">
-        <span class="icon">⏱️</span> Time Tracker
-      </div>
-      <div class="nav-item" data-screen="schedule">
-        <span class="icon">📋</span> Schedule
-      </div>
-      <div class="nav-item" data-screen="memory">
-        <span class="icon">🧠</span> Memory
-      </div>
-      
-      <div class="sidebar-section-label">Insights</div>
-      <div class="nav-item" data-screen="reports">
-        <span class="icon">📊</span> Reports
-      </div>
-      <div class="nav-item" data-screen="analytics">
-        <span class="icon">📈</span> Analytics
-      </div>
-      <div class="nav-item" data-screen="reflection">
-        <span class="icon">📝</span> Reflection
-      </div>
-      
-      <div class="sidebar-section-label">System</div>
-      <div class="nav-item" data-screen="profile">
-        <span class="icon">👤</span> Profile
-      </div>
-      <div class="nav-item" data-screen="notifications">
-        <span class="icon">🔔</span> Notifications
-        <span class="badge">3</span>
-      </div>
-      <div class="nav-item" data-screen="settings">
-        <span class="icon">⚙️</span> Settings
+  <!-- ░░ AURORA BACKGROUND ░░ -->
+  <div class="aurora-bg" aria-hidden="true">
+    <div class="aurora-blob aurora-1"></div>
+    <div class="aurora-blob aurora-2"></div>
+    <div class="aurora-blob aurora-3"></div>
+    <div class="aurora-blob aurora-4"></div>
+  </div>
+
+  <!-- ░░ STATUS BAR ░░ -->
+  <header class="status-bar">
+    <div class="status-left">
+      <div id="app-logo" class="logo-mark">N</div>
+      <div class="brand-info">
+        <span class="brand-name">NYVRON</span>
+        <div id="sidebar-status-text" class="brand-status">Connected</div>
       </div>
     </div>
-    
-    <div class="sidebar-footer">
-      <div class="status">
-        <span class="status-dot"></span>
-        LOCAL ONLY • SECURE
-      </div>
+    <div class="status-center">
+      <div id="topbar-title" class="screen-label">Today</div>
+      <div id="topbar-clock" class="status-clock">00:00</div>
     </div>
-  </nav>
+    <div class="status-right">
+      <div id="offline-badge" class="offline-badge hidden">⚠ Offline</div>
+      <button id="commandbar-trigger" class="search-pill" type="button" aria-label="Open command palette">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Search</span>
+        <kbd>⌘K</kbd>
+      </button>
+    </div>
+  </header>
 
-  <!-- ═══════════ MAIN CONTENT ═══════════ -->
-  <main id="main" class="main">
-    
-    <!-- TOP BAR -->
-    <header id="topbar" class="topbar">
-      <span class="topbar-title" id="topbar-title">Dashboard</span>
-      <div class="topbar-clock" id="topbar-clock">--:--:-- IST</div>
-      <div class="topbar-search" onclick="openCommandBar()">
-        <span>🔍</span> Search <kbd>⌘K</kbd>
+  <!-- ░░ SCREENS ░░ -->
+  <main class="screens-wrapper" id="screens-wrapper">
+
+    <!-- ═══════════════════════ TODAY ═══════════════════════ -->
+    <section id="screen-today" class="screen active" aria-label="Today">
+      <div class="screen-scroll">
+        <div class="screen-hero">
+          <div class="hero-live-pill">
+            <span class="live-dot"></span>
+            <span>NYVRON · Live</span>
+          </div>
+          <h1 id="today-greeting" class="hero-heading">Good Morning</h1>
+          <p id="today-subtitle" class="hero-sub">Start your day with intention.</p>
+          <div class="hero-time-block">
+            <div id="today-time" class="hero-clock">00:00</div>
+            <div id="today-date" class="hero-date">Monday, 29 Jun 2026</div>
+          </div>
+        </div>
+
+        <!-- Energy -->
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group">
+              <span class="card-icon">⚡</span>
+              <span class="card-title">Energy</span>
+            </div>
+          </div>
+          <div class="chip-row">
+            <button class="energy-btn ios-chip" data-energy="high">🔥 High</button>
+            <button class="energy-btn ios-chip" data-energy="medium">✨ Medium</button>
+            <button class="energy-btn ios-chip" data-energy="low">🌙 Low</button>
+          </div>
+          <div id="low-energy-banner" class="energy-banner hidden">
+            <span>Low energy? Make today lighter.</span>
+            <button id="low-energy-dismiss" class="banner-dismiss" type="button">Dismiss</button>
+          </div>
+        </div>
+
+        <!-- Priorities -->
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group">
+              <span class="card-icon">🎯</span>
+              <span class="card-title">Priorities</span>
+              <span class="count-badge" id="priority-count">0</span>
+            </div>
+            <button id="today-add-priority" class="fab-add" type="button" aria-label="Add priority">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <ul id="today-priorities" class="task-list" role="list"></ul>
+        </div>
+
+        <!-- Schedule -->
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group">
+              <span class="card-icon">🗓</span>
+              <span class="card-title">Today's Schedule</span>
+            </div>
+            <button id="today-add-schedule" class="fab-add" type="button" aria-label="Add schedule item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <ul id="today-schedule-list" class="task-list" role="list"></ul>
+        </div>
+
+        <!-- Reminders -->
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group">
+              <span class="card-icon">🔔</span>
+              <span class="card-title">Reminders</span>
+            </div>
+            <button id="today-add-reminder" class="fab-add" type="button" aria-label="Add reminder">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <ul id="today-reminders" class="task-list" role="list"></ul>
+        </div>
+
+        <!-- Quick Notes -->
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group">
+              <span class="card-icon">✏️</span>
+              <span class="card-title">Quick Notes</span>
+            </div>
+          </div>
+          <textarea id="quick-notes-input" class="glass-textarea" placeholder="Write anything for today..." rows="3"></textarea>
+          <button id="quick-notes-save" class="ios-action-btn" type="button">Save Note</button>
+          <div id="quick-notes-list" class="notes-output"></div>
+        </div>
+
+        <!-- Countdown -->
+        <div class="glass-card countdown-card" data-3d id="countdown-card">
+
+          <!-- Empty state -->
+          <div id="countdown-empty" class="countdown-empty">
+            <div class="countdown-empty-icon">⏳</div>
+            <p class="countdown-empty-text">No countdown set</p>
+            <button class="ios-action-btn countdown-set-trigger" type="button" style="margin-top:10px">+ Add Countdown</button>
+          </div>
+
+          <!-- Live countdown display (hidden until set) -->
+          <div id="countdown-live" class="countdown-live hidden">
+            <div class="countdown-live-header">
+              <div class="countdown-live-left">
+                <div class="countdown-event-emoji" id="countdown-emoji">🎯</div>
+                <div>
+                  <div id="countdown-event-name" class="countdown-event-name">Event</div>
+                  <div id="countdown-event-date" class="countdown-event-date">–</div>
+                </div>
+              </div>
+              <div class="countdown-live-actions">
+                <button class="ios-chip-sm countdown-set-trigger" type="button">Edit</button>
+                <button id="countdown-delete-btn" class="countdown-del-btn" type="button" aria-label="Delete countdown">✕</button>
+              </div>
+            </div>
+
+            <!-- Segmented unit tiles -->
+            <div class="countdown-units" id="countdown-units">
+              <div class="countdown-unit" id="cd-days">
+                <div class="cd-unit-glass">
+                  <span class="cd-num" id="cd-days-num">00</span>
+                </div>
+                <span class="cd-unit-label">DAYS</span>
+              </div>
+              <div class="cd-colon">:</div>
+              <div class="countdown-unit" id="cd-hours">
+                <div class="cd-unit-glass">
+                  <span class="cd-num" id="cd-hours-num">00</span>
+                </div>
+                <span class="cd-unit-label">HRS</span>
+              </div>
+              <div class="cd-colon">:</div>
+              <div class="countdown-unit" id="cd-mins">
+                <div class="cd-unit-glass">
+                  <span class="cd-num" id="cd-mins-num">00</span>
+                </div>
+                <span class="cd-unit-label">MIN</span>
+              </div>
+              <div class="cd-colon">:</div>
+              <div class="countdown-unit" id="cd-secs">
+                <div class="cd-unit-glass">
+                  <span class="cd-num" id="cd-secs-num">00</span>
+                </div>
+                <span class="cd-unit-label">SEC</span>
+              </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="cd-progress-track">
+              <div class="cd-progress-fill" id="cd-progress-fill"></div>
+            </div>
+            <div class="cd-progress-labels">
+              <span id="cd-created-label" class="cd-prog-label">Start</span>
+              <span id="cd-pct-label" class="cd-prog-pct">0%</span>
+              <span id="cd-target-label" class="cd-prog-label">End</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- North Star -->
+        <div class="glass-card glass-card--accent" data-3d>
+          <div class="card-row">
+            <div class="card-label-group">
+              <span class="card-icon">⭐</span>
+              <span class="card-title">North Star</span>
+              <span id="northstar-phase" class="card-subtitle-inline">Phase 1</span>
+            </div>
+            <button id="northstar-edit-btn" class="ios-chip-sm" type="button">Edit</button>
+          </div>
+          <div id="northstar-direction" class="northstar-body">Stability, consistency, and confidence.</div>
+          <div id="reflection-quote" class="northstar-quote">"Focus on the next 25 minutes, not the whole day."</div>
+        </div>
+
+        <div class="bottom-spacer"></div>
       </div>
-      <div class="topbar-actions">
-        <button class="topbar-btn" onclick="openQuickCapture()" title="Remember This">✦</button>
-        <button class="topbar-btn" onclick="toggleMiniMode()" title="Mini Mode">◈</button>
-        <button class="topbar-btn" onclick="toggleEmergency()" title="Emergency Mode">⚡</button>
-        <button class="topbar-btn" onclick="cycleTheme()" title="Toggle Theme" id="theme-btn">◐</button>
-      </div>
-    </header>
+    </section>
 
-    <!-- ═══════════ SCREENS ═══════════ -->
-    <div id="screens" class="screens">
-      
-      <!-- ═══════════ TODAY SCREEN ═══════════ -->
-      <section id="screen-today" class="screen active">
-        <div class="today-container">
-          <!-- Current Time & Greeting -->
-          <div class="today-header">
-            <div class="today-time" id="today-live-time">--:--:--</div>
-            <div class="today-timezone">IST • Mumbai</div>
-            <h1 class="today-greeting" id="today-greeting">Hello! Boss !</h1>
-            <p class="today-date" id="today-date">Tuesday, June 23</p>
-          </div>
-
-          <!-- Quick Actions -->
-          <div class="today-quick-actions">
-            <button class="btn btn-primary" onclick="startFocusSession()">🎯 Start Focus</button>
-            <button class="btn btn-outline" onclick="openQuickCapture()">✦ Remember This</button>
-            <button class="btn btn-outline" onclick="navigate('calendar')">📅 Add Schedule</button>
-          </div>
-
-          <!-- Energy & Mode Status -->
-          <div class="today-status-grid">
-            <div class="status-card">
-              <div class="status-icon">⚡</div>
-              <div class="status-label">Energy</div>
-              <div class="status-value" id="today-energy">High</div>
-            </div>
-            <div class="status-card">
-              <div class="status-icon">🎯</div>
-              <div class="status-label">Mode</div>
-              <div class="status-value" id="today-mode">Deep Work</div>
-            </div>
-            <div class="status-card">
-              <div class="status-icon">⏱️</div>
-              <div class="status-label">Focus Time</div>
-              <div class="status-value" id="today-focus-time"> #variable </div>
-            </div>
-          </div>
-
-          <!-- Top 3 Priorities -->
-          <div class="today-section">
-            <h3 class="section-title">🎯 Top 3 Priorities</h3>
-            <div class="priority-list">
-              <div class="priority-item">
-                <div class="priority-rank">1</div>
-                <div class="priority-content">
-                  <div class="priority-title"> # change </div>
-                  <div class="priority-meta"> #change </div>
-                </div>
-              </div>
-              <div class="priority-item">
-                <div class="priority-rank">2</div>
-                <div class="priority-content">
-                  <div class="priority-title"> # change </div>
-                  <div class="priority-meta"> #change </div>
-                </div>
-              </div>
-              <div class="priority-item">
-                <div class="priority-rank">3</div>
-                <div class="priority-content">
-                  <div class="priority-title"> # change </div>
-                  <div class="priority-meta"> #change </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Next Event -->
-          <div class="today-section">
-            <h3 class="section-title">⏰ Next Event</h3>
-            <div class="next-event-card">
-              <div class="next-event-title"> # variable </div>
-              <div class="next-event-time"> # variable </div>
-              <div class="next-event-countdown"> # variablev </div>
-            </div>
-          </div>
-
-          <!-- Today's Schedule -->
-          <div class="today-section">
-            <h3 class="section-title">📅 Today's Schedule</h3>
-            <div class="today-schedule-list">
-              <div class="schedule-item">
-                <div class="schedule-time"> # variable </div>
-                <div class="schedule-dot high"></div>
-                <div class="schedule-content">
-                  <div class="schedule-title"> # variable </div>
-                  <div class="schedule-mode"> # variable </div>
-                </div>
-              </div>
-              <div class="schedule-item">
-                <div class="schedule-time"> # variable </div>
-                <div class="schedule-dot high"></div>
-                <div class="schedule-content">
-                  <div class="schedule-title"> # variable </div>
-                  <div class="schedule-mode"> # variable </div>
-                </div>
-              </div>
-              <div class="schedule-item">
-                <div class="schedule-time"> # variable </div>
-                <div class="schedule-dot low"></div>
-                <div class="schedule-content">
-                  <div class="schedule-title"> # variable </div>
-                  <div class="schedule-mode"> # variable </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Countdown -->
-          <div class="today-section">
-            <h3 class="section-title">⏳ Countdown</h3>
-            <div class="countdown-mini">
-              <div class="countdown-item">
-                <div class="countdown-label"> #variable </div>
-                <div class="countdown-value"> #variable </div>
-              </div>
-              <div class="countdown-item">
-                <div class="countdown-label"> #variable </div>
-                <div class="countdown-value"> #variable </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Quick Notes -->
-          <div class="today-section">
-            <h3 class="section-title">📝 Quick Notes</h3>
-            <textarea class="quick-notes-input" placeholder="Jot down something..." rows="3"></textarea>
-          </div>
-
-        </div>
-      </section>
-
-      <!-- ═══════════ DASHBOARD SCREEN ═══════════ -->
-      <section id="screen-dashboard" class="screen">
-        
-        <!-- North Star Card (Permanent) -->
-        <div class="north-star-card">
-          <div class="north-star-label">North Star</div>
-          <div class="north-star-phase">Current Phase: #variable</div>
-          <div class="north-star-direction" id="north-star-direction">
-            Long-Term Direction: #variable
-          </div>
-          <div class="north-star-edit" onclick="editNorthStar()">✏️ Edit direction</div>
-        </div>
-
-        <!-- Context Layers Switcher -->
-        <div class="context-layers">
-          <button class="context-layer-btn active" data-layer="study">📚 Study</button>
-          <button class="context-layer-btn" data-layer="life">🌱 Life</button>
-          <button class="context-layer-btn" data-layer="projects">🔨 Projects</button>
-          <button class="context-layer-btn" data-layer="explore">🧭 Explore</button>
-        </div>
-
-        <!-- Low Energy Protocol Banner -->
-        <div class="low-energy-banner" id="low-energy-banner">
-          <div class="low-energy-content">
-            <span class="low-energy-icon">🪫</span>
-            <div class="low-energy-text">
-              Sensing low energy. I've reduced notifications and simplified your view. Consider a lighter day.
-            </div>
-            <span class="low-energy-action" onclick="dismissLowEnergy()">Dismiss</span>
+    <!-- ═══════════════════════ DASHBOARD ═══════════════════════ -->
+    <section id="screen-dashboard" class="screen" aria-label="Dashboard">
+      <div class="screen-scroll">
+        <div class="screen-hero screen-hero--compact">
+          <h1 id="dashboard-greeting" class="hero-heading">Dashboard</h1>
+          <p class="hero-sub">Control center for your day.</p>
+          <div class="hero-time-block">
+            <div id="dashboard-time" class="hero-clock hero-clock--sm">00:00</div>
+            <div id="dashboard-date" class="hero-date">Monday, 29 Jun 2026</div>
           </div>
         </div>
 
-        <div class="dash-greeting">
-          <h1 id="greeting-text">Welcome back!</h1>
-          <p class="dash-greeting-sub" id="date-text">Tuesday, June 23</p>
-          
-          <!-- LIVE CLOCK: Mumbai/IST Timezone -->
-          <div class="dash-clock" id="dash-clock">
-            --:--:--
-            <span class="timezone">IST • Mumbai</span>
-          </div>
-          
-          <div class="energy-selector">
-            <button class="energy-btn active" data-energy="high">⚡ High Energy</button>
-            <button class="energy-btn" data-energy="medium">🔋 Medium</button>
-            <button class="energy-btn" data-energy="low">🪫 Low</button>
-          </div>
+        <!-- Quick Navigate -->
+        <div class="quick-nav-grid">
+          <button class="nav-item quick-nav-tile" data-screen-target="screen-calendar">
+            <span class="qnt-icon">📅</span>
+            <span class="qnt-label">Calendar</span>
+          </button>
+          <button class="nav-item quick-nav-tile" data-screen-target="screen-schedule">
+            <span class="qnt-icon">📋</span>
+            <span class="qnt-label">Schedule</span>
+          </button>
+          <button class="nav-item quick-nav-tile" data-screen-target="screen-memory">
+            <span class="qnt-icon">🧠</span>
+            <span class="qnt-label">Memory</span>
+          </button>
+          <button class="nav-item quick-nav-tile" data-screen-target="screen-reflection">
+            <span class="qnt-icon">📝</span>
+            <span class="qnt-label">Journal</span>
+          </button>
         </div>
 
-        <!-- Countdown Cards Section -->
-        <div class="countdown-section" style="margin-bottom:24px;">
-          <div class="countdown-card">
-            <div class="countdown-header">
-              <span class="countdown-label">Upcoming</span>
-              <span class="countdown-icon">🎓</span>
+        <!-- Progress Ring Hero -->
+        <div class="glass-card progress-card" data-3d>
+          <div class="progress-layout">
+            <div class="ring-container">
+              <svg width="130" height="130" viewBox="0 0 130 130">
+                <defs>
+                  <linearGradient id="progress-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#30D158"/>
+                    <stop offset="100%" stop-color="#007AFF"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="65" cy="65" r="55" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="9"/>
+                <circle id="today-progress-ring" cx="65" cy="65" r="55" fill="none"
+                  stroke="url(#progress-gradient)" stroke-width="9" stroke-linecap="round"
+                  stroke-dasharray="345.58" stroke-dashoffset="345.58"
+                  transform="rotate(-90 65 65)"/>
+              </svg>
+              <div class="ring-center-text">
+                <div id="progress-ring-percentage" class="ring-pct">0%</div>
+              </div>
             </div>
-            <div class="countdown-title"> #variable </div>
-            <div class="countdown-bar">
-              <div class="countdown-bar-fill" style="width: 65%"></div>
-            </div>
-            <div class="countdown-meta">
-              <span class="countdown-days"> #variable </span>
-              <span class="countdown-date"> #variable </span>
-            </div>
-          </div>
-          
-          <div class="countdown-card">
-            <div class="countdown-header">
-              <span class="countdown-label">Deadline</span>
-              <span class="countdown-icon">📋</span>
-            </div>
-            <div class="countdown-title"> #variable </div>
-            <div class="countdown-bar">
-              <div class="countdown-bar-fill" style="width: 45%"></div>
-            </div>
-            <div class="countdown-meta">
-              <span class="countdown-days"> #variable </span>
-              <span class="countdown-date"> #variable </span>
+            <div class="progress-info">
+              <div class="pinfo-big" id="progress-stat-completed">0 / 0</div>
+              <div class="pinfo-label">Tasks done</div>
+              <div id="dashboard-progress-text" class="pinfo-sub">No sessions logged</div>
+              <button id="dashboard-progress-set-btn" class="ios-chip-sm" type="button">Open tracker →</button>
             </div>
           </div>
         </div>
 
         <!-- Dashboard Grid -->
-        <div class="grid grid-dashboard">
-          
-          <!-- Focus Card -->
-          <div class="card hideable">
-            <div class="card-header">
-              <span class="card-title">🎯 Today's Focus</span>
-              <span class="card-action" onclick="navigate('schedule')">View all</span>
+        <div class="dash-two-col">
+
+          <div class="glass-card" data-3d>
+            <div class="card-row">
+              <div class="card-label-group"><span class="card-icon">🗓</span><span class="card-title">Upcoming</span></div>
+              <button id="dashboard-upcoming-add-btn" class="fab-add" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
             </div>
-            <div class="focus-selector">
-              <button class="focus-btn active" data-focus="study">📚 Study</button>
-              <button class="focus-btn" data-focus="deep">🧘 Deep Work</button>
-              <button class="focus-btn" data-focus="explorer">🧭 Explorer</button>
-              <button class="focus-btn" data-focus="relax">☕ Relax</button>
-            </div>
+            <ul id="dashboard-upcoming-list" class="compact-event-list" role="list"></ul>
           </div>
 
-          <!-- Tasks Card -->
-          <div class="card hideable">
-            <div class="card-header">
-              <span class="card-title">✅ Tasks</span>
-              <span class="card-action">+ Add</span>
+          <div class="glass-card" data-3d>
+            <div class="card-row">
+              <div class="card-label-group"><span class="card-icon">⚠️</span><span class="card-title">Deadlines</span></div>
+              <button id="dashboard-deadlines-add-btn" class="fab-add" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
             </div>
-            <div id="dash-tasks">
-              <div class="task-item">
-                <div class="task-check" onclick="toggleTask(this)"></div>
-                <span class="task-priority priority-high"></span>
-                <span class="task-text"> #variable </span>
-              </div>
-              <div class="task-item">
-                <div class="task-check" onclick="toggleTask(this)"></div>
-                <span class="task-priority priority-med"></span>
-                <span class="task-text"> #variable  </span>
-              </div>
-              <div class="task-item">
-                <div class="task-check done" onclick="toggleTask(this)"></div>
-                <span class="task-priority priority-low"></span>
-                <span class="task-text done"> #variable </span>
-              </div>
-              <div class="task-item">
-                <div class="task-check" onclick="toggleTask(this)"></div>
-                <span class="task-priority priority-med"></span>
-                <span class="task-text"> #variable </span>
-              </div>
-            </div>
+            <ul id="dashboard-deadlines-list" class="compact-event-list" role="list"></ul>
           </div>
 
-          <!-- Reminders Card -->
-          <div class="card hideable">
-            <div class="card-header">
-              <span class="card-title">⏰ Reminders</span>
+          <div class="glass-card" data-3d>
+            <div class="card-row">
+              <div class="card-label-group"><span class="card-icon">🔔</span><span class="card-title">Reminders</span></div>
+              <button id="dashboard-reminders-add-btn" class="fab-add" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
             </div>
-            <div class="task-item">
-              <span class="task-priority priority-high"></span>
-              <span class="task-text"> #change </span>
-            </div>
-            <div class="task-item">
-              <span class="task-priority priority-med"></span>
-              <span class="task-text"> #change </span>
-            </div>
-            <div class="task-item">
-              <span class="task-priority priority-low"></span>
-              <span class="task-text"> #change </span>
-            </div>
+            <ul id="dashboard-reminders-list" class="task-list" role="list"></ul>
           </div>
 
-          <!-- Progress Card -->
-          <div class="card hideable">
-            <div class="card-header">
-              <span class="card-title">📈 Progress</span>
+          <div class="glass-card" data-3d>
+            <div class="card-row">
+              <div class="card-label-group"><span class="card-icon">🎯</span><span class="card-title">Today's Focus</span></div>
+              <button id="dashboard-focus-add-btn" class="fab-add" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
             </div>
-            <div style="display:flex;flex-direction:column;gap:14px;">
-              <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:#variable;">
-                  <span class="text-sm">Tasks completed</span>
-                  <span class="text-xs text-muted"> #variable </span>
-                </div>
-                <div class="progress-bar">
-                  <div class="progress-fill" style="width:60%"></div>
-                </div>
-              </div>
-              <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:#variable;">
-                  <span class="text-sm">Focus time</span>
-                  <span class="text-xs text-muted"> #variable </span>
-                </div>
-                <div class="progress-bar">
-                  <div class="progress-fill" style="width:62%"></div>
-                </div>
-              </div>
-              <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:#variable;">
-                  <span class="text-sm">Reflections</span>
-                  <span class="text-xs text-muted"> #variable </span>
-                </div>
-                <div class="progress-bar">
-                  <div class="progress-fill" style="width:100%"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Weekly Chart Card -->
-          <div class="card hideable">
-            <div class="card-header">
-              <span class="card-title">📊 This Week</span>
-            </div>
-            <div style="display:flex;align-items:flex-end;gap:8px;height:72px;">
-              <div style="flex:1;background:linear-gradient(180deg, #0a84ff, rgba(10,132,255,0.3));border-radius:4px 4px 0 0;height:0%"></div>
-              <div style="flex:1;background:linear-gradient(180deg, #30d158, rgba(48,209,88,0.3));border-radius:4px 4px 0 0;height:0%"></div>
-              <div style="flex:1;background:linear-gradient(180deg, #ff9500, rgba(255,149,0,0.3));border-radius:4px 4px 0 0;height:0%"></div>
-              <div style="flex:1;background:linear-gradient(180deg, #ff2d55, rgba(255,45,85,0.3));border-radius:4px 4px 0 0;height:0%"></div>
-              <div style="flex:1;background:linear-gradient(180deg, #af52de, rgba(175,82,222,0.3));border-radius:4px 4px 0 0;height:0%"></div>
-              <div style="flex:1;background:var(--bg-tertiary);border-radius:4px 4px 0 0;height:0%"></div>
-              <div style="flex:1;background:var(--bg-tertiary);border-radius:4px 4px 0 0;height:0%"></div>
-#have to change according to the data, backend
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-top:8px;">
-              <span class="text-xs text-dim">Mon</span>
-              <span class="text-xs text-dim">Sun</span>
-            </div>
-          </div>
-
-          <!-- Reflection Card -->
-          <div class="card hideable">
-            <div class="card-header">
-              <span class="card-title">💭 Reflection</span>
-              <span class="card-action" onclick="navigate('reflection')">Open</span>
-            </div>
-            <p class="text-sm text-muted" style="line-height:1.6;font-style:italic;font-family:var(--font-serif);">
-              " #automated reflection text "
-            </p>
-            <div style="margin-top:12px;">
-              <span class="tag tag-accent">🔥 Journaling streak: #variable</span>
-            </div>
+            <ul id="dashboard-focus-list" class="task-list" role="list"></ul>
           </div>
 
         </div>
-      </section>
 
-      <!-- ═══════════ CHAT SCREEN ═══════════ -->
-<section id="screen-chat" class="screen" style="padding:0;">
-  <div class="chat-container">
-    <!-- Chat History Sidebar -->
-    <div class="chat-history-panel" id="chat-history-panel" style="display:none;">
-      <div class="chat-history-header">
-        <h3>💬 Chat History</h3>
-        <button class="btn-icon btn-ghost" onclick="toggleChatHistory()">✕</button>
+        <div class="bottom-spacer"></div>
       </div>
-      <button class="btn btn-primary" style="width:100%;margin-bottom:12px;" onclick="startNewChat()">
-        ✨ New Chat
-      </button>
-      <div class="chat-history-list">
-        <div class="chat-history-item chat-history-empty">
-          <div class="chat-history-title">No saved conversations yet.</div>
-          <div class="chat-history-meta">Pin important chats here when you’re ready.</div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Thinking Status Indicator -->
-    <div class="chat-thinking-status" id="chat-thinking-status" style="display:none;">
-      <div class="thinking-dots">
-        <span></span><span></span><span></span>
-      </div>
-      <span class="thinking-text">NYVRON is organizing this for you…</span>
-    </div>
-    
-    <!-- Chat Mode Switcher -->
-    <div class="chat-mode-switcher" style="padding:10px 20px;">
-      <button class="chat-mode-btn active" data-mode="normal">💬 Chat</button>
-      <button class="chat-mode-btn" data-mode="observe">👁️ Observe</button>
-    </div>
-    
-    <div class="chat-quick-actions" style="padding:0 20px 10px;">
-      <button class="chat-quick-action" onclick="toggleChatHistory()">📜 History</button>
-      <button class="chat-quick-action">📋 Plan my day</button>
-      <button class="chat-quick-action">🔍 What's pending?</button>
-      <button class="chat-quick-action">💭 Quick reflection</button>
-      <button class="chat-quick-action">📄 Summarize today</button>
-    </div>
-    
-    <div class="chat-messages" id="chat-messages">
-      <!-- Optional initial assistant message -->
-      <div class="chat-msg assistant">
-        <div class="bubble">Namaste, I’m NYVRON. How can I assist you today?</div>
-        <span class="msg-time">Today</span>
-      </div>
-    </div>
-    
-    <div id="chat-messages" class="chat-messages">
-  <!-- messages will be appended here -->
-</div>
-    <div style="padding:0 20px;">
-      <div class="chat-input-area">
-        <button class="chat-voice-btn" id="voice-btn" onclick="toggleVoice()">🎙️</button>
-        <div class="chat-input-wrap">
-          <textarea
-            class="chat-input"
-            id="chat-input"
-            rows="1"
-            placeholder="Message NYVRON..."
-          ></textarea>
-        </div>
-        <button class="chat-send-btn" id="chat-send-btn">→</button>
-      </div>
-    </div>
-</div>
-  </div>
-</section>
+    </section>
 
-      <!-- ═══════════ SCHEDULE SCREEN ═══════════ -->
-      <section id="screen-schedule" class="screen">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-          <h2 class="serif text-lg">📅 Schedule</h2>
-          <div class="schedule-views">
-            <button class="schedule-view-btn active" data-view="day">Today</button>
-            <button class="schedule-view-btn" data-view="week">Week</button>
-            <button class="schedule-view-btn" data-view="month">Month</button>
+    <!-- ═══════════════════════ CHAT ═══════════════════════ -->
+    <section id="screen-chat" class="screen screen--chat" aria-label="NYVRON Chat">
+      <div class="chat-layout">
+        <div class="chat-topbar">
+          <div class="chat-ai-identity">
+            <div class="chat-ai-avatar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm0 13c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08A7.15 7.15 0 0 1 12 18z"/></svg>
+            </div>
+            <div>
+              <div class="chat-ai-name">NYVRON AI</div>
+              <div id="chat-backend-status" class="chat-ai-status">Connected · Context loaded</div>
+            </div>
+          </div>
+          <div class="chat-header-actions">
+            <select id="chat-model-select" class="glass-select-sm" aria-label="Select AI Model">
+              <option value="auto">Auto-Detect</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+              <option value="gpt-4o-mini">GPT-4o Mini</option>
+              <option value="llama-3">Llama 3 (HF)</option>
+              <option value="groq-llama-3">Llama 3.1 (Groq - Free)</option>
+            </select>
+            <button id="chat-new-btn" class="ios-chip-sm" type="button">New Chat</button>
+            <button id="chat-history-btn" class="ios-chip-sm" type="button">History</button>
           </div>
         </div>
-        
-        <!-- Countdown for Schedule -->
-        <div class="countdown-card" style="margin-bottom:24px;">
-          <div class="countdown-header">
-            <span class="countdown-label">Next Event</span>
-            <span class="countdown-icon">🎯</span>
-          </div>
-          <div class="countdown-title"> #variable </div>
-          <div class="countdown-bar">
-            <div class="countdown-bar-fill" style="width: #variable %"></div>
-          </div>
-          <div class="countdown-meta">
-            <span class="countdown-days"> #variable </span>
-            <span class="countdown-date"> #variable </span>
-          </div>
-        </div>
-        
-        <div class="timeline" id="timeline">
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events"></div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events">
-              <div class="timeline-event" draggable="true">
-                <div class="event-title">🚶 #variable</div>
-                <div class="event-time"> #variable </div>
-              </div>
-            </div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events">
-              <div class="timeline-event focus-block" draggable="true">
-                <div class="event-title"> #variable </div>
-                <div class="event-time"> #variable </div>
-              </div>
-            </div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events"></div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events">
-              <div class="timeline-event" draggable="true">
-                <div class="event-title"> #variable </div>
-                <div class="event-time"> #variable </div>
-              </div>
-            </div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events"></div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events">
-              <div class="timeline-event" draggable="true">
-                <div class="event-title"> #variable </div>
-                <div class="event-time"> #variable </div>
-              </div>
-            </div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events">
-              <div class="timeline-event focus-block" draggable="true">
-                <div class="event-title"> #variable </div>
-                <div class="event-time"> #variable </div>
-              </div>
-            </div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events">
-              <div class="timeline-event" draggable="true">
-                <div class="event-title"> #variable </div>
-                <div class="event-time"> #variable </div>
-              </div>
-            </div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events"></div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events"></div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events"></div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events">
-              <div class="timeline-event focus-block" draggable="true">
-                <div class="event-title"> #variable </div>
-                <div class="event-time"> #variable </div>
-              </div>
-            </div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events"></div>
-          </div>
-          <div class="timeline-hour">
-            <span class="timeline-time"> #variable </span>
-            <div class="timeline-events">
-              <div class="timeline-event" draggable="true">
-                <div class="event-title"> #variable </div>
-                <div class="event-time"> #variable </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- ═══════════ MEMORY SCREEN ═══════════ -->
-      <section id="screen-memory" class="screen">
-        <h2 class="serif text-lg" style="margin-bottom:18px;">🧠 Memory</h2>
-        
-        <div class="memory-tabs">
-          <button class="memory-tab active" data-tab="temp">📝 Temporary</button>
-          <button class="memory-tab" data-tab="long">💾 Long-term</button>
-          <button class="memory-tab" data-tab="archived">📦 Archived</button>
-          <button class="memory-tab" data-tab="explorer">🧭 Explorer</button>
+        <div id="chat-messages" class="chat-messages-feed" role="log" aria-live="polite" aria-label="Chat messages"></div>
+
+        <div id="chat-thinking-status" class="chat-typing hidden" aria-live="polite">
+          <div class="typing-indicator"><span></span><span></span><span></span></div>
+          <span>NYVRON is thinking...</span>
         </div>
-        
-        <!-- Explorer Mode Panel -->
-        <div class="explorer-panel" id="explorer-panel" style="display:none;">
-          <div class="explorer-header">
-            <h3>🧭 Explorer Mode</h3>
-            <p class="text-sm text-muted">Collect ideas, links, and observations to convert later</p>
-          </div>
-          
-          <div class="explorer-categories">
-            <div class="explorer-category">
-              <div class="category-header">💡 Ideas</div>
-              <div class="category-content">
-                <div class="explorer-item">
-                  <div class="explorer-item-text">Build a personal knowledge graph</div>
-                  <div class="explorer-item-meta">Today · Idea</div>
-                </div>
-                <div class="explorer-item">
-                  <div class="explorer-item-text">Explore WebAssembly for performance-critical apps</div>
-                  <div class="explorer-item-meta">Yesterday · Idea</div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="explorer-category">
-              <div class="category-header">🔗 Links</div>
-              <div class="category-content">
-                <div class="explorer-item">
-                  <div class="explorer-item-text">The Cult of Done Manifesto</div>
-                  <div class="explorer-item-meta">2 days ago · Link</div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="explorer-category">
-              <div class="category-header">👁️ Observations</div>
-              <div class="category-content">
-                <div class="explorer-item">
-                  <div class="explorer-item-text">Noticed I'm most productive between 10 AM - 12 PM</div>
-                  <div class="explorer-item-meta">Today · Observation</div>
-                </div>
-                <div class="explorer-item">
-                  <div class="explorer-item-text">Email checking breaks flow — batch it</div>
-                  <div class="explorer-item-meta">Yesterday · Observation</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <button class="btn btn-primary" style="width:100%;margin-top:16px;" onclick="addExplorerItem()">
-            ✨ Add to Explorer
+
+        <div class="quick-prompt-strip">
+          <button class="prompt-pill" data-quick-prompt="Help me plan the next 2 hours.">Plan 2 hrs</button>
+          <button class="prompt-pill" data-quick-prompt="Summarise today's schedule & priorities.">Today summary</button>
+          <button class="prompt-pill" data-quick-prompt="Ask me 3 reflection questions about my day.">Reflect</button>
+          <button class="prompt-pill" data-quick-prompt="What should I focus on right now based on my priorities?">What to focus?</button>
+        </div>
+
+        <div class="chat-input-zone">
+          <textarea id="chat-input" class="chat-textarea" rows="1" placeholder="Ask NYVRON anything about your day..." aria-label="Chat message input"></textarea>
+          <button id="chat-send-btn" class="send-btn" type="button" aria-label="Send message">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>
-        
-        <div class="memory-search">
-          <input type="text" class="input" placeholder="🔍 Search memories..." id="memory-search-input">
-        </div>
-        
-        <div id="memory-list">
-          <div class="memory-item">
-            <div class="mem-text"> #variable </div>
-            <div class="mem-meta">
-              <span class="tag tag-accent"> #variable </span>
-              <span> #variable </span>
-              <div class="mem-actions">
-                <button class="mem-action-btn"> #variable </button>
-                <button class="mem-action-btn"> #variable </button>
-                <button class="mem-action-btn" style="color:var(--danger)"> #variable </button>
-              </div>
-            </div>
-          </div>
-          <div class="memory-item">
-            <div class="mem-text"> #variable </div>
-            <div class="mem-meta">
-              <span class="tag tag-warning"> #variable </span>
-              <span> #variable </span>
-              <div class="mem-actions">
-                <button class="mem-action-btn"> #variable </button>
-                <button class="mem-action-btn"> #variable </button>
-                <button class="mem-action-btn" style="color:var(--danger)"> #variable </button>
-              </div>
-            </div>
-          </div>
-          <div class="memory-item">
-            <div class="mem-text"> #variable </div>
-            <div class="mem-meta">
-              <span class="tag tag-info"> #variable </span>
-              <span> #variable  </span>
-              <div class="mem-actions">
-                <button class="mem-action-btn"> #variable </button>
-                <button class="mem-action-btn"> #variable </button>
-                <button class="mem-action-btn" style="color:var(--danger)"> #variable </button>
-              </div>
-            </div>
-          </div>
-          <div class="memory-item">
-            <div class="mem-text"> #variable </div>
-            <div class="mem-meta">
-              <span class="tag tag-danger"> #variable </span>
-              <span> #variable </span>
-              <div class="mem-actions">
-                <button class="mem-action-btn"> #variable </button>
-                <button class="mem-action-btn"> #variable </button>
-                <button class="mem-action-btn" style="color:var(--danger)"> #variable </button>
-              </div>
-            </div>
-          </div>
-          <div class="memory-item">
-            <div class="mem-text"> #variable </div>
-            <div class="mem-meta">
-              <span class="tag tag-info"> #variable </span>
-              <span> #variable </span>
-              <div class="mem-actions">
-                <button class="mem-action-btn"> #variable </button>
-                <button class="mem-action-btn"> #variable </button>
-                <button class="mem-action-btn" style="color:var(--danger)"> #variable </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- ═══════════ REPORTS SCREEN ═══════════ -->
-      <section id="screen-reports" class="screen">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-          <h2 class="serif text-lg">📊 Reports</h2>
-          <button class="btn btn-outline" onclick="exportReport()">📥 Export TXT</button>
-        </div>
-        
-        <div class="report-period">
-          <button class="report-period-btn active">7 Days</button>
-          <button class="report-period-btn">30 Days</button>
-          <button class="report-period-btn">Monthly</button>
-        </div>
-        
-        <div class="grid grid-3" style="margin-bottom:24px;">
-          <div class="card">
-            <div class="stat-number"> #variable </div>
-            <div class="stat-label">Tasks Completed</div>
-            <div class="stat-change text-accent">↑  #variable  vs last week</div>
+        <!-- Chat side panel (history + observe) — shown in wider layouts -->
+        <div class="chat-side-panel hidden" id="chat-side-panel">
+          <!-- New Chat Action Card -->
+          <div class="glass-card" style="padding: 14px;">
+            <button id="sidebar-chat-new-btn" class="ios-action-btn full-width" type="button" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>+</span> New Chat
+            </button>
           </div>
-          <div class="card">
-            <div class="stat-number"> #variable </div>
-            <div class="stat-label">Focus Time</div>
-            <div class="stat-change text-accent">↑  #variable  vs last week</div>
-          </div>
-          <div class="card">
-            <div class="stat-number"> #variable </div>
-            <div class="stat-label">Reflections</div>
-            <div class="stat-change text-muted">→  #variable  vs last week</div>
-          </div>
-        </div>
-        
-        <div class="report-block">
-          <h3>📈 Daily Activity</h3>
-          <div class="report-bar-chart">
-            <div class="report-bar" style="height: #variable ;background:linear-gradient(180deg, #0a84ff, rgba(10,132,255,0.2))"><span class="bar-label">Mon</span></div>
-            <div class="report-bar" style="height: #variable ;background:linear-gradient(180deg, #30d158, rgba(48,209,88,0.2))"><span class="bar-label">Tue</span></div>
-            <div class="report-bar" style="height: #variable ;background:linear-gradient(180deg, #ff9500, rgba(255,149,0,0.2))"><span class="bar-label">Wed</span></div>
-            <div class="report-bar" style="height: #variable ;background:linear-gradient(180deg, #ff2d55, rgba(255,45,85,0.2))"><span class="bar-label">Thu</span></div>
-            <div class="report-bar" style="height: #variable ;background:linear-gradient(180deg, #af52de, rgba(175,82,222,0.2))"><span class="bar-label">Fri</span></div>
-            <div class="report-bar" style="height: #variable ;background:linear-gradient(180deg, #64d2ff, rgba(100,210,255,0.2))"><span class="bar-label">Sat</span></div>
-            <div class="report-bar" style="height: #variable %;background:linear-gradient(180deg, #ffd60a, rgba(255,214,10,0.2))"><span class="bar-label">Sun</span></div>
-          </div>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="report-block">
-          <h3>⚡ Energy Distribution</h3>
-          <div style="display:flex;gap:16px;margin-top:10px;">
-            <div><span class="tag tag-success">High:  #variable </span></div>
-            <div><span class="tag tag-warning">Medium:  #variable </span></div>
-            <div><span class="tag tag-danger">Low:  #variable </span></div>
-          </div>
-        </div>
-        
-        <div class="report-block">
-          <h3>🎯 Top Focus Modes</h3>
-          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-            <span class="tag tag-info">🧘 Deep Work —  #variable  </span>
-            <span class="tag tag-accent">📚 Study —  #variable </span>
-            <span class="tag tag-success">🧭 Explorer —  #variable </span>
-            <span class="tag tag-warning">☕ Relax —  #variable </span>
-          </div>
-        </div>
-      </section>
 
-      <!-- ═══════════ REFLECTION SCREEN ═══════════ -->
-      <section id="screen-reflection" class="screen">
-        <h2 class="serif text-lg" style="margin-bottom:6px;">📝 Reflection Journal</h2>
-        <p class="text-sm text-muted" style="margin-bottom:24px;">Daily logs & weekly reflection</p>
-        
-        <div class="card" style="margin-bottom:24px;">
-          <p class="reflection-prompt">"What is one thing you learned today?"</p>
-          <textarea class="input textarea" placeholder="Write your reflection..." id="reflection-input"></textarea>
-          <div style="display:flex;justify-content:flex-end;margin-top:12px;gap:8px;">
-            <button class="btn btn-ghost">💾 Save Draft</button>
-            <button class="btn btn-primary" onclick="saveReflection()">✨ Save Entry</button>
+          <!-- Recent Chats Card -->
+          <div class="glass-card">
+            <div class="card-row"><span class="card-icon">💬</span><span class="card-title">Recent Chats</span></div>
+            <ul id="chat-history-list" class="history-list" role="list"></ul>
           </div>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <h3 class="text-sm text-muted" style="margin-bottom:14px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Past Entries</h3>
-        
-        <div id="reflection-entries">
-          <div class="reflection-entry">
-            <div class="ref-date"> #variable </div>
-            <div class="ref-text"> #variable </div>
-          </div>
-          <div class="reflection-entry">
-            <div class="ref-date"> #variable </div>
-            <div class="ref-text"> #variable </div>
-          </div>
-          <div class="reflection-entry">
-            <div class="ref-date"> #variable </div>
-            <div class="ref-text"> #variable </div>
-          </div>
-          <div class="reflection-entry">
-            <div class="ref-date"> #variable </div>
-            <div class="ref-text"> #variable </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- ═══════════ PROFILE SCREEN ═══════════ -->
-      <section id="screen-profile" class="screen">
-        <div class="profile-header">
-          <div class="profile-avatar">U</div>
-          <div class="profile-info">
-            <h2>OMKAR DEEPA ANIL PATIL BHOPLE</h2>
-            <p>Member since June 2026</p>
+          <!-- Observe Card -->
+          <div class="glass-card">
+            <div class="card-row"><span class="card-icon">👁</span><span class="card-title">Observe</span></div>
+            <div id="chat-observe-summary" class="observe-text">No sessions yet.</div>
+            <div id="chat-observe-state" class="observe-sub">Dominant mode: none.</div>
           </div>
         </div>
-        
-        <div class="grid grid-2">
-          <div>
-            <div class="profile-section">
-              <h3>Preferences</h3>
-              <div class="card">
-                <div class="profile-stat-row">
-                  <span class="label">Language</span>
-                  <span class="value">Hinglish</span>
-                </div>
-                <div class="profile-stat-row">
-                  <span class="label">Theme</span>
-                  <span class="value" id="profile-theme">  #variable, ACCORDING TO WHICH I SELECT</span>
-                </div>
-                <div class="profile-stat-row">
-                  <span class="label">Focus Mode</span>
-                  <span class="value">  #variable, ACCORDING TO WHICH I SELECT</span>
-                </div>
-                <div class="profile-stat-row">
-                  <span class="label">Ambience</span>
-                  <span class="value">  #variable, ACCORDING TO WHICH I SELECT</span>
-                </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ CALENDAR ═══════════════════════ -->
+    <section id="screen-calendar" class="screen" aria-label="Calendar">
+      <div class="screen-scroll">
+        <div class="screen-hero screen-hero--compact">
+          <h1 class="hero-heading">Calendar</h1>
+          <p class="hero-sub">Events, reminders & deadlines</p>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <span id="calendar-current-label" class="card-title">June 2026</span>
+            <div class="nav-arrow-group">
+              <button id="calendar-prev-btn" class="arrow-btn" type="button" aria-label="Previous month">‹</button>
+              <button id="calendar-next-btn" class="arrow-btn" type="button" aria-label="Next month">›</button>
+            </div>
+          </div>
+          <div class="cal-weekdays">
+            <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+          </div>
+          <div id="calendar-days-grid" class="cal-grid"></div>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group">
+              <span class="card-icon">📍</span>
+              <div>
+                <div class="card-title">Day Details</div>
+                <div id="calendar-selected-date" class="card-sub">Select a date</div>
               </div>
             </div>
-            
-            <div class="profile-section">
-              <h3>Goals</h3>
-              <div class="card">
-                <div class="task-item">
-                  <span class="task-priority priority-high"></span>
-                  <span class="task-text"> #variable </span>
-                </div>
-                <div class="task-item">
-                  <span class="task-priority priority-med"></span>
-                  <span class="task-text"> #variable </span>
-                </div>
-                <div class="task-item">
-                  <span class="task-priority priority-low"></span>
-                  <span class="task-text"> #variable </span>
-                </div>
-              </div>
-            </div>
+            <button id="calendar-new-event-btn" class="fab-add" type="button" aria-label="New event">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
           </div>
-          
-          <div>
-            <div class="profile-section">
-              <h3>Knowledge</h3>
-              <div class="card">
-                <p class="text-sm text-muted">Imported folders appear here. NYVRON reads but never edits originals.</p>
-                <button class="btn btn-outline" style="margin-top:12px;width:100%;justify-content:center;">📁 Import Folder</button> #NOT USABLE UNTIL NOW
-              </div>
-            </div>
-            
-            <div class="profile-section">
-              <h3>Timeline</h3>
-              <div class="card">
-                <div class="profile-stat-row">
-                  <span class="label">Total tasks completed</span>
-                  <span class="value"> #variable </span>
-                </div>
-                <div class="profile-stat-row">
-                  <span class="label">Reflections written</span>
-                  <span class="value"> #variable </span>
-                </div>
-                <div class="profile-stat-row">
-                  <span class="label">Focus hours</span>
-                  <span class="value"> #variable </span>
-                </div>
-                <div class="profile-stat-row">
-                  <span class="label">Memories stored</span>
-                  <span class="value"> #variable </span>
-                </div>
-              </div>
-            </div>
+          <ul id="calendar-events-list" class="event-list-ui" role="list"></ul>
+          <div class="chip-row chip-row--sm">
+            <button class="ios-chip-sm" data-calendar-add-type="meeting">Meeting</button>
+            <button class="ios-chip-sm" data-calendar-add-type="reminder">Reminder</button>
+            <button class="ios-chip-sm" data-calendar-add-type="deadline">Deadline</button>
           </div>
         </div>
-      </section>
 
-      <!-- ═══════════ NOTIFICATIONS SCREEN ═══════════ -->
-      <section id="screen-notifications" class="screen">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-          <h2 class="serif text-lg">🔔 Notifications</h2>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span class="text-sm text-muted">Quiet Mode</span>
-            <div class="toggle" id="quiet-toggle" onclick="this.classList.toggle('on')"></div>
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">📋</span><span class="card-title">All Events</span></div>
           </div>
+          <ul id="calendar-saved-events-list" class="event-list-ui" role="list"></ul>
         </div>
-        
-        <div class="text-sm text-muted" style="margin-bottom:14px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Active</div>
-        
-        <div id="notif-active">
-          <div class="notif-item">
-            <div class="notif-icon reminder">⏰</div>
-            <div class="notif-content">
-              <div class="notif-title"> #variable </div>
-              <div class="notif-desc"> #variable </div>
-              <div class="notif-time"> #variable </div>
-            </div>
-          </div>
-          <div class="notif-item">
-            <div class="notif-icon reminder">⏰</div>
-            <div class="notif-content">
-              <div class="notif-title"> #variable  </div>
-              <div class="notif-desc"> #variable </div>
-              <div class="notif-time"> #variable </div>
-            </div>
-          </div>
-          <div class="notif-item">
-            <div class="notif-icon reminder">⏰</div>
-            <div class="notif-content">
-              <div class="notif-title"> #variable </div>
-              <div class="notif-desc"> #variable </div>
-              <div class="notif-time"> #variable </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="text-sm text-muted" style="margin-bottom:14px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">History</div>
-        
-        <div id="notif-history">
-          <div class="notif-item" style="opacity:0.6;">
-            <div class="notif-icon system">✓</div>
-            <div class="notif-content">
-              <div class="notif-title"> #variable </div>
-              <div class="notif-desc"> #variable </div>
-              <div class="notif-time"> #variable </div>
-            </div>
-          </div>
-          <div class="notif-item" style="opacity:0.6;">
-            <div class="notif-icon reminder">⏰</div>
-            <div class="notif-content">
-              <div class="notif-title"> #variable </div>
-              <div class="notif-desc"> #variable </div>
-              <div class="notif-time"> #variable </div>
-            </div>
-          </div>
-          <div class="notif-item" style="opacity:0.6;">
-            <div class="notif-icon system">💾</div>
-            <div class="notif-content">
-              <div class="notif-title"> #variable </div>
-              <div class="notif-desc"> #variable </div>
-              <div class="notif-time"> #variable </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- ═══════════ SETTINGS SCREEN ═══════════ -->
-      <section id="screen-settings" class="screen">
-        <h2 class="serif text-lg" style="margin-bottom:24px;">⚙️ Settings</h2>
-        
-        <div class="settings-group">
-          <h3>Appearance</h3>
-          <div class="settings-row">
-            <div>
-              <div class="label">Theme</div>
-              <div class="desc">Dark, Light, or Auto</div>
-            </div>
-            <div class="theme-switcher">
-              <button class="theme-btn active" data-theme="dark">🌙 Dark</button>
-              <button class="theme-btn" data-theme="light">☀️ Light</button>
-              <button class="theme-btn" data-theme="auto">🔄 Auto</button>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div>
-              <div class="label">Large Text</div>
-              <div class="desc">Increase font size for readability</div>
-            </div>
-            <div class="toggle" id="large-text-toggle" onclick="toggleLargeText()"></div>
-          </div>
-          <div class="settings-row">
-            <div>
-              <div class="label">Reduced Motion</div>
-              <div class="desc">Minimize animations</div>
-            </div>
-            <div class="toggle" id="reduced-motion-toggle" onclick="toggleReducedMotion()"></div>
-          </div>
+        <div class="bottom-spacer"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ TIME TRACKER ═══════════════════════ -->
+    <section id="screen-time" class="screen" aria-label="Time Tracker">
+      <div class="screen-scroll">
+        <div class="screen-hero screen-hero--compact">
+          <h1 class="hero-heading">Time Tracker</h1>
+          <p class="hero-sub">Log sessions & deep work blocks</p>
         </div>
-        
-        <div class="settings-group">
-          <h3>Voice & Language</h3>
-          <div class="settings-row">
-            <div>
-              <div class="label">Voice Input</div>
-              <div class="desc">Push to talk</div>
-            </div>
-            <div class="toggle on" id="voice-toggle" onclick="this.classList.toggle('on')"></div>
+
+        <div class="glass-card timer-hero-card" data-3d>
+          <div id="timer-display" class="timer-big">00:00:00</div>
+          <div id="timer-mode-selector" class="chip-row chip-row--center">
+            <button class="glass-chip ios-chip active" data-mode="study">📚 Study</button>
+            <button class="glass-chip ios-chip" data-mode="deep-work">🧠 Deep Work</button>
+            <button class="glass-chip ios-chip" data-mode="break">☕ Break</button>
           </div>
-          <div class="settings-row">
-            <div>
-              <div class="label">Language</div>
-              <div class="desc">Primary conversation language</div>
-            </div>
-            <select class="input" style="width:auto;padding:6px 12px;" id="language-select">
-              <option value="hinglish">🇮🇳 Hinglish</option>
-              <option value="marathi">🇮🇳 Marathi</option>
+          <div class="timer-btn-trio">
+            <button id="timer-start-btn" class="timer-btn timer-start" type="button">Start</button>
+            <button id="timer-pause-btn" class="timer-btn timer-pause" type="button">Pause</button>
+            <button id="timer-reset-btn" class="timer-btn timer-reset" type="button">Reset</button>
+          </div>
+          <div class="form-stack">
+            <input id="timer-session-name" class="glass-input" type="text" placeholder="Session name (e.g. Maths problem set)" />
+            <input id="timer-tags-input" class="glass-input" type="text" placeholder="Tags (e.g. exam, morning)" />
+          </div>
+          <button id="timer-save-session-btn" class="ios-action-btn" type="button">Save Session</button>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">📊</span><span class="card-title">Sessions</span></div>
+          </div>
+          <ul id="timer-sessions-list" class="session-list-ui" role="list"></ul>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">📅</span><span class="card-title">Sessions Calendar</span></div>
+          </div>
+          <div id="time-calendar-container" class="time-cal-wrap"></div>
+          <ul id="time-calendar-sessions-list" class="session-list-ui" role="list"></ul>
+        </div>
+
+        <div class="bottom-spacer"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ SCHEDULE ═══════════════════════ -->
+    <section id="screen-schedule" class="screen" aria-label="Schedule">
+      <div class="screen-scroll">
+        <div class="screen-hero screen-hero--compact">
+          <h1 class="hero-heading">Schedule</h1>
+          <p class="hero-sub">Day / week / month blocks</p>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">☀️</span><span class="card-title">Today</span></div>
+            <button id="schedule-new-block-btn" class="fab-add" type="button" aria-label="New schedule block">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <ul id="schedule-day-list" class="schedule-list-ui" role="list"></ul>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">📅</span><span class="card-title">This Week</span></div>
+          </div>
+          <ul id="schedule-week-list" class="schedule-list-ui" role="list"></ul>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">📆</span><span class="card-title">This Month</span></div>
+          </div>
+          <ul id="schedule-month-list" class="schedule-list-ui" role="list"></ul>
+        </div>
+
+        <div class="bottom-spacer"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ MEMORY ═══════════════════════ -->
+    <section id="screen-memory" class="screen" aria-label="Memory">
+      <div class="screen-scroll">
+        <div class="screen-hero screen-hero--compact">
+          <h1 class="hero-heading">Memory</h1>
+          <p class="hero-sub">What NYVRON knows about you</p>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">➕</span><span class="card-title">Add Memory</span></div>
+          </div>
+          <div class="form-stack">
+            <input id="memory-title-input" class="glass-input" type="text" placeholder="Title (optional)" />
+            <textarea id="memory-body-input" class="glass-textarea" rows="3" placeholder="What should NYVRON remember?"></textarea>
+          </div>
+          <button id="memory-save-btn" class="ios-action-btn" type="button">Add Memory</button>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">🧠</span><span class="card-title">Saved Memories</span></div>
+          </div>
+          <ul id="memory-list" class="memory-cards-list" role="list"></ul>
+        </div>
+
+        <div class="bottom-spacer"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ REFLECTION ═══════════════════════ -->
+    <section id="screen-reflection" class="screen" aria-label="Reflection">
+      <div class="screen-scroll">
+        <div class="screen-hero screen-hero--compact">
+          <h1 class="hero-heading">Reflection</h1>
+          <p class="hero-sub">Capture moments, learn from your day</p>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">✍️</span><span class="card-title">New Entry</span></div>
+          </div>
+          <textarea id="reflection-input" class="glass-textarea" rows="4" placeholder="What did you learn today? What went well?"></textarea>
+          <button id="reflection-save-btn" class="ios-action-btn" type="button">Save Reflection</button>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">📖</span><span class="card-title">Journal</span></div>
+          </div>
+          <ul id="reflection-entries-list" class="reflection-list-ui" role="list"></ul>
+        </div>
+
+        <div class="bottom-spacer"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ PROFILE ═══════════════════════ -->
+    <section id="screen-profile" class="screen" aria-label="Profile">
+      <div class="screen-scroll">
+
+        <div class="glass-card profile-hero-card" data-3d>
+          <div id="profile-avatar-circle" class="profile-avatar">N</div>
+          <div id="profile-name" class="profile-username">User</div>
+          <button id="profile-avatar-upload" class="ios-chip-sm" type="button">Change Photo</button>
+        </div>
+
+        <div class="profile-nav-grid">
+          <button class="nav-item profile-nav-tile" data-screen-target="screen-memory">
+            <span class="pnt-icon">🧠</span><span class="pnt-label">Memory</span>
+          </button>
+          <button class="nav-item profile-nav-tile" data-screen-target="screen-reflection">
+            <span class="pnt-icon">📝</span><span class="pnt-label">Journal</span>
+          </button>
+          <button class="nav-item profile-nav-tile" data-screen-target="screen-settings">
+            <span class="pnt-icon">⚙️</span><span class="pnt-label">Settings</span>
+          </button>
+          <button class="nav-item profile-nav-tile" data-screen-target="screen-schedule">
+            <span class="pnt-icon">📋</span><span class="pnt-label">Schedule</span>
+          </button>
+        </div>
+
+        <!-- Knowledge Base -->
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">📄</span><span class="card-title">Knowledge Base</span></div>
+          </div>
+          <label class="file-drop-zone" for="memory-file-input">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            <span id="upload-label-text">Choose a .txt document...</span>
+          </label>
+          <input id="memory-file-input" class="sr-only" type="file" accept=".txt" />
+          <div id="knowledge-status-card" class="kb-status-card hidden">
+            <span id="knowledge-file-name" class="kb-filename">No file</span>
+            <span id="knowledge-file-size" class="kb-badge">0 KB</span>
+            <span id="knowledge-word-count" class="kb-words">0 words</span>
+            <span class="kb-active-badge">● Active</span>
+          </div>
+          <button id="memory-remove-file-btn" class="danger-chip hidden" type="button">Remove file</button>
+        </div>
+
+        <!-- Ambience -->
+        <div class="glass-card" data-3d>
+          <div class="card-row">
+            <div class="card-label-group"><span class="card-icon">🎵</span><span class="card-title">Ambience</span></div>
+          </div>
+          <div class="form-stack">
+            <input id="ambience-url-rain" class="glass-input" type="text" placeholder="Rain audio URL" />
+            <input id="ambience-url-lofi" class="glass-input" type="text" placeholder="Lofi audio URL" />
+          </div>
+          <div class="chip-row">
+            <button id="ambience-rain-btn" class="ios-chip" type="button">🌧 Rain</button>
+            <button id="ambience-lofi-btn" class="ios-chip" type="button">🎵 Lofi</button>
+            <button id="ambience-silent-btn" class="ios-chip" type="button">🔇 Silent</button>
+          </div>
+          <audio id="ambience-audio" controls style="width:100%;margin-top:12px;display:none;border-radius:12px;"></audio>
+        </div>
+
+        <div class="bottom-spacer"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ SETTINGS ═══════════════════════ -->
+    <section id="screen-settings" class="screen" aria-label="Settings">
+      <div class="screen-scroll">
+        <div class="screen-hero screen-hero--compact">
+          <h1 class="hero-heading">Settings</h1>
+          <p class="hero-sub">Customize NYVRON to your needs</p>
+        </div>
+
+        <div class="glass-card" data-3d>
+          <div class="card-row"><div class="card-label-group"><span class="card-icon">🎨</span><span class="card-title">Appearance</span></div></div>
+          <div class="settings-row-item">
+            <label class="settings-row-label" for="settings-theme-select">Theme</label>
+            <select id="settings-theme-select" class="glass-select">
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+              <option value="auto">Auto (System)</option>
             </select>
           </div>
-        </div>
-        
-        <div class="settings-group">
-          <h3>Privacy & Memory</h3>
-          <div class="settings-row">
-            <div>
-              <div class="label">Remember Chats</div>
-              <div class="desc">Store conversation history locally</div>
-            </div>
-            <div class="toggle on" id="remember-toggle" onclick="this.classList.toggle('on')"></div>
+          <div class="settings-row-item">
+            <label class="settings-row-label" for="settings-font-size">Font scale</label>
+            <input id="settings-font-size" class="glass-input settings-num" type="number" step="0.1" min="0.8" max="2.0" />
           </div>
-          <div class="settings-row">
-            <div>
-              <div class="label">Auto-Archive</div>
-              <div class="desc">Archive memories older than 30 days</div>
-            </div>
-            <div class="toggle" id="archive-toggle" onclick="this.classList.toggle('on')"></div>
-          </div>
-          <div class="settings-row">
-            <div>
-              <div class="label">Clear All Memory</div>
-              <div class="desc">Permanently delete all stored memories</div>
-            </div>
-            <button class="btn btn-outline" style="color:var(--danger);border-color:var(--danger);">🗑️ Forget All</button>
-          </div>
-        </div>
-        
-        <div class="settings-group">
-          <h3>Ambience</h3>
-          <div class="settings-row">
-            <div>
-              <div class="label">Background Sound</div>
-              <div class="desc">OFF by default</div>
-            </div>
-            <div class="ambience-controls">
-              <button class="ambience-btn" data-ambience="rain">🌧️ Rain</button>
-              <button class="ambience-btn" data-ambience="forest">🌲 Forest</button>
-              <button class="ambience-btn active" data-ambience="silent">🔇 Silent</button>
-            </div>
-          </div>
-        </div>
-        
-        <div class="settings-group">
-          <h3>Backup</h3>
-          <div class="settings-row">
-            <div>
-              <div class="label">Export Data</div>
-              <div class="desc">One-click export of all local data</div>
-            </div>
-            <button class="btn btn-primary" onclick="exportData()">📥 Export</button>
-          </div>
-          <div class="settings-row">
-            <div>
-              <div class="label">Import Data</div>
-              <div class="desc">Restore from backup file</div>
-            </div>
-            <button class="btn btn-outline">📤 Import</button>
-          </div>
-        </div>
-      </section>
-
-      </section>
-
-      <!-- ═══════════ CALENDAR SCREEN ═══════════ -->
-      <section id="screen-calendar" class="screen">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-          <h2 class="serif text-lg">📅 Calendar</h2>
-          <button class="btn btn-primary" onclick="createCalendarEvent()">✨ New Event</button>
-        </div>
-        
-        <!-- Calendar Views -->
-        <div class="calendar-views">
-          <button class="calendar-view-btn active" data-view="day">Day</button>
-          <button class="calendar-view-btn" data-view="week">Week</button>
-          <button class="calendar-view-btn" data-view="month">Month</button>
-        </div>
-
-        <!-- Calendar Grid -->
-        <div class="calendar-container">
-          <div class="calendar-header">
-            <button class="btn-icon btn-ghost" onclick="prevCalendarPeriod()">←</button>
-            <div class="calendar-title" id="calendar-title">June 2026</div>
-            <button class="btn-icon btn-ghost" onclick="nextCalendarPeriod()">→</button>
-          </div>
-          
-          <!-- Month View -->
-          <div class="calendar-month-grid" id="calendar-month-grid">
-            <div class="calendar-day-header">Sun</div>
-            <div class="calendar-day-header">Mon</div>
-            <div class="calendar-day-header">Tue</div>
-            <div class="calendar-day-header">Wed</div>
-            <div class="calendar-day-header">Thu</div>
-            <div class="calendar-day-header">Fri</div>
-            <div class="calendar-day-header">Sat</div>
-            <!-- Days will be populated by JavaScript -->
+          <div class="settings-row-item">
+            <label class="settings-row-label" for="settings-logo-input">Custom logo</label>
+            <input id="settings-logo-input" class="glass-input" type="file" accept="image/*" />
           </div>
         </div>
 
-        <!-- Events List -->
-        <div class="calendar-events-section">
-          <h3 class="text-sm text-muted" style="margin-bottom:12px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Events</h3>
-          <div class="calendar-events-list" id="calendar-events-list">
-            <div class="calendar-event-item" draggable="true">
-              <div class="event-color" style="background:#0a84ff"></div>
-              <div class="event-content">
-                <div class="event-title"> #variable </div>
-                <div class="event-meta"> #variable </div>
-              </div>
-              <div class="event-actions">
-                <button class="btn-icon btn-ghost" onclick="editCalendarEvent(this)">✏️</button>
-                <button class="btn-icon btn-ghost" onclick="deleteCalendarEvent(this)">🗑️</button>
-              </div>
-            </div>
-            <div class="calendar-event-item" draggable="true">
-              <div class="event-color" style="background:#30d158"></div>
-              <div class="event-content">
-                <div class="event-title"> #variable </div>
-                <div class="event-meta"> #variable </div>
-              </div>
-              <div class="event-actions">
-                <button class="btn-icon btn-ghost" onclick="editCalendarEvent(this)">✏️</button>
-                <button class="btn-icon btn-ghost" onclick="deleteCalendarEvent(this)">🗑️</button>
-              </div>
-            </div>
+        <div class="glass-card" data-3d>
+          <div class="card-row"><div class="card-label-group"><span class="card-icon">💾</span><span class="card-title">Data & Privacy</span></div></div>
+          <div class="toggle-row">
+            <span class="settings-row-label">Remember chats</span>
+            <label class="ios-toggle-wrap">
+              <input id="settings-remember-chats" type="checkbox" />
+              <span class="ios-toggle-track"><span class="ios-toggle-thumb"></span></span>
+            </label>
           </div>
-        </div>
-      </section>
-
-      <!-- ═══════════ TIME TRACKING SCREEN ═══════════ -->
-      <section id="screen-time-tracking" class="screen">
-        <h2 class="serif text-lg" style="margin-bottom:20px;">⏱️ Time Tracker</h2>
-        
-        <!-- Timer Display -->
-        <div class="timer-container">
-          <div class="timer-display" id="timer-display">00:00:00</div>
-          <div class="timer-mode" id="timer-mode">Deep Work</div>
-          
-          <!-- Timer Controls -->
-          <div class="timer-controls">
-            <button class="btn btn-primary" id="timer-start-btn" onclick="startTimer()">▶️ Start</button>
-            <button class="btn btn-outline" id="timer-pause-btn" onclick="pauseTimer()" style="display:none;">⏸️ Pause</button>
-            <button class="btn btn-outline" id="timer-resume-btn" onclick="resumeTimer()" style="display:none;">▶️ Resume</button>
-            <button class="btn btn-outline" id="timer-stop-btn" onclick="stopTimer()" style="display:none;">⏹️ Stop</button>
+          <div class="toggle-row">
+            <span class="settings-row-label">Store history</span>
+            <label class="ios-toggle-wrap">
+              <input id="settings-store-history" type="checkbox" />
+              <span class="ios-toggle-track"><span class="ios-toggle-thumb"></span></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <span class="settings-row-label">Auto-archive sessions</span>
+            <label class="ios-toggle-wrap">
+              <input id="settings-auto-archive" type="checkbox" />
+              <span class="ios-toggle-track"><span class="ios-toggle-thumb"></span></span>
+            </label>
+          </div>
+          <div class="danger-stack">
+            <button id="settings-clear-memory-btn" class="danger-chip" type="button">Clear NYVRON Memory</button>
+            <button id="settings-forget-all-btn" class="danger-chip" type="button">Forget Everything</button>
           </div>
         </div>
 
-        <!-- Mode Selector -->
-        <div class="timer-mode-selector">
-          <h3 class="text-sm text-muted" style="margin-bottom:10px;">Mode</h3>
-          <div class="mode-chips">
-            <button class="mode-chip active" data-mode="study">📚 Study</button>
-            <button class="mode-chip" data-mode="work">💼 Work</button>
-            <button class="mode-chip" data-mode="explore">🧭 Explore</button>
-            <button class="mode-chip" data-mode="life">🌱 Life</button>
-            <button class="mode-chip" data-mode="deep">🧘 Deep Work</button>
-            <button class="mode-chip" data-mode="relax">☕ Relax</button>
-          </div>
-        </div>
+        <div class="bottom-spacer"></div>
+      </div>
+    </section>
 
-        <!-- Tags -->
-        <div class="timer-tags">
-          <h3 class="text-sm text-muted" style="margin-bottom:10px;">Priority</h3>
-          <div class="tag-chips">
-            <button class="tag-chip active" data-priority="high">🔴 High</button>
-            <button class="tag-chip" data-priority="medium">🟡 Medium</button>
-            <button class="tag-chip" data-priority="low">🟢 Low</button>
-          </div>
-          
-          <h3 class="text-sm text-muted" style="margin:14px 0 10px;">Optional Tags</h3>
-          <div class="tag-chips">
-            <button class="tag-chip" data-tag="study">Study</button>
-            <button class="tag-chip" data-tag="exam">Exam</button>
-            <button class="tag-chip" data-tag="personal">Personal</button>
-            <button class="tag-chip" data-tag="project">Project</button>
-            <button class="tag-chip" data-tag="health">Health</button>
-            <button class="tag-chip" data-tag="explore">Explore</button>
-          </div>
-        </div>
+  </main><!-- end screens-wrapper -->
 
-        <!-- Today's Sessions -->
-        <div class="sessions-section">
-          <h3 class="text-sm text-muted" style="margin-bottom:12px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Today's Sessions</h3>
-          <div class="sessions-list" id="sessions-list">
-            <div class="session-item">
-              <div class="session-mode">📚 Study</div>
-              <div class="session-duration"> #variable </div>
-              <div class="session-note">"keep going"</div>
-            </div>
-            <div class="session-item">
-              <div class="session-mode">🧘 Deep Work</div>
-              <div class="session-duration"> #variable </div>
-              <div class="session-note">" #variable )</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Session Stats -->
-        <div class="session-stats">
-          <div class="stat-item">
-            <div class="stat-value"> #variable </div>
-            <div class="stat-label">Sessions</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value"> #variable </div>
-            <div class="stat-label">Total Time</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value"> #variable </div>
-            <div class="stat-label">Breaks</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ═══════════ ANALYTICS SCREEN ═══════════ -->
-      <section id="screen-analytics" class="screen">
-        <h2 class="serif text-lg" style="margin-bottom:20px;">📈 Time Analytics</h2>
-        
-        <!-- Period Selector -->
-        <div class="analytics-period">
-          <button class="period-btn active" data-period="today">Today</button>
-          <button class="period-btn" data-period="7days">7 Days</button>
-          <button class="period-btn" data-period="month">Month</button>
-        </div>
-
-        <!-- Hours per Mode -->
-        <div class="analytics-card">
-          <h3 class="card-title">Hours per Mode</h3>
-          <div class="mode-bars">
-            <div class="mode-bar-item">
-              <div class="mode-bar-label">📚 Study</div>
-              <div class="mode-bar-track">
-                <div class="mode-bar-fill" style="width: #variable %;background:linear-gradient(90deg, #0a84ff, #5e5ce6)"></div>
-              </div>
-              <div class="mode-bar-value"> #variable </div>
-            </div>
-            <div class="mode-bar-item">
-              <div class="mode-bar-label">🧘 Deep Work</div>
-              <div class="mode-bar-track">
-                <div class="mode-bar-fill" style="width: #variable %;background:linear-gradient(90deg, #bf5af2, #af52de)"></div>
-              </div>
-              <div class="mode-bar-value"> #variable </div>
-            </div>
-            <div class="mode-bar-item">
-              <div class="mode-bar-label">💼 Work</div>
-              <div class="mode-bar-track">
-                <div class="mode-bar-fill" style="width: #variable %;background:linear-gradient(90deg, #30d158, #34c759)"></div>
-              </div>
-              <div class="mode-bar-value"> #variable  </div>
-            </div>
-            <div class="mode-bar-item">
-              <div class="mode-bar-label">🧭 Explore</div>
-              <div class="mode-bar-track">
-                <div class="mode-bar-fill" style="width: #variable %;background:linear-gradient(90deg, #ff9500, #ff2d55)"></div>
-              </div>
-              <div class="mode-bar-value"> #variable </div>
-            </div>
-            <div class="mode-bar-item">
-              <div class="mode-bar-label">☕ Relax</div>
-              <div class="mode-bar-track">
-                <div class="mode-bar-fill" style="width: #variable %;background:linear-gradient(90deg, #64d2ff, #5ac8fa)"></div>
-              </div>
-              <div class="mode-bar-value"> #variable </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Today's Distribution (Ring) -->
-        <div class="analytics-card">
-          <h3 class="card-title">Today's Distribution</h3>
-          <div class="distribution-ring">
-            <svg width="180" height="180" viewBox="0 0 180 180">
-              <circle cx="90" cy="90" r="70" fill="none" stroke="var(--bg-tertiary)" stroke-width="20"/>
-              <circle cx="90" cy="90" r="70" fill="none" stroke="#0a84ff" stroke-width="20" stroke-dasharray=" #variable " stroke-dashoffset="0" transform="rotate(-90 90 90)"/>
-              <circle cx="90" cy="90" r="70" fill="none" stroke="#bf5af2" stroke-width="20" stroke-dasharray=" #variable " stroke-dashoffset="-110" transform="rotate(-90 90 90)"/>
-              <circle cx="90" cy="90" r="70" fill="none" stroke="#30d158" stroke-width="20" stroke-dasharray=" #variable " stroke-dashoffset="-260" transform="rotate(-90 90 90)"/>
-              <circle cx="90" cy="90" r="70" fill="none" stroke="#ff9500" stroke-width="20" stroke-dasharray=" #variable " stroke-dashoffset="-340" transform="rotate(-90 90 90)"/>
-            </svg>
-            <div class="ring-legend">
-              <div class="legend-item"><span class="legend-dot" style="background:#0a84ff"></span>Study  #variable %</div>
-              <div class="legend-item"><span class="legend-dot" style="background:#bf5af2"></span>Deep Work  #variable %</div>
-              <div class="legend-item"><span class="legend-dot" style="background:#30d158"></span>Work  #variable %</div>
-              <div class="legend-item"><span class="legend-dot" style="background:#ff9500"></span>Explore  #variable %</div>
-              <div class="legend-item"><span class="legend-dot" style="background:#64d2ff"></span>Relax  #variable %</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Weekly Comparison -->
-        <div class="analytics-card">
-          <h3 class="card-title">Weekly Comparison</h3>
-          <div class="weekly-bars">
-            <div class="weekly-bar-item">
-              <div class="weekly-bar-label">This Week</div>
-              <div class="weekly-bar-track">
-                <div class="weekly-bar-fill" style="width: #variable %;background:linear-gradient(90deg, #0a84ff, #5e5ce6, #bf5af2)"></div>
-              </div>
-              <div class="weekly-bar-value"> #variable </div>
-            </div>
-            <div class="weekly-bar-item">
-              <div class="weekly-bar-label">Last Week</div>
-              <div class="weekly-bar-track">
-                <div class="weekly-bar-fill" style="width: #variable %;background:linear-gradient(90deg, #30d158, #34c759)"></div>
-              </div>
-              <div class="weekly-bar-value"> #variable </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Stats Grid -->
-        <div class="analytics-stats-grid">
-          <div class="stat-card">
-            <div class="stat-value"> #variable </div>
-            <div class="stat-label">Avg Session</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value"> #variable </div>
-            <div class="stat-label">Most Productive</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value"> #variable </div>
-            <div class="stat-label">Top Mode</div>
-          </div>
-        </div>
-      </section>
-
-    </div>
-  </main>
-
-  <!-- ═══════════ BOTTOM NAV (Mobile) ═══════════ -->
-  <nav id="bottomnav" class="bottomnav">
-    <button class="bottom-nav-item active" data-screen="today">
-      <span class="icon">☀️</span>Today
+  <!-- ░░ BOTTOM TAB BAR ░░ -->
+  <nav class="bottom-tabs" role="navigation" aria-label="Main navigation">
+    <button class="nav-item tab-btn active" data-screen-target="screen-today" aria-label="Today">
+      <div class="tab-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/></svg>
+      </div>
+      <span class="tab-label">Today</span>
     </button>
-    <button class="bottom-nav-item" data-screen="chat">
-      <span class="icon">💬</span>Chat
+    <button class="nav-item tab-btn" data-screen-target="screen-dashboard" aria-label="Dashboard">
+      <div class="tab-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+      </div>
+      <span class="tab-label">Plan</span>
     </button>
-    <button class="bottom-nav-item" data-screen="calendar">
-      <span class="icon">📅</span>Calendar
+    <button class="nav-item tab-btn tab-btn--hub" data-screen-target="screen-chat" aria-label="NYVRON AI Chat">
+      <div class="tab-hub-bubble">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="none"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+      </div>
     </button>
-    <button class="bottom-nav-item" data-screen="time-tracking">
-      <span class="icon">⏱️</span>Timer
+    <button class="nav-item tab-btn" data-screen-target="screen-time" aria-label="Track">
+      <div class="tab-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <span class="tab-label">Track</span>
     </button>
-    <button class="bottom-nav-item" data-screen="settings">
-      <span class="icon">⚙️</span>More
+    <button class="nav-item tab-btn" data-screen-target="screen-profile" aria-label="Profile">
+      <div class="tab-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <span class="tab-label">Me</span>
     </button>
   </nav>
 
-</div>
+  <!-- ░░ MODALS ░░ -->
 
-<!-- ═══════════ COMMAND BAR OVERLAY ═══════════ -->
-<div id="commandbar" class="commandbar-overlay hidden">
-  <div class="commandbar">
-    <input type="text" class="commandbar-input" id="command-input" placeholder="🔍 Search or type a command..." oninput="handleCommandInput(event)">
-    <div class="commandbar-results" id="command-results">
-      <div class="commandbar-item" onclick="executeCommand('dashboard')">
-        <span class="icon">🏠</span> Go to Dashboard
+  <!-- Calendar Modal -->
+  <div id="calendar-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cal-modal-title">
+    <div class="modal-backdrop-tap" id="calendar-modal-backdrop"></div>
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div class="modal-header">
+        <h2 id="cal-modal-title" class="modal-title">New Event</h2>
+        <button id="calendar-modal-close" class="modal-close-btn" type="button" aria-label="Close">✕</button>
       </div>
-      <div class="commandbar-item" onclick="executeCommand('chat')">
-        <span class="icon">💬</span> Go to Chat
-      </div>
-      <div class="commandbar-item" onclick="executeCommand('schedule')">
-        <span class="icon">📅</span> Go to Schedule
-      </div>
-      <div class="commandbar-item" onclick="executeCommand('memory')">
-        <span class="icon">🧠</span> Go to Memory
-      </div>
-      <div class="commandbar-item" onclick="executeCommand('reminder')">
-        <span class="icon">⏰</span> Create Reminder
-      </div>
-      <div class="commandbar-item" onclick="executeCommand('task')">
-        <span class="icon">✅</span> New Task
-      </div>
-      <div class="commandbar-item" onclick="executeCommand('reflection')">
-        <span class="icon">📝</span> New Reflection
+      <div class="modal-body">
+        <label class="ios-label">Title</label>
+        <input id="calendar-event-title" class="glass-input" type="text" placeholder="Event title" />
+        <label class="ios-label">Type</label>
+        <select id="calendar-event-type" class="glass-select">
+          <option value="meeting">Meeting</option>
+          <option value="reminder">Reminder</option>
+          <option value="deadline">Deadline</option>
+          <option value="other">Other</option>
+        </select>
+        <label class="ios-label">Date</label>
+        <input id="calendar-event-date" class="glass-input" type="date" />
+        <label class="ios-label">Time</label>
+        <input id="calendar-event-time" class="glass-input" type="time" />
+        <label class="ios-label">Notes</label>
+        <textarea id="calendar-event-notes" class="glass-textarea" rows="3" placeholder="Optional notes..."></textarea>
+        <button id="calendar-event-save" class="ios-action-btn full-width" type="button">Save Event</button>
       </div>
     </div>
-    <div class="commandbar-hint">
-      <span><kbd>↑↓</kbd> Navigate</span>
-      <span><kbd>↵</kbd> Select</span>
-      <span><kbd>esc</kbd> Close</span>
+  </div>
+
+  <!-- Schedule Block Modal -->
+  <div id="schedule-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="sched-modal-title">
+    <div class="modal-backdrop-tap" id="schedule-modal-backdrop"></div>
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div class="modal-header">
+        <h2 id="sched-modal-title" class="modal-title">New Block</h2>
+        <button id="schedule-modal-close" class="modal-close-btn" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="ios-label">Title</label>
+        <input id="schedule-block-title" class="glass-input" type="text" placeholder="Block title" />
+        <label class="ios-label">Scope</label>
+        <select id="schedule-block-scope" class="glass-select">
+          <option value="day">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+        </select>
+        <label class="ios-label">Time</label>
+        <input id="schedule-block-time" class="glass-input" type="time" />
+        <button id="schedule-block-save" class="ios-action-btn full-width" type="button">Save Block</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- ═══════════ QUICK CAPTURE OVERLAY ═══════════ -->
-<div id="quickcapture" class="quickcapture-overlay hidden">
-  <div class="quickcapture-box">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <h3 class="text-md" style="font-weight:600;">✦ Remember This</h3>
-      <button class="btn-icon btn-ghost" onclick="closeQuickCapture()">✕</button>
+  <!-- North Star Modal -->
+  <div id="northstar-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ns-modal-title">
+    <div class="modal-backdrop-tap" id="northstar-modal-backdrop"></div>
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div class="modal-header">
+        <h2 id="ns-modal-title" class="modal-title">⭐ North Star</h2>
+        <button id="northstar-modal-close" class="modal-close-btn" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="ios-label">Current Phase</label>
+        <input id="northstar-phase-input" class="glass-input" type="text" placeholder="e.g. Phase 1: Foundation" />
+        <label class="ios-label">Direction / Mission</label>
+        <textarea id="northstar-direction-input" class="glass-textarea" rows="3" placeholder="Your guiding direction..."></textarea>
+        <label class="ios-label">Daily Quote / Mantra</label>
+        <input id="northstar-quote-input" class="glass-input" type="text" placeholder="e.g. Focus on the next 25 minutes" />
+        <button id="northstar-save-btn" class="ios-action-btn full-width" type="button">Save</button>
+      </div>
     </div>
-    <textarea placeholder="What should NYVRON remember?" id="quickcapture-input"></textarea>
-    <div class="quickcapture-actions">
-      <button class="btn btn-ghost" onclick="closeQuickCapture()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveQuickCapture()">💾 Save Memory</button>
+  </div>
+
+  <!-- Countdown Modal -->
+  <div id="countdown-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cd-modal-title">
+    <div class="modal-backdrop-tap" id="countdown-modal-backdrop"></div>
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div class="modal-header">
+        <h2 id="cd-modal-title" class="modal-title">⏳ Set Countdown</h2>
+        <button id="countdown-modal-close" class="modal-close-btn" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="ios-label">Label</label>
+        <input id="countdown-label-input" class="glass-input" type="text" placeholder="e.g. Exam day, Trip starts" />
+        <label class="ios-label">Target Date & Time</label>
+        <input id="countdown-datetime-input" class="glass-input" type="datetime-local" />
+        <button id="countdown-save-btn" class="ios-action-btn full-width" type="button">Start Countdown</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- ═══════════ MINI MODE ═══════════ -->
-<div id="minimode" class="minimode hidden">
-  <div class="minimode-header">
-    <span>NYVRON</span>
-    <button class="btn-icon btn-ghost" style="width:26px;height:26px;font-size:13px;" onclick="toggleMiniMode()">✕</button>
+  <!-- ░░ FOCUS MODE OVERLAY ░░ -->
+  <div id="focus-overlay" class="focus-overlay hidden" role="dialog" aria-modal="true" aria-label="Focus session">
+    <div class="focus-blur-bg"></div>
+    <div class="focus-content">
+      <button id="focus-close-btn" class="focus-exit" type="button">✕ Exit Focus</button>
+      <div class="focus-badge">FOCUS SESSION</div>
+      <h2 id="focus-task-title" class="focus-task-name">Task Name</h2>
+      <p class="focus-mantra">Stay within the block. Eliminate distractions.</p>
+      <div class="focus-ring-wrap">
+        <svg width="240" height="240" viewBox="0 0 240 240" style="overflow:visible">
+          <circle cx="120" cy="120" r="100" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="8"/>
+          <circle id="focus-timer-ring" cx="120" cy="120" r="100" fill="none"
+            stroke="url(#focus-grad)" stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="628.32" stroke-dashoffset="628.32"
+            transform="rotate(-90 120 120)"/>
+          <defs>
+            <linearGradient id="focus-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#007AFF"/>
+              <stop offset="100%" stop-color="#5E5CE6"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div id="focus-timer-display" class="focus-time-text">25:00</div>
+      </div>
+      <div class="focus-btn-row">
+        <button id="focus-play-btn" class="focus-primary" type="button">Pause</button>
+        <button id="focus-reset-btn" class="focus-secondary" type="button">Reset</button>
+      </div>
+    </div>
   </div>
-  <div class="minimode-body" id="minimode-body">
-    <div style="margin-bottom:12px;"><strong>📋 Today:</strong> #variable </div>
-    <div style="margin-bottom:12px;"><strong>⏰ Next:</strong> #variable  </div>
-    <div style="margin-bottom:12px;"><strong>⚡ Energy:</strong> #variable </div>
-    <div><strong>🎯 Focus:</strong> #variable </div>
+
+  <!-- ░░ COMMAND PALETTE ░░ -->
+  <div id="commandbar" class="cmdbar-overlay hidden" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="cmdbar-backdrop"></div>
+    <div class="cmdbar-panel">
+      <div class="cmdbar-input-row">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="opacity:0.5;flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="commandbar-input" class="cmdbar-field" type="text" placeholder="Search commands..." autocomplete="off" />
+        <kbd class="cmdbar-esc-key" id="cmdbar-esc-key">esc</kbd>
+      </div>
+      <div class="cmdbar-divider"></div>
+      <ul id="commandbar-results" class="cmdbar-list" role="listbox" aria-label="Commands"></ul>
+    </div>
   </div>
-</div>
 
-<!-- ═══════════ OFFLINE INDICATOR ═══════════ -->
-<div class="offline-badge">LOCAL ONLY • SECURE</div>
+</div><!-- end .app -->
 
-<script>
-/* ============================================
-   NYVRON 2.0 — Application Logic
-   ============================================
-   
-   This JavaScript handles:
-   - Navigation between screens
-   - Theme switching (dark/light/auto)
-   - Live clock (Mumbai/IST timezone)
-   - Energy & focus mode selection
-   - Chat interactions (placeholder for backend)
-   - Command bar (⌘K)
-   - Quick capture
-   - Mini mode
-   - Emergency mode
-   - Accessibility toggles
-   - Data export/import
-   
-   BACKEND INTEGRATION POINTS:
-   - sendMessage() — Connect to ChatGPT API
-   - toggleVoice() — Connect to speech-to-text
-   - saveReflection() — Save to backend
-   - saveQuickCapture() — Save to backend
-   - exportData() — Sync with backend
-*/
-
-// ═══════════ STATE MANAGEMENT ═══════════
-const state = {
-  currentScreen: 'dashboard',
-  theme: localStorage.getItem('nyvron-theme') || 'dark',
-  energy: localStorage.getItem('nyvron-energy') || 'high',
-  focus: localStorage.getItem('nyvron-focus') || 'study',
-  emergency: false,
-  largeText: localStorage.getItem('nyvron-large-text') === 'true',
-  reducedMotion: localStorage.getItem('nyvron-reduced-motion') === 'true',
-  commandBarOpen: false,
-  quickCaptureOpen: false,
-  miniMode: false,
-  selectedCommandIndex: 0,
-  voiceRecording: false,
-  ambience: localStorage.getItem('nyvron-ambience') || 'silent',
-  chatMode: 'normal',
-  contextLayer: localStorage.getItem('nyvron-context-layer') || 'study',
-};
-
-// ═══════════ INITIALIZATION ═══════════
-function init() {
-  console.log('🚀 NYVRON 2.0 initialized');
-  applyTheme(state.theme);
-  applyEnergy(state.energy);
-  applyFocus(state.focus);
-  
-  if (state.largeText) document.getElementById('app').classList.add('large-text');
-  if (state.reducedMotion) document.getElementById('app').classList.add('reduced-motion');
-  
-  setSyncedToggle('large-text-toggle', state.largeText);
-  setSyncedToggle('reduced-motion-toggle', state.reducedMotion);
-  
-  updateGreeting();
-  updateDate();
-  startLiveClock();
-  loadNorthStar();
-  
-  setupKeyboardShortcuts();
-  setupNavListeners();
-  setupScheduleListeners();
-  setupMemoryListeners();
-  setupEnergyListeners();
-  setupFocusListeners();
-  setupSettingsListeners();
-  setupReportListeners();
-  setupAmbienceListeners();
-  
-  updateProfileTheme();
-  syncThemeBtns();
-}
-
-function setSyncedToggle(id, on) {
-  const el = document.getElementById(id);
-  if (el) { 
-    if (on) el.classList.add('on'); 
-    else el.classList.remove('on'); 
-  }
-}
-
-function loadNorthStar() {
-  const saved = localStorage.getItem('nyvron-north-star');
-  if (saved) {
-    const direction = document.getElementById('north-star-direction');
-    if (direction) {
-      direction.textContent = 'Long-Term Direction: ' + saved;
-    }
-  }
-}
-
-// ═══════════ LIVE CLOCK (Mumbai/IST) ═══════════
-function startLiveClock() {
-  function updateClock() {
-    const now = new Date();
-    const options = { 
-      timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    };
-    const timeStr = now.toLocaleTimeString('en-US', options);
-    
-    const dashClock = document.getElementById('dash-clock');
-    if (dashClock) {
-      dashClock.innerHTML = timeStr + '<span class="timezone">IST • Mumbai</span>';
-    }
-    
-    const topbarClock = document.getElementById('topbar-clock');
-    if (topbarClock) {
-      topbarClock.textContent = timeStr + ' IST';
-    }
-  }
-  
-  updateClock();
-  setInterval(updateClock, 1000);
-}
-
-// ═══════════ NAVIGATION ═══════════
-function navigate(screen) {
-  state.currentScreen = screen;
-  
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const target = document.getElementById('screen-' + screen);
-  if (target) target.classList.add('active');
-  
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.querySelectorAll('.nav-item[data-screen="' + screen + '"]').forEach(n => n.classList.add('active'));
-  
-  document.querySelectorAll('.bottom-nav-item').forEach(n => n.classList.remove('active'));
-  document.querySelectorAll('.bottom-nav-item[data-screen="' + screen + '"]').forEach(n => n.classList.add('active'));
-  
-  const titles = { 
-    today: 'Today',
-    dashboard:'Dashboard', 
-    chat:'Chat',
-    calendar:'Calendar',
-    'time-tracking':'Time Tracker',
-    schedule:'Schedule', 
-    memory:'Memory',
-    reports:'Reports',
-    analytics:'Analytics',
-    reflection:'Reflection', 
-    profile:'Profile', 
-    notifications:'Notifications', 
-    settings:'Settings' 
-  };
-  
-  document.getElementById('topbar-title').textContent = titles[screen] || 'NYVRON';
-  document.getElementById('screens').scrollTop = 0;
-}
-
-function setupNavListeners() {
-  document.querySelectorAll('.nav-item[data-screen]').forEach(item => {
-    item.addEventListener('click', () => navigate(item.dataset.screen));
-  });
-  document.querySelectorAll('.bottom-nav-item[data-screen]').forEach(item => {
-    item.addEventListener('click', () => navigate(item.dataset.screen));
-  });
-}
-
-// ═══════════ THEME MANAGEMENT ═══════════
-function applyTheme(theme) {
-  state.theme = theme;
-  
-  if (theme === 'auto') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-  } else {
-    document.documentElement.setAttribute('data-theme', theme);
-  }
-  
-  localStorage.setItem('nyvron-theme', theme);
-  updateProfileTheme();
-}
-
-function cycleTheme() {
-  const order = ['dark', 'light', 'auto'];
-  const idx = order.indexOf(state.theme);
-  const next = order[(idx + 1) % order.length];
-  applyTheme(next);
-  syncThemeBtns();
-}
-
-function syncThemeBtns() {
-  document.querySelectorAll('.theme-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.theme === state.theme);
-  });
-}
-
-function updateProfileTheme() {
-  const el = document.getElementById('profile-theme');
-  if (el) {
-    el.textContent = state.theme.charAt(0).toUpperCase() + state.theme.slice(1);
-  }
-}
-
-// ═══════════ GREETING & DATE ═══════════
-function updateGreeting() {
-  const h = new Date().getHours();
-  let g = 'Good evening';
-  if (h < 12) g = 'Good morning';
-  else if (h < 17) g = 'Good afternoon';
-  
-  const el = document.getElementById('greeting-text');
-  if (el) el.textContent = g;
-}
-
-function updateDate() {
-  const d = new Date();
-  const opts = { weekday: 'long', month: 'long', day: 'numeric' };
-  const el = document.getElementById('date-text');
-  if (el) el.textContent = d.toLocaleDateString('en-IN', opts);
-}
-
-// ═══════════ ENERGY SELECTION ═══════════
-function applyEnergy(level) {
-  state.energy = level;
-  localStorage.setItem('nyvron-energy', level);
-  document.querySelectorAll('.energy-btn').forEach(b => 
-    b.classList.toggle('active', b.dataset.energy === level)
-  );
-  checkLowEnergyProtocol();
-}
-
-function setupEnergyListeners() {
-  document.querySelectorAll('.energy-btn').forEach(btn => {
-    btn.addEventListener('click', () => applyEnergy(btn.dataset.energy));
-  });
-}
-
-// ═══════════ FOCUS MODE ═══════════
-function applyFocus(mode) {
-  state.focus = mode;
-  localStorage.setItem('nyvron-focus', mode);
-  document.querySelectorAll('.focus-btn').forEach(b => 
-    b.classList.toggle('active', b.dataset.focus === mode)
-  );
-}
-
-function setupFocusListeners() {
-  document.querySelectorAll('.focus-btn').forEach(btn => {
-    btn.addEventListener('click', () => applyFocus(btn.dataset.focus));
-  });
-}
-
-// ═══════════ TASK TOGGLE ═══════════
-function toggleTask(checkEl) {
-  checkEl.classList.toggle('done');
-  const textEl = checkEl.parentElement.querySelector('.task-text');
-  if (textEl) textEl.classList.toggle('done');
-}
-
-// ═══════════ CHAT ═══════════
-function handleChatKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-}
-
-/* 
- * 🔌 BACKEND INTEGRATION POINT
- * Replace the simulated response with actual ChatGPT API call
- * Example:
- *   const response = await fetch('/api/chat', { method: 'POST', body: JSON.stringify({ message: text }) });
- *   const data = await response.json();
- *   reply.innerHTML = '<div class="bubble">' + data.reply + '</div>';
- */
-function sendMessage() {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
-  
-  const messages = document.getElementById('chat-messages');
-  const thinkingStatus = document.getElementById('chat-thinking-status');
-  const now = new Date();
-  const time = now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
-  
-  // Add user message
-  const userMsg = document.createElement('div');
-  userMsg.className = 'chat-msg user';
-  userMsg.innerHTML = '<div class="bubble">' + escapeHtml(text) + '</div><span class="msg-time">' + time + '</span>';
-  messages.appendChild(userMsg);
-  
-  input.value = '';
-  input.style.height = 'auto';
-  messages.scrollTop = messages.scrollHeight;
-  
-  // Show thinking status
-  thinkingStatus.style.display = 'flex';
-  
-  // Typing indicator
-  const typing = document.createElement('div');
-  typing.className = 'chat-msg assistant';
-  typing.id = 'typing-indicator';
-  typing.innerHTML = '<div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>';
-  messages.appendChild(typing);
-  messages.scrollTop = messages.scrollHeight;
-  
-  // Simulated response (replace with backend call)
-  setTimeout(() => {
-    // Hide thinking status
-    thinkingStatus.style.display = 'none';
-    
-    const t = document.getElementById('typing-indicator');
-    if (t) t.remove();
-    
-    const reply = document.createElement('div');
-    reply.className = 'chat-msg assistant';
-    const responses = [
-      'Noted! I\'ll keep that in mind. ✨',
-      'Got it. Anything else you need? 💭',
-      'Understood. I\'ve updated your preferences. ✅',
-      'Sure, I\'ll set that up for you. 🎯',
-      'Done! Let me know if you need anything else. 💪',
-      'Alright, noted. I\'ll remind you later. ⏰',
-    ];
-    const r = responses[Math.floor(Math.random() * responses.length)];
-    reply.innerHTML = '<div class="bubble">' + r + '</div><span class="msg-time">' + time + '</span>';
-    messages.appendChild(reply);
-    messages.scrollTop = messages.scrollHeight;
-  }, 1800);
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// ═══════════ VOICE INPUT ═══════════
-/* 
- * 🔌 BACKEND INTEGRATION POINT
- * Connect to Web Speech API or speech-to-text service
- * Example:
- *   const recognition = new webkitSpeechRecognition();
- *   recognition.start();
- *   recognition.onresult = (event) => { input.value = event.results[0][0].transcript; };
- */
-function toggleVoice() {
-  state.voiceRecording = !state.voiceRecording;
-  const btn = document.getElementById('voice-btn');
-  btn.classList.toggle('recording', state.voiceRecording);
-  
-  if (state.voiceRecording) {
-    btn.textContent = '⏹️';
-    console.log('🎙️ Voice recording started (connect to speech-to-text API)');
-  } else {
-    btn.textContent = '🎙️';
-    console.log('🎙️ Voice recording stopped');
-  }
-}
-
-// ═══════════ COMMAND BAR (⌘K) ═══════════
-function openCommandBar() {
-  state.commandBarOpen = true;
-  state.selectedCommandIndex = 0;
-  document.getElementById('commandbar').classList.remove('hidden');
-  const input = document.getElementById('command-input');
-  input.value = '';
-  input.focus();
-  updateCommandSelection();
-}
-
-function closeCommandBar() {
-  state.commandBarOpen = false;
-  document.getElementById('commandbar').classList.add('hidden');
-}
-
-function handleCommandInput(e) {
-  const query = e.target.value.toLowerCase();
-  const items = document.querySelectorAll('#command-results .commandbar-item');
-  items.forEach(item => {
-    const text = item.textContent.toLowerCase();
-    item.style.display = text.includes(query) || !query ? '' : 'none';
-  });
-  state.selectedCommandIndex = 0;
-  updateCommandSelection();
-}
-
-function updateCommandSelection() {
-  const items = Array.from(document.querySelectorAll('#command-results .commandbar-item'))
-    .filter(i => i.style.display !== 'none');
-  items.forEach((item, i) => 
-    item.classList.toggle('selected', i === state.selectedCommandIndex)
-  );
-}
-
-function executeCommand(cmd) {
-  closeCommandBar();
-  if (['dashboard','chat','schedule','memory','reports','reflection','profile','notifications','settings'].includes(cmd)) {
-    navigate(cmd);
-  } else if (cmd === 'reminder') {
-    navigate('notifications');
-  } else if (cmd === 'task') {
-    navigate('dashboard');
-  } else if (cmd === 'reflection') {
-    navigate('reflection');
-  }
-}
-
-// ═══════════ QUICK CAPTURE ═══════════
-/* 
- * 🔌 BACKEND INTEGRATION POINT
- * Save the captured memory to backend
- * Example:
- *   await fetch('/api/memory', { method: 'POST', body: JSON.stringify({ text }) });
- */
-function openQuickCapture() {
-  state.quickCaptureOpen = true;
-  document.getElementById('quickcapture').classList.remove('hidden');
-  document.getElementById('quickcapture-input').focus();
-}
-
-function closeQuickCapture() {
-  state.quickCaptureOpen = false;
-  document.getElementById('quickcapture').classList.add('hidden');
-  document.getElementById('quickcapture-input').value = '';
-}
-
-function saveQuickCapture() {
-  const text = document.getElementById('quickcapture-input').value.trim();
-  if (!text) return;
-  
-  // Add to memory list (frontend only — connect to backend)
-  const list = document.getElementById('memory-list');
-  const item = document.createElement('div');
-  item.className = 'memory-item';
-  item.innerHTML = '<div class="mem-text">' + escapeHtml(text) + '</div><div class="mem-meta"><span class="tag tag-accent">✦ quick capture</span><span>Just now</span><div class="mem-actions"><button class="mem-action-btn">Edit</button><button class="mem-action-btn">Archive</button><button class="mem-action-btn" style="color:var(--danger)">Forget</button></div></div>';
-  list.insertBefore(item, list.firstChild);
-  
-  console.log('💾 Memory saved:', text);
-  closeQuickCapture();
-  navigate('memory');
-}
-
-// ═══════════ MINI MODE ═══════════
-function toggleMiniMode() {
-  state.miniMode = !state.miniMode;
-  document.getElementById('minimode').classList.toggle('hidden', !state.miniMode);
-}
-
-// ═══════════ EMERGENCY MODE ═══════════
-function toggleEmergency() {
-  state.emergency = !state.emergency;
-  document.getElementById('app').classList.toggle('emergency', state.emergency);
-  console.log('⚡ Emergency mode:', state.emergency ? 'ON' : 'OFF');
-}
-
-// ═══════════ ACCESSIBILITY ═══════════
-function toggleLargeText() {
-  state.largeText = !state.largeText;
-  document.getElementById('app').classList.toggle('large-text', state.largeText);
-  localStorage.setItem('nyvron-large-text', state.largeText);
-  setSyncedToggle('large-text-toggle', state.largeText);
-}
-
-function toggleReducedMotion() {
-  state.reducedMotion = !state.reducedMotion;
-  document.getElementById('app').classList.toggle('reduced-motion', state.reducedMotion);
-  localStorage.setItem('nyvron-reduced-motion', state.reducedMotion);
-  setSyncedToggle('reduced-motion-toggle', state.reducedMotion);
-}
-
-// ═══════════ KEYBOARD SHORTCUTS ═══════════
-function setupKeyboardShortcuts() {
-  document.addEventListener('keydown', (e) => {
-    // Cmd/Ctrl + K — Command Bar
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-      e.preventDefault();
-      if (state.commandBarOpen) closeCommandBar();
-      else openCommandBar();
-    }
-    
-    // Escape
-    if (e.key === 'Escape') {
-      if (state.commandBarOpen) closeCommandBar();
-      if (state.quickCaptureOpen) closeQuickCapture();
-    }
-    
-    // Command bar navigation
-    if (state.commandBarOpen) {
-      const items = Array.from(document.querySelectorAll('#command-results .commandbar-item'))
-        .filter(i => i.style.display !== 'none');
-      
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        state.selectedCommandIndex = Math.min(state.selectedCommandIndex + 1, items.length - 1);
-        updateCommandSelection();
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        state.selectedCommandIndex = Math.max(state.selectedCommandIndex - 1, 0);
-        updateCommandSelection();
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (items[state.selectedCommandIndex]) {
-          const onclick = items[state.selectedCommandIndex].getAttribute('onclick');
-          if (onclick) {
-            const match = onclick.match(/executeCommand\('(.+?)'\)/);
-            if (match) executeCommand(match[1]);
-          }
-        }
-      }
-    }
-  });
-}
-
-// ═══════════ SCHEDULE ═══════════
-function setupScheduleListeners() {
-  document.querySelectorAll('.schedule-view-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.schedule-view-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
-  });
-}
-
-// ═══════════ MEMORY ═══════════
-function setupMemoryListeners() {
-  document.querySelectorAll('.memory-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.memory-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-    });
-  });
-  
-  const search = document.getElementById('memory-search-input');
-  if (search) {
-    search.addEventListener('input', () => {
-      const q = search.value.toLowerCase();
-      document.querySelectorAll('.memory-item').forEach(item => {
-        const text = item.querySelector('.mem-text').textContent.toLowerCase();
-        item.style.display = text.includes(q) ? '' : 'none';
-      });
-    });
-  }
-}
-
-// ═══════════ SETTINGS ═══════════
-function setupSettingsListeners() {
-  document.querySelectorAll('.theme-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      applyTheme(btn.dataset.theme);
-      syncThemeBtns();
-    });
-  });
-}
-
-// ═══════════ REPORTS ═══════════
-function setupReportListeners() {
-  document.querySelectorAll('.report-period-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.report-period-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
-  });
-}
-
-/* 
- * 🔌 BACKEND INTEGRATION POINT
- * Generate report from backend data
- * Example:
- *   const response = await fetch('/api/reports/generate');
- *   const data = await response.json();
- *   // Create blob from data
- */
-function exportReport() {
-  const data = 'NYVRON Report Export\nGenerated: ' + new Date().toLocaleString() + '\n\nTasks Completed: 42\nFocus Time: 18h\nReflections: 7\n\n[Detailed report data would be generated from backend]';
-  
-  const blob = new Blob([data], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'nyvron-report-' + new Date().toISOString().slice(0,10) + '.txt';
-  a.click();
-  URL.revokeObjectURL(url);
-  
-  console.log('📥 Report exported');
-}
-
-/* 
- * 🔌 BACKEND INTEGRATION POINT
- * Export all data from backend
- * Example:
- *   const response = await fetch('/api/export');
- *   const data = await response.json();
- */
-function exportData() {
-  const data = { 
-    theme: state.theme, 
-    energy: state.energy, 
-    focus: state.focus, 
-    ambience: state.ambience,
-    exportDate: new Date().toISOString() 
-  };
-  
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'nyvron-backup-' + new Date().toISOString().slice(0,10) + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  
-  console.log('📥 Data exported');
-}
-
-// ═══════════ REFLECTION ═══════════
-/* 
- * 🔌 BACKEND INTEGRATION POINT
- * Save reflection to backend
- * Example:
- *   await fetch('/api/reflection', { method: 'POST', body: JSON.stringify({ text, date }) });
- */
-function saveReflection() {
-  const input = document.getElementById('reflection-input');
-  const text = input.value.trim();
-  if (!text) return;
-  
-  const entries = document.getElementById('reflection-entries');
-  const d = new Date();
-  const dateStr = d.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' });
-  
-  const entry = document.createElement('div');
-  entry.className = 'reflection-entry';
-  entry.innerHTML = '<div class="ref-date">' + dateStr + '</div><div class="ref-text">' + escapeHtml(text) + '</div>';
-  entries.insertBefore(entry, entries.firstChild);
-  
-  input.value = '';
-  console.log('✨ Reflection saved:', text);
-}
-
-// ═══════════ AMBIENCE ═══════════
-function setupAmbienceListeners() {
-  document.querySelectorAll('.ambience-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.ambience-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.ambience = btn.dataset.ambience;
-      localStorage.setItem('nyvron-ambience', state.ambience);
-      console.log('🎵 Ambience:', state.ambience);
-    });
-  });
-}
-
-// ═══════════ CHAT HISTORY ═══════════
-function toggleChatHistory() {
-  const panel = document.getElementById('chat-history-panel');
-    if (!panel) return;
-  panel.classList.toggle("open");
-}
-
-function startNewChat() {
-  const messages = document.getElementById('chat-messages');
-  messages.innerHTML = '';
-  
-  // Add welcome message
-  const welcome = document.createElement('div');
-  welcome.className = 'chat-msg assistant';
-  welcome.innerHTML = '<div class="bubble">Hello! I\'m NYVRON, your personal assistant. How can I help you today? ✨</div><span class="msg-time">' + new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) + '</span>';
-  messages.appendChild(welcome);
-  
-  toggleChatHistory();
-  console.log('✨ Started new chat');
-}
-
-// ═══════════ CHAT MODE SWITCHER ═══════════
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.chat-mode-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.chat-mode-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.chatMode = btn.dataset.mode;
-      console.log('💬 Chat mode:', state.chatMode);
-      
-      if (state.chatMode === 'observe') {
-        // Observe mode: NYVRON only listens, records, summarizes
-        const messages = document.getElementById('chat-messages');
-        const observeMsg = document.createElement('div');
-        observeMsg.className = 'chat-msg assistant';
-        observeMsg.innerHTML = '<div class="bubble">👁️ Observe mode active. I\'ll listen and record. Share anything on your mind.</div><span class="msg-time">' + new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) + '</span>';
-        messages.appendChild(observeMsg);
-        messages.scrollTop = messages.scrollHeight;
-      }
-    });
-  });
-});
-
-// ═══════════ CONTEXT LAYERS ═══════════
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.context-layer-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.context-layer-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.contextLayer = btn.dataset.layer;
-      localStorage.setItem('nyvron-context-layer', state.contextLayer);
-      console.log('📚 Context layer:', state.contextLayer);
-    });
-  });
-});
-
-// ═══════════ LOW ENERGY PROTOCOL ═══════════
-let lowEnergyCount = 0;
-
-function checkLowEnergyProtocol() {
-  if (state.energy === 'low') {
-    lowEnergyCount++;
-    if (lowEnergyCount >= 2) {
-      // Show low energy banner
-      const banner = document.getElementById('low-energy-banner');
-      if (banner) {
-        banner.classList.add('active');
-        console.log('🪫 Low energy protocol activated');
-        
-        // Reduce notifications (hide non-essential)
-        document.querySelectorAll('.notif-item').forEach(item => {
-          if (!item.querySelector('.notif-icon.reminder')) {
-            item.style.opacity = '0.3';
-          }
-        });
-      }
-    }
-  } else {
-    lowEnergyCount = Math.max(0, lowEnergyCount - 1);
-  }
-}
-
-function dismissLowEnergy() {
-  const banner = document.getElementById('low-energy-banner');
-  if (banner) {
-    banner.classList.remove('active');
-  }
-}
-
-// ═══════════ NORTH STAR ═══════════
-function editNorthStar() {
-  const direction = document.getElementById('north-star-direction');
-  const currentText = direction.textContent.replace('Long-Term Direction: ', '');
-  const newText = prompt('Edit your long-term direction:', currentText);
-  
-  if (newText && newText !== currentText) {
-    direction.textContent = 'Long-Term Direction: ' + newText;
-    localStorage.setItem('nyvron-north-star', newText);
-    console.log('⭐ North Star updated:', newText);
-  }
-}
-
-// ═══════════ EXPLORER MODE ═══════════
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.memory-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const explorerPanel = document.getElementById('explorer-panel');
-      if (tab.dataset.tab === 'explorer') {
-        explorerPanel.style.display = 'block';
-      } else {
-        explorerPanel.style.display = 'none';
-      }
-    });
-  });
-});
-
-function addExplorerItem() {
-  const item = prompt('Add an idea, link, or observation:');
-  if (item) {
-    console.log('🧭 Added to Explorer:', item);
-    // Backend integration point: save to database
-  }
-}
-
-// ═══════════ OVERLAY CLICK OUTSIDE ═══════════
-document.getElementById('commandbar').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('commandbar')) closeCommandBar();
-});
-
-document.getElementById('quickcapture').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('quickcapture')) closeQuickCapture();
-});
-
-// ═══════════ AUTO-UPDATE TIME ═══════════
-setInterval(() => { 
-  updateGreeting(); 
-  updateDate(); 
-}, 60000);
-
-// ═══════════ TODAY PAGE ═══════════
-function updateTodayTime() {
-  const now = new Date();
-  const options = { 
-    timeZone: 'Asia/Kolkata',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  };
-  const timeStr = now.toLocaleTimeString('en-US', options);
-  const el = document.getElementById('today-live-time');
-  if (el) el.textContent = timeStr;
-}
-
-setInterval(updateTodayTime, 1000);
-updateTodayTime();
-
-// ═══════════ TIMER ═══════════
-let timerInterval = null;
-let timerSeconds = 0;
-let timerRunning = false;
-let timerMode = 'deep';
-let timerPriority = 'high';
-
-function startTimer() {
-  timerRunning = true;
-  document.getElementById('timer-start-btn').style.display = 'none';
-  document.getElementById('timer-pause-btn').style.display = 'inline-flex';
-  document.getElementById('timer-stop-btn').style.display = 'inline-flex';
-  
-  timerInterval = setInterval(() => {
-    timerSeconds++;
-    updateTimerDisplay();
-  }, 1000);
-  
-  console.log('⏱️ Timer started');
-}
-
-function pauseTimer() {
-  timerRunning = false;
-  clearInterval(timerInterval);
-  document.getElementById('timer-pause-btn').style.display = 'none';
-  document.getElementById('timer-resume-btn').style.display = 'inline-flex';
-  console.log('⏸️ Timer paused');
-}
-
-function resumeTimer() {
-  timerRunning = true;
-  document.getElementById('timer-resume-btn').style.display = 'none';
-  document.getElementById('timer-pause-btn').style.display = 'inline-flex';
-  
-  timerInterval = setInterval(() => {
-    timerSeconds++;
-    updateTimerDisplay();
-  }, 1000);
-  
-  console.log('▶️ Timer resumed');
-}
-
-function stopTimer() {
-  timerRunning = false;
-  clearInterval(timerInterval);
-  
-  // Show session note prompt
-  const note = prompt('Session complete! Add a note (optional):', '');
-  
-  // Reset timer
-  timerSeconds = 0;
-  updateTimerDisplay();
-  document.getElementById('timer-start-btn').style.display = 'inline-flex';
-  document.getElementById('timer-pause-btn').style.display = 'none';
-  document.getElementById('timer-resume-btn').style.display = 'none';
-  document.getElementById('timer-stop-btn').style.display = 'none';
-  
-  console.log('⏹️ Timer stopped. Note:', note);
-  // Backend integration point: save session with duration, mode, priority, note
-}
-
-function updateTimerDisplay() {
-  const hours = Math.floor(timerSeconds / 3600);
-  const minutes = Math.floor((timerSeconds % 3600) / 60);
-  const seconds = timerSeconds % 60;
-  const display = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  document.getElementById('timer-display').textContent = display;
-}
-
-// Mode chip selection
-document.querySelectorAll('.mode-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    document.querySelectorAll('.mode-chip').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    timerMode = chip.dataset.mode;
-    const modeNames = { study: 'Study', work: 'Work', explore: 'Explore', life: 'Life', deep: 'Deep Work', relax: 'Relax' };
-    document.getElementById('timer-mode').textContent = modeNames[timerMode] || timerMode;
-  });
-});
-
-// Priority tag selection
-document.querySelectorAll('.tag-chip[data-priority]').forEach(chip => {
-  chip.addEventListener('click', () => {
-    document.querySelectorAll('.tag-chip[data-priority]').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    timerPriority = chip.dataset.priority;
-  });
-});
-
-// Optional tag selection
-document.querySelectorAll('.tag-chip[data-tag]').forEach(chip => {
-  chip.addEventListener('click', () => {
-    chip.classList.toggle('active');
-  });
-});
-
-// ═══════════ CALENDAR ═══════════
-let currentCalendarDate = new Date();
-
-function updateCalendarTitle() {
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  document.getElementById('calendar-title').textContent = `${months[currentCalendarDate.getMonth()]} ${currentCalendarDate.getFullYear()}`;
-}
-
-function renderCalendar() {
-  const grid = document.getElementById('calendar-month-grid');
-  const today = new Date();
-  const year = currentCalendarDate.getFullYear();
-  const month = currentCalendarDate.getMonth();
-  
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  
-  // Keep headers
-  let html = '';
-  const headers = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  headers.forEach(h => {
-    html += `<div class="calendar-day-header">${h}</div>`;
-  });
-  
-  // Empty cells before first day
-  for (let i = 0; i < firstDay; i++) {
-    html += '<div class="calendar-day"></div>';
-  }
-  
-  // Days
-  for (let day = 1; day <= daysInMonth; day++) {
-    const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-    const hasEvent = day === 15 || day === 22; // Sample events
-    html += `<div class="calendar-day${isToday ? ' today' : ''}${hasEvent ? ' has-event' : ''}">${day}</div>`;
-  }
-  
-  grid.innerHTML = html;
-  updateCalendarTitle();
-}
-
-function prevCalendarPeriod() {
-  currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
-  renderCalendar();
-}
-
-function nextCalendarPeriod() {
-  currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
-  renderCalendar();
-}
-
-function createCalendarEvent() {
-  const title = prompt('Event title:');
-  if (title) {
-    console.log('📅 Created event:', title);
-    // Backend integration point: save to database
-  }
-}
-
-function editCalendarEvent(btn) {
-  console.log('✏️ Edit event');
-  // Backend integration point
-}
-
-function deleteCalendarEvent(btn) {
-  if (confirm('Delete this event?')) {
-    btn.closest('.calendar-event-item').remove();
-    console.log('🗑️ Deleted event');
-    // Backend integration point
-  }
-}
-
-// Calendar view switching
-document.querySelectorAll('.calendar-view-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.calendar-view-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    console.log('📅 Calendar view:', btn.dataset.view);
-  });
-});
-
-// Initialize calendar
-renderCalendar();
-
-// ═══════════ FOCUS SESSION ═══════════
-function startFocusSession() {
-  navigate('time-tracking');
-  // Auto-start timer
-  setTimeout(() => startTimer(), 300);
-}
-
-// ═══════════ ANALYTICS ═══════════
-document.querySelectorAll('.period-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    console.log('📈 Analytics period:', btn.dataset.period);
-    // Backend integration point: fetch data for period
-  });
-});
-
-// ═══════════ START APP ═══════════
-init();
-</script>
-<script>
-  function formatTime(date = new Date()) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-
-  function appendMessage(role, text) {
-    const container = document.getElementById("chat-messages");
-    if (!container) return;
-
-    const msg = document.createElement("div");
-    msg.classList.add("chat-msg");
-    if (role === "user") {
-      msg.classList.add("user");
-    } else {
-      msg.classList.add("assistant");
-    }
-
-    const bubble = document.createElement("div");
-    bubble.classList.add("bubble");
-    bubble.textContent = text;
-
-    const time = document.createElement("div");
-    time.classList.add("msg-time");
-    time.textContent = formatTime();
-
-    msg.appendChild(bubble);
-    msg.appendChild(time);
-    container.appendChild(msg);
-
-    container.scrollTop = container.scrollHeight;
-  }
-
-  async function sendMessage() {
-    const input = document.getElementById("chat-input");
-    if (!input) return;
-
-    const message = input.value.trim();
-    if (!message) return;
-
-    // User message on right (blue bubble)
-    appendMessage("user", message);
-    input.value = "";
-
-    // Temporary AI “thinking” bubble on left (grey)
-    const thinkingText = "NYVRON is thinking...";
-    appendMessage("assistant", thinkingText);
-
-    try {
-      const response = await fetch("http://localhost:3001/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
-
-      const data = await response.json();
-      const reply = data.reply || "(no reply)";
-
-      const container = document.getElementById("chat-messages");
-      if (container && container.lastChild) {
-        container.removeChild(container.lastChild);
-      }
-      appendMessage("assistant", reply);
-    } catch (err) {
-      console.error("Error calling backend:", err);
-      const container = document.getElementById("chat-messages");
-      if (container && container.lastChild) {
-        container.removeChild(container.lastChild);
-      }
-      appendMessage("assistant", "Error talking to NYVRON backend.");
-    }
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    const sendBtn = document.getElementById("chat-send-btn");
-    const input = document.getElementById("chat-input");
-
-    if (sendBtn) {
-      sendBtn.addEventListener("click", sendMessage);
-    }
-
-    if (input) {
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          sendMessage();
-        }
-      });
-    }
-  });
-</script>
+<script src="app.js"></script>
 </body>
 </html>

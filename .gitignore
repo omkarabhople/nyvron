@@ -1,0 +1,7 @@
+node_modules/
+dist/
+insert api key here
+.DS_Store
+backend/.DS_Store
+frontend/.DS_Store
+*.log
