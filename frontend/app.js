@@ -2143,92 +2143,92 @@ function renderBooks() {
     container.appendChild(card);
     grid.appendChild(container);
     
-    // Swipe Touch Gesture Handlers
-    let startY = 0;
-    let currentY = 0;
-    let swiped = false;
-    let hasDragged = false;
-    
+    // Swipe Touch Gesture Handlers (Leak-free temporary binding pattern)
     card.addEventListener('touchstart', (e) => {
-      startY = e.touches[0].clientY;
-      currentY = startY;
-      hasDragged = false;
+      const startY = e.touches[0].clientY;
+      let currentY = startY;
+      let hasDragged = false;
+      
       card.style.transition = 'none';
       deleteLayer.style.transition = 'none';
-    }, {passive: true});
-    
-    card.addEventListener('touchmove', (e) => {
-      currentY = e.touches[0].clientY;
-      let deltaY = currentY - startY;
-      if (Math.abs(deltaY) > 5) {
-        hasDragged = true;
-      }
-      if (hasDragged && deltaY < 0) {
-        let translateVal = Math.max(-60, deltaY);
-        card.style.transform = `translateY(${translateVal}px)`;
-        deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
-      }
-    }, {passive: true});
-    
-    card.addEventListener('touchend', () => {
-      if (!hasDragged) return;
       
-      card.style.transition = 'transform 0.2s ease';
-      deleteLayer.style.transition = 'opacity 0.2s ease';
-      let deltaY = currentY - startY;
-      if (deltaY < -25) {
-        card.style.transform = 'translateY(-60px)';
-        deleteLayer.style.opacity = '1';
-        swiped = true;
-      } else {
-        card.style.transform = 'translateY(0px)';
-        deleteLayer.style.opacity = '0';
-        swiped = false;
-      }
-    });
+      const onTouchMove = (moveEvent) => {
+        currentY = moveEvent.touches[0].clientY;
+        let deltaY = currentY - startY;
+        if (Math.abs(deltaY) > 5) {
+          hasDragged = true;
+        }
+        if (hasDragged && deltaY < 0) {
+          let translateVal = Math.max(-60, deltaY);
+          card.style.transform = `translateY(${translateVal}px)`;
+          deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
+        }
+      };
+      
+      const onTouchEnd = () => {
+        card.removeEventListener('touchmove', onTouchMove);
+        card.removeEventListener('touchend', onTouchEnd);
+        
+        if (!hasDragged) return;
+        
+        card.style.transition = 'transform 0.2s ease';
+        deleteLayer.style.transition = 'opacity 0.2s ease';
+        let deltaY = currentY - startY;
+        if (deltaY < -25) {
+          card.style.transform = 'translateY(-60px)';
+          deleteLayer.style.opacity = '1';
+        } else {
+          card.style.transform = 'translateY(0px)';
+          deleteLayer.style.opacity = '0';
+        }
+      };
+      
+      card.addEventListener('touchmove', onTouchMove, {passive: true});
+      card.addEventListener('touchend', onTouchEnd);
+    }, {passive: true});
     
-    // Swipe Mouse Fallback Gestures (Desktop Support)
-    let isMouseDown = false;
+    // Swipe Mouse Fallback Gestures (Desktop Support - Leak-free temporary binding pattern)
     card.addEventListener('mousedown', (e) => {
-      startY = e.clientY;
-      currentY = startY;
-      isMouseDown = true;
-      hasDragged = false;
+      const startY = e.clientY;
+      let currentY = startY;
+      let hasDragged = false;
+      
       card.style.transition = 'none';
       deleteLayer.style.transition = 'none';
-    });
-    
-    window.addEventListener('mousemove', (e) => {
-      if (!isMouseDown) return;
-      currentY = e.clientY;
-      let deltaY = currentY - startY;
-      if (Math.abs(deltaY) > 5) {
-        hasDragged = true;
-      }
-      if (hasDragged && deltaY < 0) {
-        let translateVal = Math.max(-60, deltaY);
-        card.style.transform = `translateY(${translateVal}px)`;
-        deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
-      }
-    });
-    
-    window.addEventListener('mouseup', () => {
-      if (!isMouseDown) return;
-      isMouseDown = false;
-      if (!hasDragged) return;
       
-      card.style.transition = 'transform 0.2s ease';
-      deleteLayer.style.transition = 'opacity 0.2s ease';
-      let deltaY = currentY - startY;
-      if (deltaY < -25) {
-        card.style.transform = 'translateY(-60px)';
-        deleteLayer.style.opacity = '1';
-        swiped = true;
-      } else {
-        card.style.transform = 'translateY(0px)';
-        deleteLayer.style.opacity = '0';
-        swiped = false;
-      }
+      const onMouseMove = (moveEvent) => {
+        currentY = moveEvent.clientY;
+        let deltaY = currentY - startY;
+        if (Math.abs(deltaY) > 5) {
+          hasDragged = true;
+        }
+        if (hasDragged && deltaY < 0) {
+          let translateVal = Math.max(-60, deltaY);
+          card.style.transform = `translateY(${translateVal}px)`;
+          deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
+        }
+      };
+      
+      const onMouseUp = () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        
+        if (!hasDragged) return;
+        
+        card.style.transition = 'transform 0.2s ease';
+        deleteLayer.style.transition = 'opacity 0.2s ease';
+        let deltaY = currentY - startY;
+        if (deltaY < -25) {
+          card.style.transform = 'translateY(-60px)';
+          deleteLayer.style.opacity = '1';
+        } else {
+          card.style.transform = 'translateY(0px)';
+          deleteLayer.style.opacity = '0';
+        }
+      };
+      
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
     });
     
     // Wire Delete action
@@ -2636,18 +2636,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Book cover click to open reader
     if (e.target.closest('.book-cover-card')) {
-      const card = e.target.closest('.book-cover-card');
-      // If the card is swiped, clicking resets it
-      if (card.style.transform === 'translateY(-60px)') {
-        card.style.transform = 'translateY(0px)';
-        const deleteLayer = card.previousElementSibling;
-        if (deleteLayer) deleteLayer.style.opacity = '0';
-        return;
-      }
-      const bid = card.dataset.id;
-      const book = STATE.books.find(b => b.id === bid);
-      if(book) {
-        openBookReader(book);
+      try {
+        const card = e.target.closest('.book-cover-card');
+        // If the card is swiped, clicking resets it
+        if (card.style.transform === 'translateY(-60px)') {
+          card.style.transform = 'translateY(0px)';
+          const deleteLayer = card.previousElementSibling;
+          if (deleteLayer) deleteLayer.style.opacity = '0';
+          return;
+        }
+        const bid = card.dataset.id;
+        const book = STATE.books.find(b => b.id === bid);
+        if(book) {
+          openBookReader(book);
+        } else {
+          console.warn("Book not found in STATE.books:", bid);
+        }
+      } catch (err) {
+        alert("Error opening book reader: " + err.message + "\n" + err.stack);
       }
     }
 
