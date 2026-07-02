@@ -466,6 +466,7 @@ function saveJournalEntry(){
     STATE.journalEntries.push({id:STATE.journalEditId,title,body,mood:STATE.selectedMood,date:new Date().toISOString(),gradient:grad});
   }
   save();renderJournal();
+  $('journal-write-overlay')?.classList.add('hidden');
 }
 
 // --- closeModal ---
@@ -1499,7 +1500,7 @@ function openBookReader(book) {
   };
 
   $('cr-delete-book-btn').onclick = () => {
-    if (confirm('Delete this book from library?')) {
+    showConfirm('Delete Book', 'Delete this book from library?', () => {
       window.removeEventListener('keydown', handleKeyboardNav);
       window.removeEventListener('resize', adjustReaderResponsiveScale);
       const bookId = book.id;
@@ -1509,7 +1510,7 @@ function openBookReader(book) {
         overlay.classList.add('hidden');
         renderBooks();
       });
-    }
+    });
   };
 
   $('cr-sidebar-toggle').onclick = () => {
@@ -1695,7 +1696,7 @@ function openBookReader(book) {
   if (book.fileType === 'pdf') {
     getFile(book.id).then(blob => {
       if (!blob) {
-        alert("PDF file not found in local storage.");
+        showAlert("Missing File", "PDF file not found in local storage.");
         overlay.classList.add('hidden');
         return;
       }
@@ -1770,14 +1771,20 @@ function openJournalWrite(entryId){
 
 // --- startCascaraSession ---
 function startCascaraSession(sid){
+  showPrompt('Study Topic', 'What topic are you studying right now?', 'General Study', (heading) => {
+    const studyHeading = heading && heading.trim() ? heading.trim() : 'General Study';
+    continueCascaraStart(sid, studyHeading);
+  }, () => {
+    continueCascaraStart(sid, 'General Study');
+  });
+}
+
+function continueCascaraStart(sid, studyHeading) {
   if(STATE.cascara.activeSubjectId)stopCascaraSession();
   STATE.cascara.activeSubjectId=sid; STATE.cascara.activeStart=Date.now();
   const sub=STATE.cascara.subjects.find(s=>s.id===sid);
   if(sub){sub._baseMs=sub.todayMs;}
   const overlay=$('cascara-focus-overlay');
-  
-  const heading = prompt('What topic are you studying right now?', 'General Study');
-  const studyHeading = heading && heading.trim() ? heading.trim() : 'Studying';
   
   if(overlay){
     $('cfo-subject-name').textContent=sub?.name||'Subject';
@@ -1883,11 +1890,11 @@ function renderCountdown() {
 
   $('del-countdown-btn')?.addEventListener('click', (ev) => {
     ev.stopPropagation();
-    if (confirm('Delete this countdown?')) {
+    showConfirm('Delete Countdown', 'Delete this countdown?', () => {
       STATE.countdown = { title: "", target: "" };
       save();
       renderCountdown();
-    }
+    });
   });
 }
 
@@ -2153,6 +2160,7 @@ function renderBooks() {
     card.innerHTML = `
       <div class="book-cover-art" style="background: linear-gradient(135deg, ${b.fileType === 'pdf' ? '#7f1d1d, #b91c1c' : '#1e3c72, #2a5298'})">
         <span class="book-type-badge">${b.fileType.toUpperCase()}</span>
+        <button class="book-dots-btn" data-id="${b.id}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; display:flex; align-items:center; justify-content:center; color:#fff; cursor:pointer; font-size:14px; font-weight:bold; z-index:10; outline:none; transition: background 0.2s;">⋮</button>
         <div style="font-size: 13px; line-height: 1.2; font-weight:700; word-break:break-word;">${b.title}</div>
       </div>
       <div class="book-meta">
@@ -2170,6 +2178,7 @@ function renderBooks() {
     
     // Swipe Touch Gesture Handlers (Leak-free temporary binding pattern)
     card.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.book-dots-btn')) return;
       const startY = e.touches[0].clientY;
       let currentY = startY;
       let hasDragged = false;
@@ -2214,6 +2223,7 @@ function renderBooks() {
     
     // Swipe Mouse Fallback Gestures (Desktop Support - Leak-free temporary binding pattern)
     card.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.book-dots-btn')) return;
       const startY = e.clientY;
       let currentY = startY;
       let hasDragged = false;
@@ -2256,17 +2266,33 @@ function renderBooks() {
       window.addEventListener('mouseup', onMouseUp);
     });
     
+    // Wire dots button click
+    const dotsBtn = card.querySelector('.book-dots-btn');
+    if (dotsBtn) {
+      dotsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showConfirm('Delete Book', 'Are you sure you want to delete this book?', () => {
+          const bookId = b.id;
+          STATE.books = STATE.books.filter(x => x.id !== bookId);
+          save();
+          deleteFile(bookId).then(() => {
+            renderBooks();
+          });
+        });
+      });
+    }
+    
     // Wire Delete action
     deleteBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (confirm('Are you sure you want to delete this book?')) {
+      showConfirm('Delete Book', 'Are you sure you want to delete this book?', () => {
         const bookId = b.id;
         STATE.books = STATE.books.filter(x => x.id !== bookId);
         save();
         deleteFile(bookId).then(() => {
           renderBooks();
         });
-      }
+      });
     });
   });
 }
@@ -2293,8 +2319,21 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('nv-theme', themeSel.value);
   });
 
-  // Motivation/North Star refresh click binding
-  $('ns-refresh')?.addEventListener('click', () => fetchNorthStar(true));
+  // Motivation/North Star refresh click binding with spin loading animation
+  $('ns-refresh')?.addEventListener('click', async () => {
+    const btn = $('ns-refresh');
+    if (btn) {
+      btn.style.pointerEvents = 'none';
+      btn.style.opacity = '0.5';
+      btn.classList.add('loading-spin');
+    }
+    await fetchNorthStar(true);
+    if (btn) {
+      btn.style.pointerEvents = '';
+      btn.style.opacity = '';
+      btn.classList.remove('loading-spin');
+    }
+  });
 
   // Energy buttons wiring
   const esegBtns = document.querySelectorAll('.eseg-btn');
@@ -2311,12 +2350,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Profile edit row triggers (Card, Avatar, Name)
   const triggerProfileEdit = () => {
-    const newName = prompt('Enter profile name:', STATE.profile.name || 'User');
-    if(newName && newName.trim()) {
-      STATE.profile.name = newName.trim();
-      save();
-      renderProfile();
-    }
+    showPrompt('Profile Name', 'Enter profile name:', STATE.profile.name || 'User', (newName) => {
+      if(newName && newName.trim()) {
+        STATE.profile.name = newName.trim();
+        save();
+        renderProfile();
+      }
+    });
   };
   $('profile-card-btn')?.addEventListener('click', triggerProfileEdit);
   $('profile-avatar')?.addEventListener('click', (e) => {
@@ -2328,6 +2368,10 @@ document.addEventListener('DOMContentLoaded', () => {
     triggerProfileEdit();
   });
 
+  // Wire backdrop close triggers
+  $('modal-close')?.addEventListener('click', closeModal);
+  $('modal-backdrop')?.addEventListener('click', closeModal);
+  $('cal-creator-backdrop')?.addEventListener('click', closeCalCreator);
   // Focus overlay close button
   $('cfo-close')?.addEventListener('click', stopCascaraSession);
 
@@ -2390,16 +2434,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Profile Edit
-  const avatar = $('profile-avatar');
-  avatar?.addEventListener('click', () => {
-    const newName = prompt('Enter profile name:', STATE.profile.name || 'User');
-    if(newName && newName.trim()) {
-      STATE.profile.name = newName.trim();
-      save();
-      renderProfile();
-    }
-  });
+
 
   // Edit direction text
   $('edit-direction-btn')?.addEventListener('click', () => {
@@ -2519,12 +2554,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Delete journal entry button in jw modal
   $('jw-tool-del')?.addEventListener('click', () => {
     if(STATE.journalEditId) {
-      if(confirm('Are you sure you want to delete this journal entry?')) {
+      showConfirm('Delete Entry', 'Are you sure you want to delete this journal entry?', () => {
         STATE.journalEntries = STATE.journalEntries.filter(e => e.id !== STATE.journalEditId);
         save();
         renderJournal();
         $('journal-write-overlay')?.classList.add('hidden');
-      }
+      });
     }
   });
 
@@ -2533,7 +2568,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const title = $('jw-title').value;
     const body = $('jw-body').value;
     if(navigator.clipboard) {
-      navigator.clipboard.writeText(`${title}\n\n${body}`).then(() => alert('Copied to clipboard!'));
+      navigator.clipboard.writeText(`${title}\n\n${body}`).then(() => showAlert('Copied', 'Copied to clipboard!'));
     }
   });
 
@@ -2606,21 +2641,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Add study subject
   $('cascara-add-subject')?.addEventListener('click', () => {
-    const name = prompt('Enter subject name:');
-    if (name && name.trim()) {
-      const colors = ['#E8652A', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      STATE.cascara.subjects.push({
-        id: randomId(),
-        name: name.trim(),
-        color: randomColor,
-        todayMs: 0,
-        totalMs: 0,
-        _baseMs: 0
-      });
-      save();
-      renderCascaraSubjects();
-    }
+    showPrompt('Add Subject', 'Enter subject name:', '', (name) => {
+      if (name && name.trim()) {
+        const colors = ['#E8652A', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        STATE.cascara.subjects.push({
+          id: randomId(),
+          name: name.trim(),
+          color: randomColor,
+          todayMs: 0,
+          totalMs: 0,
+          _baseMs: 0
+        });
+        save();
+        renderCascaraSubjects();
+      }
+    });
   });
 
   // Upload book
@@ -2733,26 +2769,27 @@ document.addEventListener('DOMContentLoaded', () => {
       `);
       setTimeout(() => {
         $('del-subject-btn')?.addEventListener('click', () => {
-          if(confirm('Are you sure you want to delete this subject and all its sessions?')) {
+          showConfirm('Delete Subject', 'Are you sure you want to delete this subject and all its sessions?', () => {
             STATE.cascara.subjects = STATE.cascara.subjects.filter(s => s.id !== sid);
             STATE.cascara.sessions = STATE.cascara.sessions.filter(s => s.subjectId !== sid);
             save();
             renderCascaraSubjects();
             renderHeatmap();
             closeModal();
-          }
+          });
         });
         $('rename-subject-btn')?.addEventListener('click', () => {
-          const newName = prompt('Enter new subject name:', sname);
-          if(newName && newName.trim()) {
-            const sub = STATE.cascara.subjects.find(s => s.id === sid);
-            if(sub) {
-              sub.name = newName.trim();
-              save();
-              renderCascaraSubjects();
-              closeModal();
+          showPrompt('Rename Subject', 'Enter new subject name:', sname, (newName) => {
+            if(newName && newName.trim()) {
+              const sub = STATE.cascara.subjects.find(s => s.id === sid);
+              if(sub) {
+                sub.name = newName.trim();
+                save();
+                renderCascaraSubjects();
+                closeModal();
+              }
             }
-          }
+          });
         });
       }, 50);
     }
@@ -2776,7 +2813,7 @@ document.addEventListener('DOMContentLoaded', () => {
           console.warn("Book not found in STATE.books:", bid);
         }
       } catch (err) {
-        alert("Error opening book reader: " + err.message + "\n" + err.stack);
+        showAlert("Error", "Error opening book reader: " + err.message);
       }
     }
 
