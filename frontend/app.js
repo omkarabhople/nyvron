@@ -1775,7 +1775,17 @@ function startCascaraSession(sid){
   const sub=STATE.cascara.subjects.find(s=>s.id===sid);
   if(sub){sub._baseMs=sub.todayMs;}
   const overlay=$('cascara-focus-overlay');
-  if(overlay){$('cfo-subject-name').textContent=sub?.name||'Subject';$('cfo-start').textContent=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});overlay.classList.remove('hidden');}
+  
+  const heading = prompt('What topic are you studying right now?', 'General Study');
+  const studyHeading = heading && heading.trim() ? heading.trim() : 'Studying';
+  
+  if(overlay){
+    $('cfo-subject-name').textContent=sub?.name||'Subject';
+    const statusEl = overlay.querySelector('.cfo-status');
+    if (statusEl) statusEl.textContent = studyHeading;
+    $('cfo-start').textContent=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+    overlay.classList.remove('hidden');
+  }
   STATE.cascara.activeInterval=setInterval(()=>{
     const elapsed=Date.now()-STATE.cascara.activeStart;
     const s=STATE.cascara.subjects.find(x=>x.id===sid);
@@ -1922,7 +1932,22 @@ function renderCalEvents(dateStr){
   const events=STATE.events[dateStr]||[];list.innerHTML='';
   if(!events.length){empty?.classList.remove('hidden');return;}
   empty?.classList.add('hidden');
-  events.forEach((ev,i)=>{const li=document.createElement('li');li.className='cal-event-item';li.style.animationDelay=`${i*.06}s`;li.innerHTML=`<div class="cal-event-dot"></div><span class="cal-event-time">${ev.time||'All day'}</span><span class="cal-event-title">${ev.title}</span><button class="cal-event-del" data-id="${ev.id}">✕</button>`;list.appendChild(li);});
+  events.forEach((ev,i)=>{
+    const li=document.createElement('li');
+    li.className='cal-event-item';
+    li.style.animationDelay=`${i*.06}s`;
+    
+    let extraHTML = '';
+    if (ev.url) {
+      extraHTML += `<div style="font-size: 11px; color: var(--cascara); margin-top: 2px;"><a href="${ev.url}" target="_blank" style="color:var(--cascara); text-decoration:underline;">${ev.url}</a></div>`;
+    }
+    if (ev.notes) {
+      extraHTML += `<div style="font-size: 11px; color: var(--txt3); margin-top: 2px;">${ev.notes}</div>`;
+    }
+    
+    li.innerHTML=`<div class="cal-event-dot"></div><div style="flex:1;"><div><span class="cal-event-time">${ev.time||'All day'}</span><span class="cal-event-title" style="margin-left: 6px; font-weight: 500;">${ev.title}</span></div>${extraHTML}</div><button class="cal-event-del" data-id="${ev.id}">✕</button>`;
+    list.appendChild(li);
+  });
 }
 
 // --- updateClock ---
@@ -2074,10 +2099,10 @@ function renderJournal(){
 }
 
 // --- fetchNorthStar ---
-async function fetchNorthStar(){
+async function fetchNorthStar(force = false){
   const qt=$('ns-quote-text'),qa=$('ns-quote-author'); if(!qt)return;
   const cached=JSON.parse(localStorage.getItem('nv-ns-cache')||'null');
-  if(cached&&Date.now()-cached.ts<86400000){
+  if(!force && cached && Date.now()-cached.ts<86400000){
     qt.classList.remove('skeleton'); qt.textContent=`"${cached.q}"`; qa.textContent=`— ${cached.a}`; return;
   }
   qt.classList.add('skeleton'); qt.textContent='⠀'; qa.textContent='';
@@ -2268,6 +2293,103 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('nv-theme', themeSel.value);
   });
 
+  // Motivation/North Star refresh click binding
+  $('ns-refresh')?.addEventListener('click', () => fetchNorthStar(true));
+
+  // Energy buttons wiring
+  const esegBtns = document.querySelectorAll('.eseg-btn');
+  const savedEnergy = localStorage.getItem('nv-energy') || 'high';
+  esegBtns.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.energy === savedEnergy);
+    btn.addEventListener('click', () => {
+      esegBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      STATE.energy = btn.dataset.energy;
+      localStorage.setItem('nv-energy', btn.dataset.energy);
+    });
+  });
+
+  // Profile edit row triggers (Card, Avatar, Name)
+  const triggerProfileEdit = () => {
+    const newName = prompt('Enter profile name:', STATE.profile.name || 'User');
+    if(newName && newName.trim()) {
+      STATE.profile.name = newName.trim();
+      save();
+      renderProfile();
+    }
+  };
+  $('profile-card-btn')?.addEventListener('click', triggerProfileEdit);
+  $('profile-avatar')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    triggerProfileEdit();
+  });
+  $('profile-name')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    triggerProfileEdit();
+  });
+
+  // Focus overlay close button
+  $('cfo-close')?.addEventListener('click', stopCascaraSession);
+
+  // Journal Editor text formatting buttons
+  const formatTextarea = (fmt) => {
+    const txt = $('jw-body'); if(!txt) return;
+    const start = txt.selectionStart;
+    const end = txt.selectionEnd;
+    const val = txt.value;
+    const sel = val.substring(start, end);
+    
+    let replacement = '';
+    if (fmt === 'bold') {
+      replacement = `**${sel || 'bold text'}**`;
+    } else if (fmt === 'italic') {
+      replacement = `*${sel || 'italic text'}*`;
+    } else if (fmt === 'list') {
+      replacement = `\n- ${sel || 'item'}`;
+    } else if (fmt === 'todo') {
+      replacement = `\n- [ ] ${sel || 'task'}`;
+    }
+    
+    txt.value = val.substring(0, start) + replacement + val.substring(end);
+    txt.focus();
+    txt.setSelectionRange(start + 2, start + 2 + (sel || '').length);
+  };
+
+  document.querySelectorAll('.jw-tool-btn[data-fmt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      formatTextarea(btn.dataset.fmt);
+    });
+  });
+
+  $('jw-tool-todo')?.addEventListener('click', () => {
+    formatTextarea('todo');
+  });
+
+  // Main AI Tab Submit Buttons wiring
+  const handleAISend = () => {
+    const inp = $('ai-input'); if (!inp) return;
+    const text = inp.value.trim();
+    if (text) {
+      inp.value = '';
+      sendAI(text);
+    }
+  };
+
+  $('ai-send')?.addEventListener('click', handleAISend);
+  $('ai-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAISend();
+    }
+  });
+
+  // Prompt chips
+  document.querySelectorAll('.ai-prompt-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      sendAI(chip.dataset.prompt);
+    });
+  });
+
   // Profile Edit
   const avatar = $('profile-avatar');
   avatar?.addEventListener('click', () => {
@@ -2443,6 +2565,7 @@ document.addEventListener('DOMContentLoaded', () => {
       title,
       allday: isAllDay,
       time: isAllDay ? 'All day' : startTime,
+      url: $('cc-url')?.value.trim() || '',
       notes: $('cc-notes')?.value || '',
     };
     
@@ -2550,19 +2673,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Global body click delegation
   document.body.addEventListener('click', e => {
-    // Toggling checklists
+    // Toggling checklists -> now deletes immediately as requested
     if (e.target.classList.contains('rem-check')) {
       const id = e.target.dataset.id;
-      const priority = STATE.priorities.find(p => p.id === id);
-      if (priority) {
-        priority.done = !priority.done;
+      const pIdx = STATE.priorities.findIndex(p => p.id === id);
+      if (pIdx > -1) {
+        STATE.priorities.splice(pIdx, 1);
         save();
         renderPriorities();
         return;
       }
-      const reminder = STATE.reminders.find(r => r.id === id);
-      if (reminder) {
-        reminder.done = !reminder.done;
+      const rIdx = STATE.reminders.findIndex(r => r.id === id);
+      if (rIdx > -1) {
+        STATE.reminders.splice(rIdx, 1);
         save();
         renderReminders();
         return;
