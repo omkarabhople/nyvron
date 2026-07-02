@@ -1,0 +1,1125 @@
+// ================
+// NYVRON APP CORE WITH STORAGE
+// ================
+
+// --- Storage helpers ---
+const STORAGE_KEYS = {
+  today: "nyvron_today",
+  calendar: "nyvron_calendar",
+  timer: "nyvron_timer",
+  schedule: "nyvron_schedule",
+  memory: "nyvron_memory",
+  reflection: "nyvron_reflection",
+  settings: "nyvron_settings",
+  profile: "nyvron_profile",
+};
+
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function saveJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (_) {}
+}
+
+// ========== Screen navigation ==========
+const screenEls = document.querySelectorAll(".screen");
+const navButtons = document.querySelectorAll("[data-screen-target]");
+const topbarTitle = document.getElementById("topbar-title");
+
+function showScreen(screenId) {
+  screenEls.forEach((screen) => {
+    screen.classList.toggle("active", screen.id === screenId);
+  });
+
+  navButtons.forEach((btn) => {
+    const target = btn.getAttribute("data-screen-target");
+    btn.classList.toggle("active", target === screenId);
+  });
+
+  if (topbarTitle) {
+    const name = screenId.replace("screen-", "").replace("-", " ");
+    topbarTitle.textContent =
+      name.charAt(0).toUpperCase() + name.slice(1);
+  }
+}
+
+navButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const target = btn.getAttribute("data-screen-target");
+    if (target) showScreen(target);
+  });
+});
+
+showScreen("screen-today");
+
+// ========== Clock & greeting ==========
+function updateTopbarClock() {
+  const now = new Date();
+  const clockEl = document.getElementById("topbar-clock");
+  const todayTimeEl = document.getElementById("today-time");
+  const dashboardTimeEl = document.getElementById("dashboard-time");
+
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  const timeString = `${hh}:${mm}:${ss}`;
+
+  if (clockEl) clockEl.textContent = timeString;
+  if (todayTimeEl) todayTimeEl.textContent = timeString;
+  if (dashboardTimeEl) dashboardTimeEl.textContent = timeString;
+
+  const todayDateEl = document.getElementById("today-date");
+  const dashboardDateEl = document.getElementById("dashboard-date");
+  const dateStr = now.toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  if (todayDateEl) todayDateEl.textContent = dateStr;
+  if (dashboardDateEl) dashboardDateEl.textContent = dateStr;
+}
+setInterval(updateTopbarClock, 1000);
+updateTopbarClock();
+
+function updateGreeting() {
+  const greetingEl = document.getElementById("today-greeting");
+  const subtitleEl = document.getElementById("today-subtitle");
+  const dashboardGreeting = document.getElementById("dashboard-greeting");
+
+  const now = new Date();
+  const hour = now.getHours();
+  let greeting = "HELLO! SIR!";
+  let line = "Let’s build your empire.";
+
+  if (hour < 12) {
+    greeting = "GOOD MORNING";
+    line = "Start your day with intent.";
+  } else if (hour < 18) {
+    greeting = "GOOD AFTERNOON";
+    line = "Keep your momentum going.";
+  } else {
+    greeting = "GOOD EVENING";
+    line = "Reflect and reset for tomorrow.";
+  }
+
+  if (greetingEl) greetingEl.textContent = greeting;
+  if (subtitleEl) subtitleEl.textContent = line;
+  if (dashboardGreeting) dashboardGreeting.textContent = greeting;
+}
+updateGreeting();
+
+// ========== Theme ==========
+const themeToggleBtn = document.getElementById("theme-toggle-btn");
+const settingsThemeSelect = document.getElementById(
+  "settings-theme-select"
+);
+
+function getCurrentTheme() {
+  return document.documentElement.getAttribute("data-theme") || "dark";
+}
+
+function applyThemeFromSettings() {
+  const settings = loadJSON(STORAGE_KEYS.settings, {});
+  const mode = settings.theme || "dark";
+  document.documentElement.setAttribute("data-theme", mode);
+  if (settingsThemeSelect) {
+    settingsThemeSelect.value = settings.theme || "dark";
+  }
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const settings = loadJSON(STORAGE_KEYS.settings, {});
+  settings.theme = theme;
+  saveJSON(STORAGE_KEYS.settings, settings);
+}
+
+function toggleTheme() {
+  const current = getCurrentTheme();
+  setTheme(current === "dark" ? "light" : "dark");
+}
+
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener("click", toggleTheme);
+}
+if (settingsThemeSelect) {
+  settingsThemeSelect.addEventListener("change", (e) => {
+    const value = e.target.value;
+    if (value === "auto") {
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      setTheme(prefersDark ? "dark" : "light");
+    } else {
+      setTheme(value);
+    }
+  });
+}
+applyThemeFromSettings();
+
+// Font size slider
+const fontSlider = document.getElementById("settings-font-size");
+if (fontSlider) {
+  const settings = loadJSON(STORAGE_KEYS.settings, {});
+  const scale = settings.fontScale || 1;
+  fontSlider.value = scale;
+  document.documentElement.style.setProperty(
+    "--nyvron-font-scale",
+    scale
+  );
+  fontSlider.addEventListener("input", (e) => {
+    const factor = parseFloat(e.target.value || "1");
+    document.documentElement.style.setProperty(
+      "--nyvron-font-scale",
+      factor
+    );
+    const s = loadJSON(STORAGE_KEYS.settings, {});
+    s.fontScale = factor;
+    saveJSON(STORAGE_KEYS.settings, s);
+  });
+}
+
+// ========== Command bar ==========
+const commandBar = document.getElementById("commandbar");
+const commandBarTrigger = document.getElementById("commandbar-trigger");
+const commandBarInput = document.getElementById("commandbar-input");
+
+function openCommandBar() {
+  if (!commandBar) return;
+  commandBar.classList.remove("hidden");
+  commandBar.setAttribute("aria-hidden", "false");
+  if (commandBarInput) {
+    commandBarInput.value = "";
+    commandBarInput.focus();
+  }
+}
+
+function closeCommandBar() {
+  if (!commandBar) return;
+  commandBar.classList.add("hidden");
+  commandBar.setAttribute("aria-hidden", "true");
+}
+
+if (commandBarTrigger) {
+  commandBarTrigger.addEventListener("click", openCommandBar);
+}
+
+document.addEventListener("keydown", (e) => {
+  const key = e.key.toLowerCase();
+  if ((e.metaKey || e.ctrlKey) && key === "k") {
+    e.preventDefault();
+    openCommandBar();
+  }
+  if (key === "escape") {
+    closeCommandBar();
+  }
+});
+
+if (commandBar) {
+  commandBar.addEventListener("click", (e) => {
+    if (e.target.classList.contains("commandbar-backdrop")) {
+      closeCommandBar();
+    }
+  });
+}
+
+// ========== Today ( priorities, schedule, notes, countdown, north star ) ==========
+const todayState = loadJSON(STORAGE_KEYS.today, {
+  priorities: [],
+  reminders: [],
+  schedule: [],
+  notes: [],
+  countdown: null,
+  northstar: {
+    phase: "Phase 1: Foundation",
+    direction: "Stability, consistency, and confidence.",
+  },
+});
+
+const todayPrioritiesEl = document.getElementById("today-priorities");
+const todayRemindersEl = document.getElementById("today-reminders");
+const todayScheduleEl = document.getElementById("today-schedule-list");
+const quickNotesInput = document.getElementById("quick-notes-input");
+const quickNotesSave = document.getElementById("quick-notes-save");
+const quickNotesList = document.getElementById("quick-notes-list");
+
+function renderTodayList(list, container, type) {
+  if (!container) return;
+  container.innerHTML = "";
+
+  list.forEach((item, idx) => {
+    const li = document.createElement("li");
+
+    const main = document.createElement("div");
+    main.className = "checklist-main";
+
+    const circle = document.createElement("button");
+    circle.className = "checklist-circle";
+    circle.type = "button";
+
+    const label = document.createElement("span");
+    label.className = "checklist-label";
+    label.textContent = item;
+
+    const del = document.createElement("button");
+    del.className = "checklist-delete";
+    del.type = "button";
+    del.textContent = "✕";
+
+    // Apple style: click circle = done, item disappears
+    circle.addEventListener("click", () => {
+      list.splice(idx, 1);
+      saveJSON(STORAGE_KEYS.today, todayState);
+      renderTodayAll();
+    });
+
+    // X = delete
+    del.addEventListener("click", () => {
+      list.splice(idx, 1);
+      saveJSON(STORAGE_KEYS.today, todayState);
+      renderTodayAll();
+    });
+
+    main.appendChild(circle);
+    main.appendChild(label);
+    li.appendChild(main);
+    li.appendChild(del);
+    container.appendChild(li);
+  });
+}
+
+function renderTodayAll() {
+  renderTodayList(todayState.priorities, todayPrioritiesEl, "priority");
+  renderTodayList(todayState.reminders, todayRemindersEl, "reminder");
+  renderTodayList(todayState.schedule, todayScheduleEl, "schedule");
+
+  if (quickNotesList) {
+    quickNotesList.innerHTML = "";
+    todayState.notes.forEach((note) => {
+      const div = document.createElement("div");
+      div.textContent = note;
+      quickNotesList.appendChild(div);
+    });
+  }
+
+  const phaseEl = document.getElementById("northstar-phase");
+  const directionEl = document.getElementById("northstar-direction");
+  if (phaseEl) phaseEl.textContent = todayState.northstar.phase;
+  if (directionEl) directionEl.textContent = todayState.northstar.direction;
+
+  if (todayState.countdown) {
+    renderCountdown();
+  }
+}
+
+const todayAddPriorityBtn = document.getElementById("today-add-priority");
+if (todayAddPriorityBtn) {
+  todayAddPriorityBtn.addEventListener("click", () => {
+    const input = prompt("New priority");
+    if (!input) return;
+    todayState.priorities.push(input);
+    saveJSON(STORAGE_KEYS.today, todayState);
+    renderTodayAll();
+  });
+}
+
+const todayAddScheduleBtn = document.getElementById("today-add-schedule");
+if (todayAddScheduleBtn) {
+  todayAddScheduleBtn.addEventListener("click", () => {
+    const input = prompt("Schedule item (time + text)");
+    if (!input) return;
+    todayState.schedule.push(input);
+    saveJSON(STORAGE_KEYS.today, todayState);
+    renderTodayAll();
+  });
+}
+
+if (quickNotesSave && quickNotesInput) {
+  quickNotesSave.addEventListener("click", () => {
+    const val = quickNotesInput.value.trim();
+    if (!val) return;
+    todayState.notes.push(val);
+    quickNotesInput.value = "";
+    saveJSON(STORAGE_KEYS.today, todayState);
+    renderTodayAll();
+  });
+}
+
+// Countdown
+const countdownSetBtn = document.getElementById("countdown-set-btn");
+const countdownLabelEl = document.getElementById("countdown-label");
+const countdownTimeEl = document.getElementById("countdown-time");
+const countdownMetaEl = document.getElementById("countdown-meta");
+let countdownTimer = null;
+
+function renderCountdown() {
+  if (!todayState.countdown) {
+    if (countdownLabelEl) countdownLabelEl.textContent = "";
+    if (countdownTimeEl) countdownTimeEl.textContent = "";
+    if (countdownMetaEl) countdownMetaEl.textContent = "";
+    return;
+  }
+
+  const target = new Date(todayState.countdown.target);
+  const now = new Date();
+  const diffMs = target.getTime() - now.getTime();
+  if (diffMs <= 0) {
+    if (countdownTimeEl) countdownTimeEl.textContent = "0 days";
+    return;
+  }
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const hours = Math.floor(
+    (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+  );
+  const mins = Math.floor(
+    (diffMs % (1000 * 60 * 60)) / (1000 * 60)
+  );
+  if (countdownLabelEl)
+    countdownLabelEl.textContent = todayState.countdown.label;
+  if (countdownTimeEl)
+    countdownTimeEl.textContent = `${days}d ${hours}h ${mins}m`;
+  if (countdownMetaEl)
+    countdownMetaEl.textContent = `Target: ${target.toLocaleDateString(
+      "en-IN"
+    )}`;
+}
+
+function startCountdownInterval() {
+  if (!todayState.countdown) return;
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = setInterval(renderCountdown, 60 * 1000);
+  renderCountdown();
+}
+
+if (countdownSetBtn) {
+  countdownSetBtn.addEventListener("click", () => {
+    const label = prompt("Countdown label (e.g., Exam, Project end)");
+    if (!label) return;
+    const dateStr = prompt("Target date (YYYY-MM-DD)");
+    if (!dateStr) return;
+    const target = new Date(dateStr);
+    if (Number.isNaN(target.getTime())) return;
+    todayState.countdown = { label, target: target.toISOString() };
+    saveJSON(STORAGE_KEYS.today, todayState);
+    startCountdownInterval();
+  });
+}
+if (todayState.countdown) startCountdownInterval();
+
+// North star
+const northstarEditBtn = document.getElementById("northstar-edit-btn");
+if (northstarEditBtn) {
+  northstarEditBtn.addEventListener("click", () => {
+    const phase = prompt(
+      "Phase",
+      todayState.northstar.phase || ""
+    );
+    const direction = prompt(
+      "Direction",
+      todayState.northstar.direction || ""
+    );
+    if (phase) todayState.northstar.phase = phase;
+    if (direction) todayState.northstar.direction = direction;
+    saveJSON(STORAGE_KEYS.today, todayState);
+    renderTodayAll();
+  });
+}
+
+// Energy
+const energyButtons = document.querySelectorAll(".energy-btn");
+const lowEnergyBanner = document.getElementById("low-energy-banner");
+const lowEnergyDismiss = document.getElementById("low-energy-dismiss");
+
+energyButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    energyButtons.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    const energy = btn.dataset.energy;
+    if (energy === "low" && lowEnergyBanner) {
+      lowEnergyBanner.classList.remove("hidden");
+    } else if (lowEnergyBanner) {
+      lowEnergyBanner.classList.add("hidden");
+    }
+  });
+});
+
+if (lowEnergyDismiss && lowEnergyBanner) {
+  lowEnergyDismiss.addEventListener("click", () => {
+    lowEnergyBanner.classList.add("hidden");
+  });
+}
+
+// initial render
+renderTodayAll();
+
+// ========== Chat ==========
+const chatInput = document.getElementById("chat-input");
+const chatSendBtn = document.getElementById("chat-send-btn");
+const chatMessages = document.getElementById("chat-messages");
+const chatThinking = document.getElementById("chat-thinking-status");
+
+function appendMessage(text, who) {
+  if (!chatMessages || !text.trim()) return;
+  const msg = document.createElement("div");
+  msg.className = `chat-message ${who}`;
+  msg.textContent = text.trim();
+  chatMessages.appendChild(msg);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function fakeAIReply(userText) {
+  if (!chatThinking) return;
+  chatThinking.classList.remove("hidden");
+  setTimeout(() => {
+    chatThinking.classList.add("hidden");
+    appendMessage(
+      "NYVRON stored this locally. (No AI backend wired yet.)",
+      "ai"
+    );
+  }, 800);
+}
+
+function sendChat() {
+  if (!chatInput) return;
+  const value = chatInput.value;
+  if (!value.trim()) return;
+  appendMessage(value, "user");
+  chatInput.value = "";
+  fakeAIReply(value);
+}
+
+if (chatSendBtn && chatInput) {
+  chatSendBtn.addEventListener("click", sendChat);
+  chatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendChat();
+    }
+  });
+}
+
+const quickActionButtons = document.querySelectorAll(
+  "[data-quick-prompt]"
+);
+quickActionButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const promptText = btn.getAttribute("data-quick-prompt") || "";
+    if (chatInput) {
+      chatInput.value = promptText;
+      chatInput.focus();
+    }
+  });
+});
+
+// ========== Calendar with events ==========
+const calendarState = loadJSON(STORAGE_KEYS.calendar, {
+  events: [], // {id, date, time, title, type, notes}
+});
+
+const calendarGrid = document.getElementById("calendar-days-grid");
+const calendarCurrentLabel = document.getElementById(
+  "calendar-current-label"
+);
+const calendarPrevBtn = document.getElementById("calendar-prev-btn");
+const calendarNextBtn = document.getElementById("calendar-next-btn");
+const calendarSelectedDate = document.getElementById(
+  "calendar-selected-date"
+);
+const calendarEventsList = document.getElementById(
+  "calendar-events-list"
+);
+
+let calYear, calMonth, selectedDateISO;
+
+function initCalendarToday() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  selectedDateISO = now.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function renderCalendarGrid() {
+  if (!calendarGrid || !calendarCurrentLabel) return;
+  calendarGrid.innerHTML = "";
+
+  const first = new Date(calYear, calMonth, 1);
+  const firstDay = (first.getDay() + 6) % 7; // Monday=0
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+  const monthName = first.toLocaleString("en-US", { month: "long" });
+  calendarCurrentLabel.textContent = `${monthName} ${calYear}`;
+
+  // fill empties
+  for (let i = 0; i < firstDay; i++) {
+    const empty = document.createElement("div");
+    empty.className = "calendar-day empty";
+    calendarGrid.appendChild(empty);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cell = document.createElement("button");
+    cell.className = "calendar-day";
+    cell.textContent = d;
+    const dateISO = new Date(calYear, calMonth, d)
+      .toISOString()
+      .slice(0, 10);
+
+    if (dateISO === selectedDateISO) {
+      cell.classList.add("selected");
+    }
+
+    cell.addEventListener("click", () => {
+      selectedDateISO = dateISO;
+      renderCalendarGrid();
+      renderCalendarDayDetails();
+    });
+
+    calendarGrid.appendChild(cell);
+  }
+}
+
+function renderCalendarDayDetails() {
+  if (!calendarSelectedDate || !calendarEventsList) return;
+  const dateObj = new Date(selectedDateISO);
+  const label = dateObj.toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  calendarSelectedDate.textContent = label;
+
+  const eventsForDay = calendarState.events.filter(
+    (e) => e.date === selectedDateISO
+  );
+  calendarEventsList.innerHTML = "";
+  if (!eventsForDay.length) {
+    const li = document.createElement("li");
+    li.textContent = "No events yet.";
+    calendarEventsList.appendChild(li);
+    return;
+  }
+  eventsForDay.forEach((ev) => {
+    const li = document.createElement("li");
+    li.textContent = `${ev.time || "--:--"} · ${ev.title} (${ev.type})`;
+    calendarEventsList.appendChild(li);
+  });
+}
+
+if (calendarPrevBtn) {
+  calendarPrevBtn.addEventListener("click", () => {
+    calMonth -= 1;
+    if (calMonth < 0) {
+      calMonth = 11;
+      calYear -= 1;
+    }
+    renderCalendarGrid();
+  });
+}
+
+if (calendarNextBtn) {
+  calendarNextBtn.addEventListener("click", () => {
+    calMonth += 1;
+    if (calMonth > 11) {
+      calMonth = 0;
+      calYear += 1;
+    }
+    renderCalendarGrid();
+  });
+}
+
+// Add event modal
+const calendarModal = document.getElementById("calendar-modal");
+const calendarModalClose = document.getElementById(
+  "calendar-modal-close"
+);
+const calendarNewEventBtn = document.getElementById(
+  "calendar-new-event-btn"
+);
+const calendarEventTitle = document.getElementById(
+  "calendar-event-title"
+);
+const calendarEventType = document.getElementById(
+  "calendar-event-type"
+);
+const calendarEventDate = document.getElementById(
+  "calendar-event-date"
+);
+const calendarEventTime = document.getElementById(
+  "calendar-event-time"
+);
+const calendarEventNotes = document.getElementById(
+  "calendar-event-notes"
+);
+const calendarEventSave = document.getElementById(
+  "calendar-event-save"
+);
+
+function openCalendarModal(prefillDate) {
+  if (!calendarModal) return;
+  calendarModal.classList.remove("hidden");
+  calendarModal.setAttribute("aria-hidden", "false");
+  if (prefillDate && calendarEventDate) {
+    calendarEventDate.value = prefillDate;
+  }
+}
+
+function closeCalendarModal() {
+  if (!calendarModal) return;
+  calendarModal.classList.add("hidden");
+  calendarModal.setAttribute("aria-hidden", "true");
+}
+
+if (calendarNewEventBtn) {
+  calendarNewEventBtn.addEventListener("click", () => {
+    openCalendarModal(selectedDateISO);
+  });
+}
+if (calendarModalClose) {
+  calendarModalClose.addEventListener("click", closeCalendarModal);
+}
+if (calendarModal) {
+  calendarModal.addEventListener("click", (e) => {
+    if (e.target.classList.contains("modal-backdrop")) {
+      closeCalendarModal();
+    }
+  });
+}
+
+if (calendarEventSave) {
+  calendarEventSave.addEventListener("click", () => {
+    if (!calendarEventTitle || !calendarEventDate) return;
+    const title = calendarEventTitle.value.trim();
+    if (!title) return;
+    const date = calendarEventDate.value || selectedDateISO;
+    const time = calendarEventTime ? calendarEventTime.value : "";
+    const type = calendarEventType ? calendarEventType.value : "other";
+    const notes = calendarEventNotes
+      ? calendarEventNotes.value.trim()
+      : "";
+
+    calendarState.events.push({
+      id: Date.now(),
+      date,
+      time,
+      title,
+      type,
+      notes,
+    });
+    saveJSON(STORAGE_KEYS.calendar, calendarState);
+    selectedDateISO = date;
+    renderCalendarGrid();
+    renderCalendarDayDetails();
+    closeCalendarModal();
+
+    // also push to dashboard reminders/upcoming in future if needed
+  });
+}
+
+// Quick add chips (simple)
+document
+  .querySelectorAll("[data-calendar-add-type]")
+  .forEach((btn) => {
+    btn.addEventListener("click", () => {
+      openCalendarModal(selectedDateISO);
+      if (calendarEventType) {
+        calendarEventType.value = btn.getAttribute(
+          "data-calendar-add-type"
+        );
+      }
+    });
+  });
+
+// init calendar
+initCalendarToday();
+renderCalendarGrid();
+renderCalendarDayDetails();
+
+// ========== Time tracker ==========
+const timerDisplay = document.getElementById("timer-display");
+const startBtn = document.getElementById("timer-start-btn");
+const pauseBtn = document.getElementById("timer-pause-btn");
+const resetBtn = document.getElementById("timer-reset-btn");
+const timerSessionName = document.getElementById(
+  "timer-session-name"
+);
+const timerTagsInput = document.getElementById("timer-tags-input");
+const timerSessionsList = document.getElementById(
+  "timer-sessions-list"
+);
+const timerSaveSessionBtn = document.getElementById(
+  "timer-save-session-btn"
+);
+
+let timerInterval = null;
+let elapsedSeconds = 0;
+let currentMode = "study";
+
+const timerState = loadJSON(STORAGE_KEYS.timer, {
+  sessions: [],
+});
+
+function renderTimer() {
+  if (!timerDisplay) return;
+  const h = String(Math.floor(elapsedSeconds / 3600)).padStart(2, "0");
+  const m = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(
+    2,
+    "0"
+  );
+  const s = String(elapsedSeconds % 60).padStart(2, "0");
+  timerDisplay.textContent = `${h}:${m}:${s}`;
+}
+
+function startTimer() {
+  if (timerInterval) return;
+  timerInterval = setInterval(() => {
+    elapsedSeconds += 1;
+    renderTimer();
+  }, 1000);
+}
+
+function pauseTimer() {
+  if (!timerInterval) return;
+  clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+function resetTimer() {
+  pauseTimer();
+  elapsedSeconds = 0;
+  renderTimer();
+}
+
+if (startBtn) startBtn.addEventListener("click", startTimer);
+if (pauseBtn) pauseBtn.addEventListener("click", pauseTimer);
+if (resetBtn) resetBtn.addEventListener("click", resetTimer);
+renderTimer();
+
+// Mode chips
+const modeChips = document.querySelectorAll(
+  "#timer-mode-selector .glass-chip"
+);
+modeChips.forEach((chip) => {
+  chip.addEventListener("click", () => {
+    modeChips.forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    currentMode = chip.dataset.mode || "study";
+  });
+});
+
+function renderSessions() {
+  if (!timerSessionsList) return;
+  timerSessionsList.innerHTML = "";
+  timerState.sessions.forEach((s) => {
+    const li = document.createElement("li");
+    li.textContent = `${s.time} · ${s.mode} · ${s.name}`;
+    timerSessionsList.appendChild(li);
+  });
+}
+
+if (timerSaveSessionBtn) {
+  timerSaveSessionBtn.addEventListener("click", () => {
+    if (elapsedSeconds === 0) {
+      alert("Timer is 0, nothing to save.");
+      return;
+    }
+    const name =
+      (timerSessionName && timerSessionName.value.trim()) ||
+      "Unnamed session";
+    const tags =
+      (timerTagsInput && timerTagsInput.value.trim()) || "";
+    timerState.sessions.push({
+      id: Date.now(),
+      seconds: elapsedSeconds,
+      time: timerDisplay ? timerDisplay.textContent : "",
+      mode: currentMode,
+      name,
+      tags,
+      date: new Date().toISOString().slice(0, 10),
+    });
+    saveJSON(STORAGE_KEYS.timer, timerState);
+    renderSessions();
+    resetTimer();
+    if (timerSessionName) timerSessionName.value = "";
+    if (timerTagsInput) timerTagsInput.value = "";
+  });
+}
+renderSessions();
+
+// ========== Schedule ==========
+const scheduleState = loadJSON(STORAGE_KEYS.schedule, {
+  day: [],
+  week: [],
+  month: [],
+});
+
+const scheduleDayList = document.getElementById("schedule-day-list");
+const scheduleWeekList = document.getElementById("schedule-week-list");
+const scheduleMonthList = document.getElementById(
+  "schedule-month-list"
+);
+const scheduleNewBlockBtn = document.getElementById(
+  "schedule-new-block-btn"
+);
+
+function renderScheduleList(list, container) {
+  if (!container) return;
+  container.innerHTML = "";
+  list.forEach((item, idx) => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    li.addEventListener("click", () => {
+      list.splice(idx, 1);
+      saveJSON(STORAGE_KEYS.schedule, scheduleState);
+      renderScheduleAll();
+    });
+    container.appendChild(li);
+  });
+}
+
+function renderScheduleAll() {
+  renderScheduleList(scheduleState.day, scheduleDayList);
+  renderScheduleList(scheduleState.week, scheduleWeekList);
+  renderScheduleList(scheduleState.month, scheduleMonthList);
+}
+
+if (scheduleNewBlockBtn) {
+  scheduleNewBlockBtn.addEventListener("click", () => {
+    const block = prompt("New block (time + label)");
+    if (!block) return;
+    scheduleState.day.push(block);
+    saveJSON(STORAGE_KEYS.schedule, scheduleState);
+    renderScheduleAll();
+  });
+}
+renderScheduleAll();
+
+// ========== Memory ==========
+const memoryState = loadJSON(STORAGE_KEYS.memory, {
+  items: [],
+});
+
+const memoryTitleInput = document.getElementById("memory-title-input");
+const memoryBodyInput = document.getElementById("memory-body-input");
+const memorySaveBtn = document.getElementById("memory-save-btn");
+const memoryListEl = document.getElementById("memory-list");
+
+function renderMemory() {
+  if (!memoryListEl) return;
+  memoryListEl.innerHTML = "";
+  memoryState.items.forEach((m, idx) => {
+    const li = document.createElement("li");
+    li.textContent = `${m.title} – ${m.body}`;
+    li.addEventListener("click", () => {
+      memoryState.items.splice(idx, 1);
+      saveJSON(STORAGE_KEYS.memory, memoryState);
+      renderMemory();
+    });
+    memoryListEl.appendChild(li);
+  });
+}
+
+if (memorySaveBtn) {
+  memorySaveBtn.addEventListener("click", () => {
+    const title =
+      (memoryTitleInput && memoryTitleInput.value.trim()) ||
+      "Untitled";
+    const body =
+      (memoryBodyInput && memoryBodyInput.value.trim()) || "";
+    if (!body) return;
+    memoryState.items.push({ title, body });
+    saveJSON(STORAGE_KEYS.memory, memoryState);
+    if (memoryTitleInput) memoryTitleInput.value = "";
+    if (memoryBodyInput) memoryBodyInput.value = "";
+    renderMemory();
+  });
+}
+renderMemory();
+
+// ========== Reflection ==========
+const reflectionState = loadJSON(STORAGE_KEYS.reflection, {
+  entries: [],
+});
+
+const reflectionInput = document.getElementById("reflection-input");
+const reflectionSaveBtn = document.getElementById(
+  "reflection-save-btn"
+);
+const reflectionListEl = document.getElementById(
+  "reflection-entries-list"
+);
+
+function renderReflections() {
+  if (!reflectionListEl) return;
+  reflectionListEl.innerHTML = "";
+  reflectionState.entries.forEach((r, idx) => {
+    const li = document.createElement("li");
+    li.textContent = `${r.date}: ${r.text}`;
+    li.addEventListener("click", () => {
+      reflectionState.entries.splice(idx, 1);
+      saveJSON(STORAGE_KEYS.reflection, reflectionState);
+      renderReflections();
+    });
+    reflectionListEl.appendChild(li);
+  });
+}
+
+if (reflectionSaveBtn) {
+  reflectionSaveBtn.addEventListener("click", () => {
+    if (!reflectionInput) return;
+    const text = reflectionInput.value.trim();
+    if (!text) return;
+    reflectionState.entries.push({
+      date: new Date().toISOString().slice(0, 10),
+      text,
+    });
+    saveJSON(STORAGE_KEYS.reflection, reflectionState);
+    reflectionInput.value = "";
+    renderReflections();
+  });
+}
+renderReflections();
+
+// ========== Profile & logo ==========
+const profileState = loadJSON(STORAGE_KEYS.profile, {
+  name: "User",
+  avatarDataUrl: null,
+});
+
+const profileNameEl = document.getElementById("profile-name");
+const profileAvatarCircle = document.getElementById(
+  "profile-avatar-circle"
+);
+const profileAvatarUpload = document.getElementById(
+  "profile-avatar-upload"
+);
+const settingsLogoInput = document.getElementById(
+  "settings-logo-input"
+);
+
+function renderProfile() {
+  if (profileNameEl) profileNameEl.textContent = profileState.name;
+  if (profileAvatarCircle) {
+    if (profileState.avatarDataUrl) {
+      profileAvatarCircle.style.backgroundImage = `url(${profileState.avatarDataUrl})`;
+      profileAvatarCircle.style.backgroundSize = "cover";
+      profileAvatarCircle.textContent = "";
+    } else {
+      profileAvatarCircle.style.backgroundImage = "";
+      profileAvatarCircle.textContent =
+        profileState.name.charAt(0).toUpperCase();
+    }
+  }
+}
+
+function handleAvatarFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    profileState.avatarDataUrl = e.target.result;
+    saveJSON(STORAGE_KEYS.profile, profileState);
+    renderProfile();
+  };
+  reader.readAsDataURL(file);
+}
+
+if (profileAvatarUpload) {
+  profileAvatarUpload.addEventListener("click", () => {
+    if (!settingsLogoInput) {
+      alert("Use Settings → Theme & UI → NYVRON logo to upload.");
+    }
+  });
+}
+
+if (settingsLogoInput) {
+  settingsLogoInput.addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    handleAvatarFile(file);
+  });
+}
+renderProfile();
+
+// ========== Settings: toggles ==========
+const rememberChatsCheckbox = document.getElementById(
+  "settings-remember-chats"
+);
+const storeHistoryCheckbox = document.getElementById(
+  "settings-store-history"
+);
+const autoArchiveCheckbox = document.getElementById(
+  "settings-auto-archive"
+);
+const settingsClearMemoryBtn = document.getElementById(
+  "settings-clear-memory-btn"
+);
+const settingsForgetAllBtn = document.getElementById(
+  "settings-forget-all-btn"
+);
+
+const settingsState = loadJSON(STORAGE_KEYS.settings, {});
+
+function applySettingsToUI() {
+  if (rememberChatsCheckbox)
+    rememberChatsCheckbox.checked = !!settingsState.rememberChats;
+  if (storeHistoryCheckbox)
+    storeHistoryCheckbox.checked = !!settingsState.storeHistory;
+  if (autoArchiveCheckbox)
+    autoArchiveCheckbox.checked = !!settingsState.autoArchive;
+}
+applySettingsToUI();
+
+function saveSettings() {
+  saveJSON(STORAGE_KEYS.settings, settingsState);
+}
+
+if (rememberChatsCheckbox) {
+  rememberChatsCheckbox.addEventListener("change", (e) => {
+    settingsState.rememberChats = e.target.checked;
+    saveSettings();
+  });
+}
+if (storeHistoryCheckbox) {
+  storeHistoryCheckbox.addEventListener("change", (e) => {
+    settingsState.storeHistory = e.target.checked;
+    saveSettings();
+  });
+}
+if (autoArchiveCheckbox) {
+  autoArchiveCheckbox.addEventListener("change", (e) => {
+    settingsState.autoArchive = e.target.checked;
+    saveSettings();
+  });
+}
+
+if (settingsClearMemoryBtn) {
+  settingsClearMemoryBtn.addEventListener("click", () => {
+    if (!confirm("Clear all memory (Memory screen only)?")) return;
+    memoryState.items = [];
+    saveJSON(STORAGE_KEYS.memory, memoryState);
+    renderMemory();
+  });
+}
+if (settingsForgetAllBtn) {
+  settingsForgetAllBtn.addEventListener("click", () => {
+    if (
+      !confirm(
+        "Forget everything (today, calendar, timer, memory, reflection, schedule)?"
+      )
+    )
+      return;
+    Object.values(STORAGE_KEYS).forEach((key) => {
+      localStorage.removeItem(key);
+    });
+    window.location.reload();
+  });
+}

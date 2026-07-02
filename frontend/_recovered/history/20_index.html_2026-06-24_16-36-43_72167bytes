@@ -1,0 +1,2104 @@
+<!DOCTYPE html>
+html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <title>NYVRON</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app-root" class="app">
+      <!-- SIDEBAR -->
+      <nav class="sidebar glass-sidebar">
+        <div class="sidebar-brand glass-card">
+          <div class="logo ios-pill" id="app-logo">
+            N
+          </div>
+          <div class="brand-text">
+            <span class="name">NYVRON</span>
+            <span class="subtext">Personal OS</span>
+          </div>
+        </div>
+
+        <div class="sidebar-nav">
+          <div class="sidebar-section-label">Main</div>
+          <button
+            class="nav-item active"
+            data-screen-target="screen-today"
+            type="button"
+          >
+            <span class="icon">☀️</span>
+            <span>Today</span>
+          </button>
+          <button
+            class="nav-item"
+            data-screen-target="screen-dashboard"
+            type="button"
+          >
+            <span class="icon">🏠</span>
+            <span>Dashboard</span>
+          </button>
+          <button
+            class="nav-item"
+            data-screen-target="screen-chat"
+            type="button"
+          >
+            <span class="icon">💬</span>
+            <span>Chat</span>
+          </button>
+          <button
+            class="nav-item"
+            data-screen-target="screen-calendar"
+            type="button"
+          >
+            <span class="icon">📅</span>
+            <span>Calendar</span>
+          </button>
+          <button
+            class="nav-item"
+            data-screen-target="screen-time-tracking"
+            type="button"
+          >
+            <span class="icon">⏱️</span>
+            <span>Time Tracker</span>
+          </button>
+          <button
+            class="nav-item"
+            data-screen-target="screen-schedule"
+            type="button"
+          >
+            <span class="icon">📋</span>
+            <span>Schedule</span>
+          </button>
+          <button
+            class="nav-item"
+            data-screen-target="screen-memory"
+            type="button"
+          >
+            <span class="icon">🧠</span>
+            <span>Memory</span>
+          </button>
+
+          <div class="sidebar-section-label">Insights</div>
+          <button
+            class="nav-item"
+            data-screen-target="screen-reports"
+            type="button"
+          >
+            <span class="icon">📊</span>
+            <span>Reports</span>
+          </button>
+          <button
+            class="nav-item"
+            data-screen-target="screen-analytics"
+            type="button"
+          >
+            <span class="icon">📈</span>
+            <span>Analytics</span>
+          </button>
+          <button
+            class="nav-item"
+            data-screen-target="screen-reflection"
+            type="button"
+          >
+            <span class="icon">📝</span>
+            <span>Reflection</</button>
+
+          <div class="sidebar-section-label">System</div>
+          <button
+            class="nav-item"
+            data-screen-target="screen-profile"
+            type="button"
+          >
+            <span class="icon">👤</span>
+            <span>Profile</span>
+          </button>
+          <button
+            class="nav-item"
+            data-screen-target="screen-notifications"
+            type="button"
+          >
+            <span class="icon">🔔</span>
+            <span>Notifications</span>
+          </button>
+          <button
+            class="nav-item"
+            data-screen-target="screen-settings"
+            type="button"
+          >
+            <span class="icon">⚙️</span>
+            <span>Settings</span>
+          </button>
+        </div>
+
+        <div class="sidebar-footer glass-card">
+          <div class="status">
+            <span class="status-indicator">
+              <span class="status-dot"></span>
+              <span class="status-ring"></span>
+            </span>
+            <span id="ai-status-label">Online · Local</span>
+          </div>
+          <div class="text-xs text-dim">
+            Mumbai · GMT+5:30
+          </div>
+        </div>
+      </nav>
+
+      <!-- MAIN PANEL -->
+      <div class="main glass-main">
+        <!-- TOPBAR -->
+        <header class="topbar glass-toolbar">
+          <div class="topbar-left">
+            <div id="topbar-title" class="topbar-title">
+              Today
+            </div>
+            <div class="topbar-subtitle">
+              Personal OS for OMKAR
+            </div>
+          </div>
+
+          <div class="topbar-center">
+            <div class="topbar-clock">
+              <span id="topbar-clock" class="topbar-clock-time">
+                --:--:--
+              </span>
+              <span class="topbar-clock-zone">
+                Mumbai · GMT+5:30
+              </span>
+            </div>
+          </div>
+
+          <div class="topbar-right">
+            <button
+              id="commandbar-trigger"
+              class="topbar-search glass-button"
+              type="button"
+            >
+              <span class="icon">🔍</span>
+              <span>Search</span>
+              <kbd>⌘K</kbd>
+            </button>
+
+            <button
+              id="theme-toggle-btn"
+              class="topbar-icon-btn glass-button"
+              type="button"
+              aria-label="Toggle theme"
+            >
+              ◐
+            </button>
+          </div>
+        </header>
+
+        <!-- OFFLINE BADGE -->
+        <div id="offline-badge" class="offline-badge glass-card hidden">
+          <span class="icon">⚠️</span>
+          <span>NYVRON is offline — working in local-only mode.</span>
+        </div>
+
+        <!-- SCREENS -->
+        <main id="screens" class="screens">
+          <!-- TODAY -->
+          <section id="screen-today" class="screen active">
+            <div class="screen-inner">
+              <div class="today-header glass-card">
+                <div class="today-header-main">
+                  <div class="today-status-pill">
+                    <div class="status-ellipse">
+                      <span class="status-dot-green"></span>
+                    </div>
+                    <span class="status-text">
+                      Online · Mumbai, India
+                    </span>
+                  </div>
+
+                  <h1 id="today-greeting" class="today-greeting">
+                    HELLO! SIR!
+                  </h1>
+
+                  <p id="today-subtitle" class="today-subtitle">
+                    Good morning · Let’s build your empire.
+                  </p>
+                </div>
+
+                <div class="today-header-time">
+                  <div class="today-time-wrap">
+                    <span
+                      id="today-time"
+                      class="today-time-display"
+                    >
+                      --:--:--
+                    </span>
+                    <span
+                      id="today-timezone"
+                      class="today-timezone"
+                    >
+                      Mumbai, India · GMT+5:30
+                    </span>
+                  </div>
+                  <div id="today-date" class="today-date">
+                    <!-- JS sets date -->
+                  </div>
+                </div>
+              </div>
+
+              <div class="today-grid">
+                <!-- Today energy -->
+                <div class="card glass-card today-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Today
+                    </div>
+                    <div class="card-subtitle">
+                      Energy & focus
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="today-energy-row">
+                      <div class="today-energy-label">
+                        Energy
+                      </div>
+                      <div id="energy-selector" class="energy-selector">
+                        <button
+                          type="button"
+                          class="energy-btn glass-chip active"
+                          data-energy="high"
+                        >
+                          ⚡ High
+                        </button>
+                        <button
+                          type="button"
+                          class="energy-btn glass-chip"
+                          data-energy="medium"
+                        >
+                          🔋 Medium
+                        </button>
+                        <button
+                          type="button"
+                          class="energy-btn glass-chip"
+                          data-energy="low"
+                        >
+                          🪫 Low
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="today-mode-row">
+                      <div class="today-label">
+                        Mode
+                      </div>
+                      <div class="today-mode-values">
+                        <div
+                          id="today-mode-primary"
+                          class="today-mode-primary"
+                        ></div>
+                        <div
+                          id="today-mode-secondary"
+                          class="today-mode-secondary"
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div
+                      id="low-energy-banner"
+                      class="low-energy-banner glass-pill hidden"
+                    >
+                      <div class="low-energy-icon">
+                        🪫
+                      </div>
+                      <div class="low-energy-text">
+                        Low energy mode enabled. Notifications reduced,
+                        schedule simplified.
+                      </div>
+                      <button
+                        id="low-energy-dismiss"
+                        type="button"
+                        class="low-energy-dismiss"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Priorities & Reminders -->
+                <div class="card glass-card today-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Priorities & Reminders
+                    </div>
+                    <button
+                      type="button"
+                      id="today-add-priority"
+                      class="card-action-btn glass-button"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <div class="card-body">
+                    <div class="list-section-label">
+                      Today’s priorities
+                    </div>
+                    <ul id="today-priorities" class="checklist"></ul>
+
+                    <div class="list-section-label">
+                      Reminders
+                    </div>
+                    <ul id="today-reminders" class="checklist"></ul>
+                  </div>
+                </div>
+
+                <!-- Today’s schedule -->
+                <div class="card glass-card today-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Today’s Schedule
+                    </div>
+                    <button
+                      type="button"
+                      id="today-add-schedule"
+                      class="card-action-btn glass-button"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <div class="card-body">
+                    <ul
+                      id="today-schedule-list"
+                      class="schedule-list"
+                    ></ul>
+                  </div>
+                </div>
+
+                <!-- Quick notes -->
+                <div class="card glass-card today-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Quick Notes
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <textarea
+                      id="quick-notes-input"
+                      class="quick-notes-input"
+                      placeholder="Drop quick thoughts, ideas, or tasks here..."
+                    ></textarea>
+                    <button
+                      type="button"
+                      id="quick-notes-save"
+                      class="glass-button"
+                    >
+                      Save note
+                    </button>
+                    <div
+                      id="quick-notes-list"
+                      class="quick-notes-list"
+                    ></div>
+                  </div>
+                </div>
+
+                <!-- Countdown -->
+                <div class="card glass-card today-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Countdown
+                    </div>
+                    <button
+                      type="button"
+                      id="countdown-set-btn"
+                      class="card-action-btn glass-button"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <div class="card-body">
+                    <div
+                      id="countdown-label"
+                      class="countdown-label"
+                    ></div>
+                    <div
+                      id="countdown-time"
+                      class="countdown-time"
+                    ></div>
+                    <div
+                      id="countdown-meta"
+                      class="countdown-meta"
+                    ></div>
+                  </div>
+                </div>
+
+                <!-- North Star -->
+                <div class="card glass-card today-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      North Star
+                    </div>
+                    <button
+                      type="button"
+                      id="northstar-edit-btn"
+                      class="card-action-btn glass-button"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                  <div class="card-body">
+                    <div class="northstar-section">
+                      <div class="northstar-label">
+                        Current phase
+                      </div>
+                      <div
+                        id="northstar-phase"
+                        class="northstar-phase"
+                      ></div>
+                    </div>
+                    <div class="northstar-section">
+                      <div class="northstar-label">
+                        Direction
+                      </div>
+                      <div
+                        id="northstar-direction"
+                        class="northstar-direction"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- DASHBOARD -->
+          <section id="screen-dashboard" class="screen">
+            <div class="screen-inner">
+              <div class="dashboard-header glass-card">
+                <div class="dashboard-header-main">
+                  <h1
+                    id="dashboard-greeting"
+                    class="dashboard-greeting"
+                  >
+                    GOOD MORNING
+                  </h1>
+                  <h3
+                    id="dashboard-date"
+                    class="dashboard-date"
+                  ></h3>
+                </div>
+                <div class="dashboard-header-time">
+                  <div class="dashboard-time-label">
+                    Mumbai · GMT+5:30
+                  </div>
+                  <div
+                    id="dashboard-time"
+                    class="dashboard-time"
+                  >
+                    --:--:--
+                  </div>
+                </div>
+              </div>
+
+              <div class="dashboard-grid">
+                <!-- Upcoming -->
+                <div class="card glass-card dash-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Upcoming
+                    </div>
+                    <button
+                      type="button"
+                      class="card-action-btn glass-button"
+                    >
+                      View all
+                    </button>
+                  </div>
+                  <div
+                    id="dashboard-upcoming"
+                    class="card-body"
+                  ></div>
+                </div>
+
+                <!-- Deadlines -->
+                <div class="card glass-card dash-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Deadlines
+                    </div>
+                    <button
+                      type="button"
+                      id="dashboard-add-deadline"
+                      class="card-action-btn glass-button"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <div
+                    id="dashboard-deadlines"
+                    class="card-body"
+                  ></div>
+                </div>
+
+                <!-- Today’s Focus -->
+                <div class="card glass-card dash-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Today’s Focus
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="focus-chips">
+                      <button
+                        type="button"
+                        class="focus-chip glass-chip"
+                        data-focus="study"
+                      >
+                        📚 Study
+                      </button>
+                      <button
+                        type="button"
+                        class="focus-chip glass-chip"
+                        data-focus="work"
+                      >
+                        💼 Work
+                      </button>
+                      <button
+                        type="button"
+                        class="focus-chip glass-chip"
+                        data-focus="relax"
+                      >
+                        ☕ Relax
+                      </button>
+                      <button
+                        type="button"
+                        class="focus-chip glass-chip"
+                        data-focus="explore"
+                      >
+                        🧭 Explore
+                      </button>
+                    </div>
+                    <div
+                      id="dashboard-focus-notes"
+                      class="focus-notes"
+                    ></div>
+                  </div>
+                </div>
+
+                <!-- Reminders -->
+                <div class="card glass-card dash-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Reminders
+                    </div>
+                    <button
+                      type="button"
+                      id="dashboard-add-reminder"
+                      class="card-action-btn glass-button"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <div
+                    id="dashboard-reminders"
+                    class="card-body"
+                  ></div>
+                </div>
+
+                <!-- Progress -->
+                <div class="card glass-card dash-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Progress
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div
+                      id="dashboard-progress-chart"
+                      class="progress-chart"
+                    >
+                      Time by mode (hooked to Reports)
+                    </div>
+                    <div
+                      id="dashboard-progress-meta"
+                      class="progress-meta"
+                    ></div>
+                  </div>
+                </div>
+
+                <!-- This week -->
+                <div class="card glass-card dash-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      This Week
+                    </div>
+                  </div>
+                  <div
+                    id="dashboard-week"
+                    class="card-body"
+                  ></div>
+                </div>
+
+                <!-- Reflection -->
+                <div class="card glass-card dash-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Reflection
+                    </div>
+                    <button
+                      type="button"
+                      class="card-action-btn glass-button"
+                      data-screen-target="screen-reflection"
+                    >
+                      Open
+                    </button>
+                  </div>
+                  <div
+                    id="dashboard-reflection"
+                    class="card-body"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- CHAT -->
+          <section id="screen-chat" class="screen">
+            <div class="screen-inner chat-screen">
+              <div class="chat-header glass-card">
+                <div class="chat-header-main">
+                  <h1 class="chat-title">
+                    Chat
+                  </h1>
+                  <p class="chat-subtitle">
+                    Talk to NYVRON · Plan, reflect, debug your day.
+                  </p>
+                </div>
+                <div class="chat-header-modes">
+                  <button
+                    type="button"
+                    class="chat-mode-btn glass-chip active"
+                    data-chat-mode="chat"
+                  >
+                    💬 Chat
+                  </button>
+                  <button
+                    type="button"
+                    class="chat-mode-btn glass-chip"
+                    data-chat-mode="observe"
+                  >
+                    👁 Observe
+                  </button>
+                </div>
+              </div>
+
+              <div class="chat-layout">
+                <!-- Chat main -->
+                <div class="chat-main glass-card">
+                  <div
+                    id="chat-messages"
+                    class="chat-messages"
+                  ></div>
+
+                  <div
+                    id="chat-thinking-status"
+                    class="chat-thinking hidden"
+                  >
+                    <span class="dot dot-1"></span>
+                    <span class="dot dot-2"></span>
+                    <span class="dot dot-3"></span>
+                    <span class="thinking-label">
+                      NYVRON is thinking...
+                    </span>
+                  </div>
+
+                  <div class="chat-input-bar">
+                    <button
+                      type="button"
+                      class="chat-input-icon glass-button"
+                      id="chat-attach-btn"
+                      aria-label="Attach"
+                    >
+                      📎
+                    </button>
+                    <textarea
+                      id="chat-input"
+                      class="chat-input"
+                      rows="1"
+                      placeholder="Ask NYVRON anything…"
+                    ></textarea>
+                    <button
+                      type="button"
+                      id="chat-send-btn"
+                      class="chat-send-btn glass-button"
+                    >
+                      ➤
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Chat side -->
+                <aside class="chat-side glass-card">
+                  <div class="chat-side-section">
+                    <div class="card-header">
+                      <div class="card-title">
+                        Quick actions
+                      </div>
+                    </div>
+                    <div class="chat-quick-actions">
+                      <button
+                        type="button"
+                        class="glass-chip"
+                        data-quick-prompt="Plan my day"
+                      >
+                        Plan my day
+                      </button>
+                      <button
+                        type="button"
+                        class="glass-chip"
+                        data-quick-prompt="What is pending today?"
+                      >
+                        What is pending?
+                      </button>
+                      <button
+                        type="button"
+                        class="glass-chip"
+                        data-quick-prompt="Summarize today"
+                      >
+                        Summarize today
+                      </button>
+                      <button
+                        type="button"
+                        class="glass-chip"
+                        data-quick-prompt="Reflect on this week"
+                      >
+                        Reflect on this week
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="chat-side-section">
+                    <div class="card-header">
+                      <div class="card-title">
+                        Observe
+                      </div>
+                    </div>
+                    <div
+                      id="chat-observe-summary"
+                      class="observe-summary"
+                    ></div>
+                    <div
+                      id="chat-observe-state"
+                      class="observe-state"
+                    ></div>
+                  </div>
+
+                  <div class="chat-side-section">
+                    <div class="card-header">
+                      <div class="card-title">
+                        Memory
+                      </div>
+                    </div>
+                    <div class="chat-memory-actions">
+                      <button
+                        type="button"
+                        class="glass-button"
+                        id="chat-save-memory-btn"
+                      >
+                        Save to memory
+                      </button>
+                      <button
+                        type="button"
+                        class="glass-button"
+                        id="chat-open-memory-btn"
+                        data-screen-target="screen-memory"
+                      >
+                        Open memory
+                      </button>
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </section>
+
+          <!-- CALENDAR -->
+          <section id="screen-calendar" class="screen">
+            <div class="screen-inner">
+              <div class="calendar-header glass-card">
+                <div class="calendar-header-main">
+                  <h1 class="calendar-title">
+                    Calendar
+                  </h1>
+                  <p class="calendar-subtitle">
+                    2026–2032 · Events, reminders, and work blocks.
+                  </p>
+                </div>
+                <div class="calendar-header-actions">
+                  <div class="calendar-view-toggle">
+                    <button
+                      type="button"
+                      class="glass-chip active"
+                      data-calendar-view="month"
+                    >
+                      Month
+                    </button>
+                    <button
+                      type="button"
+                      class="glass-chip"
+                      data-calendar-view="week"
+                    >
+                      Week
+                    </button>
+                    <button
+                      type="button"
+                      class="glass-chip"
+                      data-calendar-view="day"
+                    >
+                      Day
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    id="calendar-new-event-btn"
+                    class="glass-button"
+                  >
+                    + New event
+                  </button>
+                </div>
+              </div>
+
+              <div class="calendar-layout">
+                <!-- Calendar grid -->
+                <div class="calendar-grid glass-card">
+                  <div class="calendar-grid-header">
+                    <button
+                      type="button"
+                      id="calendar-prev-btn"
+                      class="glass-button"
+                    >
+                      ‹
+                    </button>
+                    <div
+                      id="calendar-current-label"
+                      class="calendar-current-label"
+                    >
+                      <!-- e.g., June 2026 -->
+                    </div>
+                    <button
+                      type="button"
+                      id="calendar-next-btn"
+                      class="glass-button"
+                    >
+                      ›
+                    </button>
+                  </div>
+
+                  <div class="calendar-weekdays">
+                    <span>Mon</span>
+                    <span>Tue</span>
+                    <span>Wed</span>
+                    <span>Thu</span>
+                    <span>Fri</span>
+                    <span>Sat</span>
+                    <span>Sun</span>
+                  </div>
+
+                  <div
+                    id="calendar-days-grid"
+                    class="calendar-days-grid"
+                  >
+                    <!-- date cells generated by JS -->
+                  </div>
+                </div>
+
+                <!-- Calendar details -->
+                <div class="calendar-detail glass-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Day details
+                    </div>
+                    <div
+                      id="calendar-selected-date"
+                      class="calendar-selected-date"
+                    >
+                      <!-- filled by JS -->
+                    </div>
+                  </div>
+
+                  <div class="calendar-detail-body">
+                    <div class="list-section-label">
+                      Events
+                    </div>
+                    <ul
+                      id="calendar-events-list"
+                      class="calendar-events-list"
+                    ></ul>
+
+                    <div class="list-section-label">
+                      Quick add
+                    </div>
+                    <div class="calendar-quick-add">
+                      <button
+                        type="button"
+                        class="glass-chip"
+                        data-calendar-add-type="reminder"
+                      >
+                        Reminder
+                      </button>
+                      <button
+                        type="button"
+                        class="glass-chip"
+                        data-calendar-add-type="work"
+                      >
+                        Work / Study
+                      </button>
+                      <button
+                        type="button"
+                        class="glass-chip"
+                        data-calendar-add-type="other"
+                      >
+                        Other
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Calendar add event modal -->
+              <div
+                id="calendar-modal"
+                class="modal hidden"
+                aria-hidden="true"
+              >
+                <div class="modal-backdrop"></div>
+                <div class="modal-dialog glass-card">
+                  <div class="modal-header">
+                    <div class="modal-title">
+                      New event
+                    </div>
+                    <button
+                      type="button"
+                      id="calendar-modal-close"
+                      class="modal-close-btn"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div class="modal-body">
+                    <label class="field">
+                      <span class="field-label">
+                        Title
+                      </span>
+                      <input
+                        id="calendar-event-title"
+                        type="text"
+                        class="field-input"
+                        placeholder="Event title"
+                      />
+                    </label>
+
+                    <label class="field">
+                      <span class="field-label">
+                        Type
+                      </span>
+                      <select
+                        id="calendar-event-type"
+                        class="field-input"
+                      >
+                        <option value="reminder">
+                          Reminder
+                        </option>
+                        <option value="work">
+                          Work / Study
+                        </option>
+                        <option value="schedule">
+                          Schedule block
+                        </option>
+                      </select>
+                    </label>
+
+                    <label class="field">
+                      <span class="field-label">
+                        Date
+                      </span>
+                      <input
+                        id="calendar-event-date"
+                        type="date"
+                        class="field-input"
+                      />
+                    </label>
+
+                    <label class="field">
+                      <span class="field-label">
+                        Time
+                      </span>
+                      <input
+                        id="calendar-event-time"
+                        type="time"
+                        class="field-input"
+                      />
+                    </label>
+
+                    <label class="field">
+                      <span class="field-label">
+                        Notes
+                      </span>
+                      <textarea
+                        id="calendar-event-notes"
+                        class="field-input"
+                        rows="2"
+                        placeholder="Details, links, or context..."
+                      ></textarea>
+                    </label>
+                  </div>
+                  <div class="modal-footer">
+                    <button
+                      type="button"
+                      id="calendar-event-save"
+                      class="glass-button"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TIME TRACKER -->
+          <section id="screen-time-tracking" class="screen">
+            <div class="screen-inner">
+              <div class="time-header glass-card">
+                <div class="time-header-main">
+                  <h1 class="time-title">
+                    Time Tracker
+                  </h1>
+                  <p class="time-subtitle">
+                    Yeolpumta-inspired focused sessions · Study, work, life.
+                  </p>
+                </div>
+              </div>
+
+              <div class="time-layout">
+                <!-- Timer -->
+                <div class="card glass-card time-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Session
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div
+                      id="timer-display"
+                      class="timer-display"
+                    >
+                      00:00:00
+                    </div>
+
+                    <div class="timer-controls">
+                      <button
+                        type="button"
+                        id="timer-start-btn"
+                        class="glass-button"
+                      >
+                        Start
+                      </button>
+                      <button
+                        type="button"
+                        id="timer-pause-btn"
+                        class="glass-button"
+                      >
+                        Pause
+                      </button>
+                      <button
+                        type="button"
+                        id="timer-reset-btn"
+                        class="glass-button"
+                      >
+                        Reset
+                      </button>
+                    </div>
+
+                    <div class="timer-modes">
+                      <span class="field-label">
+                        Mode
+                      </span>
+                      <div id="timer-mode-selector" class="mode-chips">
+                        <button
+                          type="button"
+                          class="glass-chip active"
+                          data-mode="study"
+                        >
+                          📚 Study
+                        </button>
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-mode="work"
+                        >
+                          💼 Work
+                        </button>
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-mode="entertainment"
+                        >
+                          🎬 Entertainment
+                        </button>
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-mode="explore"
+                        >
+                          🧭 Explore
+                        </button>
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-mode="life"
+                        >
+                          🌱 Life
+                        </button>
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-mode="timepass"
+                        >
+                          😌 Timepass
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="timer-tags">
+                      <span class="field-label">
+                        Tags
+                      </span>
+                      <input
+                        id="timer-tags-input"
+                        type="text"
+                        class="field-input"
+                        placeholder="e.g., Exam prep, Project, Health"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Save session -->
+                <div class="card glass-card time-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Save session
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <label class="field">
+                      <span class="field-label">
+                        Session name
+                      </span>
+                      <input
+                        id="timer-session-name"
+                        type="text"
+                        class="field-input"
+                        placeholder="Name this block (e.g., Maths, Deep Work)"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      id="timer-save-session-btn"
+                      class="glass-button"
+                    >
+                      Save session
+                    </button>
+                    <p class="field-help">
+                      When you stop a timer, give it a name and save. NYVRON
+                      will use this for reports and analytics.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Sessions list -->
+                <div class="card glass-card time-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Sessions
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <ul
+                      id="timer-sessions-list"
+                      class="sessions-list"
+                    ></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- SCHEDULE -->
+          <section id="screen-schedule" class="screen">
+            <div class="screen-inner">
+              <div class="schedule-header glass-card">
+                <div class="schedule-header-main">
+                  <h1 class="schedule-title">
+                    Schedule
+                  </h1>
+                  <p class="schedule-subtitle">
+                    Structure your day, week, and month in one view.
+                  </p>
+                </div>
+                <div class="schedule-header-actions">
+                  <div class="schedule-view-toggle">
+                    <button
+                      type="button"
+                      class="glass-chip active"
+                      data-schedule-view="day"
+                    >
+                      Day
+                    </button>
+                    <button
+                      type="button"
+                      class="glass-chip"
+                      data-schedule-view="week"
+                    >
+                      Week
+                    </button>
+                    <button
+                      type="button"
+                      class="glass-chip"
+                      data-schedule-view="month"
+                    >
+                      Month
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    id="schedule-new-block-btn"
+                    class="glass-button"
+                  >
+                    + Add block
+                  </button>
+                </div>
+              </div>
+
+              <div class="schedule-layout">
+                <div class="card glass-card schedule-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Today
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <ul
+                      id="schedule-day-list"
+                      class="schedule-list"
+                    ></ul>
+                  </div>
+                </div>
+
+                <div class="card glass-card schedule-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      This week
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <ul
+                      id="schedule-week-list"
+                      class="schedule-list"
+                    ></ul>
+                  </div>
+                </div>
+
+                <div class="card glass-card schedule-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      This month
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <ul
+                      id="schedule-month-list"
+                      class="schedule-list"
+                    ></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- MEMORY -->
+          <section id="screen-memory" class="screen">
+            <div class="screen-inner">
+              <div class="memory-header glass-card">
+                <div class="memory-header-main">
+                  <h1 class="memory-title">
+                    Memory
+                  </h1>
+                  <p class="memory-subtitle">
+                    Teach NYVRON about you. Local, controllable memory.
+                  </p>
+                </div>
+                <div class="memory-header-actions">
+                  <button
+                    type="button"
+                    id="memory-add-btn"
+                    class="glass-button"
+                  >
+                    + Add memory
+                  </button>
+                </div>
+              </div>
+
+              <div class="memory-layout">
+                <!-- Add memory form -->
+                <div class="card glass-card memory-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      New memory
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <label class="field">
+                      <span class="field-label">
+                        Title
+                      </span>
+                      <input
+                        id="memory-title-input"
+                        type="text"
+                        class="field-input"
+                        placeholder="Short label (e.g., My study preferences)"
+                      />
+                    </label>
+
+                    <label class="field">
+                      <span class="field-label">
+                        Details
+                      </span>
+                      <textarea
+                        id="memory-body-input"
+                        class="field-input"
+                        rows="3"
+                        placeholder="What should NYVRON remember?"
+                      ></textarea>
+                    </label>
+
+                    <button
+                      type="button"
+                      id="memory-save-btn"
+                      class="glass-button"
+                    >
+                      Save memory
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Memory list -->
+                <div class="card glass-card memory-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Stored memories
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <ul
+                      id="memory-list"
+                      class="memory-list"
+                    ></ul>
+                  </div>
+                </div>
+
+                <!-- .txt integration -->
+                <div class="card glass-card memory-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Local .txt knowledge
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="field-help">
+                      Attach .txt files as local data for NYVRON. It will first
+                      search these and your memories before calling any external
+                      AI.
+                    </p>
+
+                    <label class="field">
+                      <span class="field-label">
+                        Attach .txt file
+                      </span>
+                      <input
+                        id="memory-file-input"
+                        type="file"
+                        class="field-input"
+                        accept=".txt"
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      id="memory-remove-file-btn"
+                      class="glass-button"
+                    >
+                      Remove attached file
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- REPORTS -->
+          <section id="screen-reports" class="screen">
+            <div class="screen-inner">
+              <div class="reports-header glass-card">
+                <div class="reports-header-main">
+                  <h1 class="reports-title">
+                    Reports
+                  </h1>
+                  <p class="reports-subtitle">
+                    Last 7 days · See where your time and focus went.
+                  </p>
+                </div>
+                <div class="reports-header-actions">
+                  <label class="field-inline">
+                    <span class="field-label">
+                      Range
+                    </span>
+                    <select
+                      id="reports-range-select"
+                      class="field-input"
+                    >
+                      <option value="7">
+                        Last 7 days
+                      </option>
+                      <option value="30">
+                        Last 30 days
+                      </option>
+                      <option value="90">
+                        Last 90 days
+                      </option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div class="reports-layout">
+                <!-- Pie chart by mode -->
+                <div class="card glass-card reports-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Time by mode
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div
+                      id="reports-pie"
+                      class="reports-pie"
+                    >
+                      No data yet. Save some sessions in Time Tracker.
+                    </div>
+                    <div
+                      id="reports-pie-meta"
+                      class="reports-meta"
+                    ></div>
+                  </div>
+                </div>
+
+                <!-- Trend / graph -->
+                <div class="card glass-card reports-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Daily trend
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div
+                      id="reports-trend"
+                      class="reports-trend"
+                    >
+                      Trend will appear here.
+                    </div>
+                    <div
+                      id="reports-trend-meta"
+                      class="reports-meta"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ANALYTICS -->
+          <section id="screen-analytics" class="screen">
+            <div class="screen-inner">
+              <div class="analytics-header glass-card">
+                <div class="analytics-header-main">
+                  <h1 class="analytics-title">
+                    Analytics
+                  </h1>
+                  <p class="analytics-subtitle">
+                    Advanced breakdowns of your time, tasks, and energy.
+                  </p>
+                </div>
+              </div>
+
+              <div class="analytics-layout">
+                <div class="card glass-card analytics-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Time & energy
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div
+                      id="analytics-time-energy"
+                      class="analytics-section"
+                    ></div>
+                  </div>
+                </div>
+
+                <div class="card glass-card analytics-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Focus patterns
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div
+                      id="analytics-focus-patterns"
+                      class="analytics-section"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- REFLECTION -->
+          <section id="screen-reflection" class="screen">
+            <div class="screen-inner">
+              <div class="reflection-header glass-card">
+                <div class="reflection-header-main">
+                  <h1 class="reflection-title">
+                    Reflection
+                  </h1>
+                  <p class="reflection-subtitle">
+                    Apple Journal-inspired space to think, write, and grow.
+                  </p>
+                </div>
+              </div>
+
+              <div class="reflection-layout">
+                <!-- Motivational line -->
+                <div class="card glass-card reflection-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Today’s line
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div
+                      id="reflection-quote"
+                      class="reflection-quote"
+                    ></div>
+                    <p class="field-help">
+                      This line rotates daily from NYVRON’s list or an online
+                      source.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Journal entry -->
+                <div class="card glass-card reflection-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Journal
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <textarea
+                      id="reflection-input"
+                      class="reflection-input field-input"
+                      rows="6"
+                      placeholder="Write about your day, thoughts, wins, lessons..."
+                    ></textarea>
+                    <button
+                      type="button"
+                      id="reflection-save-btn"
+                      class="glass-button"
+                    >
+                      Save entry
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Saved entries -->
+                <div class="card glass-card reflection-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Entries
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <ul
+                      id="reflection-entries-list"
+                      class="reflection-list"
+                    ></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- PROFILE -->
+          <section id="screen-profile" class="screen">
+            <div class="screen-inner">
+              <div class="profile-header glass-card">
+                <div class="profile-header-main">
+                  <div class="profile-avatar">
+                    <div
+                      id="profile-avatar-circle"
+                      class="profile-avatar-circle"
+                    >
+                      N
+                    </div>
+                    <button
+                      type="button"
+                      id="profile-avatar-upload"
+                      class="glass-button"
+                    >
+                      Change photo
+                    </button>
+                  </div>
+                  <div class="profile-info">
+                    <h1
+                      id="profile-name"
+                      class="profile-name"
+                    >
+                      User
+                    </h1>
+                    <div
+                      id="profile-member-since"
+                      class="profile-member-since"
+                    >
+                      Member since —
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="profile-layout">
+                <!-- Preferences -->
+                <div class="card glass-card profile-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Preferences
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="field-group">
+                      <span class="field-label">
+                        Focus mode
+                      </span>
+                      <div class="chip-row">
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-focus-mode="deep"
+                        >
+                          Deep work
+                        </button>
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-focus-mode="balanced"
+                        >
+                          Balanced
+                        </button>
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-focus-mode="light"
+                        >
+                          Light
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="field-group">
+                      <span class="field-label">
+                        Ambience
+                      </span>
+                      <div class="chip-row">
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-ambience="silent"
+                        >
+                          Silent
+                        </button>
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-ambience="rain"
+                        >
+                          Rain
+                        </button>
+                        <button
+                          type="button"
+                          class="glass-chip"
+                          data-ambience="lofi"
+                        >
+                          Lofi
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Knowledge / .txt -->
+                <div class="card glass-card profile-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Knowledge
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="field-help">
+                      Manage the .txt knowledge files used by NYVRON for
+                      context.
+                    </p>
+                    <button
+                      type="button"
+                      id="profile-add-txt-btn"
+                      class="glass-button"
+                    >
+                      Add .txt file
+                    </button>
+                    <button
+                      type="button"
+                      id="profile-remove-txt-btn"
+                      class="glass-button"
+                    >
+                      Remove .txt file
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Timeline / Goals -->
+                <div class="card glass-card profile-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Timeline & goals
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div
+                      id="profile-timeline"
+                      class="profile-timeline"
+                    ></div>
+                    <div
+                      id="profile-goals"
+                      class="profile-goals"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- NOTIFICATIONS -->
+          <section id="screen-notifications" class="screen">
+            <div class="screen-inner">
+              <div class="notifications-header glass-card">
+                <div class="notifications-header-main">
+                  <h1 class="notifications-title">
+                    Notifications
+                  </h1>
+                  <p class="notifications-subtitle">
+                    All alerts in card format, easy to scan.
+                  </p>
+                </div>
+              </div>
+
+              <div class="notifications-layout">
+                <div class="card glass-card notifications-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Alerts
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <ul
+                      id="notifications-list"
+                      class="notifications-list"
+                    ></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- SETTINGS -->
+          <section id="screen-settings" class="screen">
+            <div class="screen-inner">
+              <div class="settings-header glass-card">
+                <div class="settings-header-main">
+                  <h1 class="settings-title">
+                    Settings
+                  </h1>
+                  <p class="settings-subtitle">
+                    Language, theme, memory, backups — fully under your control.
+                  </p>
+                </div>
+              </div>
+
+              <div class="settings-layout">
+                <!-- Language -->
+                <div class="card glass-card settings-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Language
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="settings-language-row">
+                      <div class="india-map-icon">
+                        🇮🇳
+                      </div>
+                      <div class="language-options">
+                        <label class="field-inline">
+                          <input
+                            type="radio"
+                            name="settings-language"
+                            value="hinglish"
+                            checked
+                          />
+                          <span>Hinglish</span>
+                        </label>
+                        <label class="field-inline">
+                          <input
+                            type="radio"
+                            name="settings-language"
+                            value="marathi"
+                          />
+                          <span>Marathi</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Theme & UI -->
+                <div class="card glass-card settings-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Theme & UI
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <label class="field-inline">
+                      <span class="field-label">
+                        Theme
+                      </span>
+                      <select
+                        id="settings-theme-select"
+                        class="field-input"
+                      >
+                        <option value="auto">
+                          Auto
+                        </option>
+                        <option value="light">
+                          Light
+                        </option>
+                        <option value="dark">
+                          Dark
+                        </option>
+                      </select>
+                    </label>
+
+                    <label class="field-inline">
+                      <span class="field-label">
+                        Font size
+                      </span>
+                      <input
+                        id="settings-font-size"
+                        type="range"
+                        min="0.8"
+                        max="1.4"
+                        step="0.05"
+                      />
+                    </label>
+
+                    <label class="field-inline">
+                      <span class="field-label">
+                        NYVRON logo
+                      </span>
+                      <input
+                        id="settings-logo-input"
+                        type="file"
+                        accept="image/*"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Memory / chats -->
+                <div class="card glass-card settings-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Memory & chats
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <label class="field-inline">
+                      <input
+                        id="settings-remember-chats"
+                        type="checkbox"
+                      />
+                      <span>Remember chats</span>
+                    </label>
+
+                    <label class="field-inline">
+                      <input
+                        id="settings-store-history"
+                        type="checkbox"
+                      />
+                      <span>Store conversation history locally</span>
+                    </label>
+
+                    <label class="field-inline">
+                      <input
+                        id="settings-auto-archive"
+                        type="checkbox"
+                      />
+                      <span>
+                        Auto-archive memories older than 30 days
+                      </span>
+                    </label>
+
+                    <button
+                      type="button"
+                      id="settings-clear-memory-btn"
+                      class="glass-button destructive"
+                    >
+                      Clear all memory
+                    </button>
+                    <button
+                      type="button"
+                      id="settings-forget-all-btn"
+                      class="glass-button destructive"
+                    >
+                      Forget everything
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Data / backup -->
+                <div class="card glass-card settings-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      Data & backup
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="field-help">
+                      Export and import all local data, sessions, and memories
+                      in one click.
+                    </p>
+                    <button
+                      type="button"
+                      id="settings-export-data-btn"
+                      class="glass-button"
+                    >
+                      Export data
+                    </button>
+                    <button
+                      type="button"
+                      id="settings-import-data-btn"
+                      class="glass-button"
+                    >
+                      Import data
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <!-- BOTTOM NAV (Mobile) -->
+        <nav class="bottom-nav glass-toolbar">
+          <button
+            type="button"
+            class="bottom-nav-item active"
+            data-screen-target="screen-today"
+          >
+            <span class="icon">☀️</span>
+            <span class="label">Today</span>
+          </button>
+          <button
+            type="button"
+            class="bottom-nav-item"
+            data-screen-target="screen-dashboard"
+          >
+            <span class="icon">🏠</span>
+            <span class="label">Home</span>
+          </button>
+          <button
+            type="button"
+            class="bottom-nav-item"
+            data-screen-target="screen-chat"
+          >
+            <span class="icon">💬</span>
+            <span class="label">Chat</span>
+          </button>
+          <button
+            type="button"
+            class="bottom-nav-item"
+            data-screen-target="screen-calendar"
+          >
+            <span class="icon">📅</span>
+            <span class="label">Calendar</span>
+          </button>
+          <button
+            type="button"
+            class="bottom-nav-item"
+            data-screen-target="screen-settings"
+          >
+            <span class="icon">⚙️</span>
+            <span class="label">Settings</span>
+          </button>
+        </nav>
+
+        <!-- COMMAND BAR -->
+        <div
+          id="commandbar"
+          class="commandbar hidden"
+          aria-hidden="true"
+        >
+          <div class="commandbar-backdrop"></div>
+          <div class="commandbar-dialog glass-card">
+            <div class="commandbar-header">
+              <input
+                id="commandbar-input"
+                type="text"
+                class="commandbar-input"
+                placeholder="Type a command or search (e.g., 'Go to Today', 'Start timer')"
+              />
+            </div>
+            <div
+              id="commandbar-results"
+              class="commandbar-results"
+            ></div>
+            <div class="commandbar-footer">
+              <span>Enter · Run</span>
+              <span>Esc · Close</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
