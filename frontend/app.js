@@ -1082,7 +1082,7 @@ function openBookReader(book) {
   // Keyboard navigation
   const handleKeyboardNav = e => {
     if (overlay.classList.contains('hidden')) return;
-    if (document.activeElement && document.activeElement.id === 'cr-search-input') return;
+    if (document.activeElement && (document.activeElement.id === 'cr-search-input' || document.activeElement.id === 'cr-chat-input')) return;
     
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
       if (book.currentPage < book.totalPages) {
@@ -1098,6 +1098,397 @@ function openBookReader(book) {
   };
   window.addEventListener('keydown', handleKeyboardNav);
   window.addEventListener('resize', adjustReaderResponsiveScale);
+
+  // ==========================================
+  // Restored Advanced Reader Features Wiring
+  // ==========================================
+  
+  // Default reader theme state check
+  const loadDefaultTheme = () => {
+    const themeVal = $('cr-theme-select')?.value || 'light';
+    overlay.className = `cascara-reader-overlay theme-${themeVal}`;
+  };
+  loadDefaultTheme();
+
+  // Popover Manager
+  const hideAllPopovers = () => {
+    $('cr-speech-settings')?.classList.add('hidden');
+    $('cr-font-settings')?.classList.add('hidden');
+    $('cr-pen-settings')?.classList.add('hidden');
+  };
+
+  // Typography Preferences
+  document.querySelectorAll('.cr-font-family-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cr-font-family-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const fam = btn.dataset.family;
+      if (contentDiv) {
+        const textContainer = contentDiv.querySelector('p');
+        if (textContainer) textContainer.style.fontFamily = fam;
+      }
+    });
+  });
+
+  const fontSlider = $('cr-font-size-slider');
+  if (fontSlider) {
+    fontSlider.addEventListener('input', (e) => {
+      if (contentDiv) {
+        const textContainer = contentDiv.querySelector('p');
+        if (textContainer) textContainer.style.fontSize = e.target.value + 'px';
+      }
+    });
+  }
+
+  const spacingSlider = $('cr-line-height-slider');
+  if (spacingSlider) {
+    spacingSlider.addEventListener('input', (e) => {
+      if (contentDiv) {
+        const textContainer = contentDiv.querySelector('p');
+        if (textContainer) textContainer.style.lineHeight = e.target.value;
+      }
+    });
+  }
+
+  // Active Tool bindings
+  document.querySelectorAll('.cr-tool-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const toolId = btn.id;
+      if (['cr-tool-speech', 'cr-tool-font', 'cr-tool-pen'].includes(toolId)) {
+        const targetPopoverId = toolId.replace('cr-tool-', 'cr-');
+        const popover = $(targetPopoverId);
+        const wasHidden = popover?.classList.contains('hidden');
+        hideAllPopovers();
+        if (wasHidden && popover) popover.classList.remove('hidden');
+      } else {
+        hideAllPopovers();
+      }
+    });
+  });
+
+  // Two-page Spread layout mode
+  let isTwoPage = false;
+  $('cr-tool-spread')?.addEventListener('click', () => {
+    isTwoPage = !isTwoPage;
+    $('cr-tool-spread').classList.toggle('active', isTwoPage);
+    const viewport = $('cr-page-view');
+    if (viewport) {
+      viewport.classList.toggle('cr-spread-view', isTwoPage);
+    }
+    adjustReaderResponsiveScale();
+  });
+
+  // Pen settings (color and brush width)
+  document.querySelectorAll('.cr-pen-color').forEach(dot => {
+    dot.addEventListener('click', () => {
+      document.querySelectorAll('.cr-pen-color').forEach(d => d.classList.remove('active'));
+      dot.classList.add('active');
+      const col = dot.dataset.color;
+      ctx.strokeStyle = col;
+    });
+  });
+
+  $('cr-pen-width')?.addEventListener('input', (e) => {
+    ctx.lineWidth = parseInt(e.target.value);
+  });
+
+  // Text-To-Speech (TTS) Integration
+  let synthesis = window.speechSynthesis;
+  let isSpeaking = false;
+  let ttsUtterance = null;
+
+  function getCurrentPageText() {
+    if (book.fileType === 'pdf') {
+      return book.pdfTextCache[book.currentPage] || "";
+    } else {
+      if (!book.fileContent) return "";
+      const words = book.fileContent.split(/\s+/);
+      const startIdx = (book.currentPage - 1) * 200;
+      return words.slice(startIdx, startIdx + 200).join(' ');
+    }
+  }
+
+  function populateVoiceList() {
+    const select = $('cr-speech-voice-select');
+    if (!select) return;
+    const voices = synthesis.getVoices();
+    select.innerHTML = '';
+
+    const femaleNames = ["samantha", "siri", "victoria", "fiona", "hazel", "susan", "zira", "google us english", "karen", "moira", "tessa", "veena"];
+    const femaleSorted = [];
+    const otherVoices = [];
+
+    voices.forEach(v => {
+      const nameL = v.name.toLowerCase();
+      const isFemale = femaleNames.some(f => nameL.includes(f)) || nameL.includes("female");
+      if (isFemale) {
+        femaleSorted.push({ voice: v, label: `✨ [Female] ${v.name} (${v.lang})` });
+      } else {
+        otherVoices.push({ voice: v, label: `${v.name} (${v.lang})` });
+      }
+    });
+
+    const allVoices = [...femaleSorted, ...otherVoices];
+    allVoices.forEach(vObj => {
+      const opt = document.createElement('option');
+      opt.value = vObj.voice.name;
+      opt.textContent = vObj.label;
+      select.appendChild(opt);
+    });
+
+    const defaultVoice = allVoices.find(vObj => vObj.voice.name.toLowerCase().includes("google us english") || vObj.voice.name.toLowerCase().includes("samantha"));
+    if (defaultVoice) {
+      select.value = defaultVoice.voice.name;
+    }
+  }
+
+  if (synthesis.onvoiceschanged !== undefined) {
+    synthesis.onvoiceschanged = populateVoiceList;
+  }
+  populateVoiceList();
+
+  const speechPlayBtn = $('cr-speech-play-btn');
+  const speechPlayText = $('cr-speech-play-text');
+
+  const toggleSpeech = () => {
+    if (isSpeaking) {
+      synthesis.cancel();
+      isSpeaking = false;
+      if (speechPlayText) speechPlayText.textContent = "Start Reading";
+      if (speechPlayBtn) speechPlayBtn.querySelector('svg').innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+    } else {
+      const text = getCurrentPageText();
+      if (!text || text.trim().length === 0) return;
+
+      ttsUtterance = new SpeechSynthesisUtterance(text);
+      const voiceVal = $('cr-speech-voice-select').value;
+      if (voiceVal) {
+        ttsUtterance.voice = synthesis.getVoices().find(v => v.name === voiceVal);
+      }
+
+      ttsUtterance.onend = () => {
+        isSpeaking = false;
+        if (speechPlayText) speechPlayText.textContent = "Start Reading";
+        if (speechPlayBtn) speechPlayBtn.querySelector('svg').innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+      };
+
+      synthesis.speak(ttsUtterance);
+      isSpeaking = true;
+      if (speechPlayText) speechPlayText.textContent = "Stop Reading";
+      if (speechPlayBtn) speechPlayBtn.querySelector('svg').innerHTML = '<rect x="6" y="6" width="12" height="12"/>';
+    }
+  };
+
+  if (speechPlayBtn) speechPlayBtn.onclick = toggleSpeech;
+
+  // MCQ Practice Quiz Generator Sidebar
+  const generateMCQs = () => {
+    const content = $('cr-mcq-content');
+    if (!content) return;
+
+    const pageText = getCurrentPageText().trim();
+    if (pageText.length < 50) {
+      content.innerHTML = '<div style="color:var(--txt3); font-size:12px; padding:20px;">Not enough text on this page to generate questions.</div>';
+      return;
+    }
+
+    content.innerHTML = '<div style="color:var(--txt2); font-size:12px; padding:20px; text-align:center;">Generating 10 questions using NYVRON Intelligence...</div>';
+
+    setTimeout(() => {
+      let sentences = pageText.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 25);
+      if (sentences.length === 0) {
+        content.innerHTML = '<div style="color:var(--txt3); font-size:12px; padding:20px;">Could not identify clear sentences to generate quiz questions.</div>';
+        return;
+      }
+
+      while (sentences.length < 10) {
+        sentences = sentences.concat(sentences);
+      }
+      sentences = sentences.slice(0, 10);
+
+      content.innerHTML = '';
+
+      sentences.forEach((sentence, idx) => {
+        const words = sentence.split(/\s+/).map(w => w.replace(/[^a-zA-Z]/g, ''));
+        const longWords = words.filter(w => w.length > 5);
+        const answer = longWords[Math.floor(Math.random() * longWords.length)] || words[0];
+        
+        if (!answer) return;
+
+        const question = sentence.replace(new RegExp('\\b' + answer + '\\b', 'i'), '_____');
+
+        const otherWords = [...new Set(words.filter(w => w.toLowerCase() !== answer.toLowerCase() && w.length > 4))];
+        const distractors = [];
+        while (distractors.length < 3) {
+          if (otherWords.length > distractors.length) {
+            distractors.push(otherWords[distractors.length]);
+          } else {
+            const fallbacks = ["analysis", "system", "structure", "theory", "method", "process", "function", "concept"];
+            const f = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+            if (!distractors.includes(f) && f.toLowerCase() !== answer.toLowerCase()) distractors.push(f);
+          }
+        }
+
+        const options = [answer, ...distractors];
+        options.sort(() => Math.random() - 0.5);
+
+        const card = document.createElement('div');
+        card.style.cssText = 'background:rgba(255,255,255,0.03); border:1px solid var(--border); padding:14px; border-radius:10px; display:flex; flex-direction:column; gap:10px; margin-bottom:12px;';
+        card.innerHTML = `
+          <div style="font-size:11px; color:var(--cascara); font-weight:700;">QUESTION ${idx + 1} OF 10</div>
+          <div style="font-size:12px; line-height:1.4; color:#fff;">"${question}"</div>
+          <div class="mcq-opts-list" style="display:flex; flex-direction:column; gap:6px;">
+            ${options.map((opt, i) => `
+              <button class="mcq-opt" data-opt="${opt}" style="padding:10px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.02); color:var(--txt2); text-align:left; cursor:pointer; font-size:12px; transition:0.2s;">
+                ${String.fromCharCode(65 + i)}. ${opt}
+              </button>
+            `).join('')}
+          </div>
+        `;
+
+        const optButtons = card.querySelectorAll('.mcq-opt');
+        optButtons.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const selected = btn.dataset.opt;
+            if (selected.toLowerCase() === answer.toLowerCase()) {
+              btn.classList.add('correct');
+              optButtons.forEach(b => b.style.pointerEvents = 'none');
+            } else {
+              btn.classList.add('incorrect');
+              optButtons.forEach(b => {
+                if (b.dataset.opt.toLowerCase() === answer.toLowerCase()) {
+                  b.classList.add('correct');
+                }
+              });
+            }
+          });
+        });
+
+        content.appendChild(card);
+      });
+    }, 800);
+  };
+
+  $('cr-mcq-refresh-btn')&&( $('cr-mcq-refresh-btn').onclick = generateMCQs );
+
+  // Toggle MCQ sidebar
+  $('cr-tool-mcq')?.addEventListener('click', () => {
+    const side = $('cr-mcq-sidebar');
+    if (!side) return;
+    const isOpen = !side.classList.contains('hidden');
+    if (isOpen) {
+      side.classList.add('hidden');
+      $('cr-tool-mcq').classList.remove('active');
+    } else {
+      side.classList.remove('hidden');
+      $('cr-tool-mcq').classList.add('active');
+      generateMCQs();
+    }
+  });
+
+  // AI Study Buddy Chatbot Widget
+  const chatFab = $('cr-chat-fab');
+  const chatWidget = $('cr-chat-widget');
+  const chatClose = $('cr-chat-close-btn');
+  const chatSend = $('cr-chat-send');
+  const chatInput = $('cr-chat-input');
+  const chatMessages = $('cr-chat-messages');
+
+  let chatHistory = [];
+
+  const toggleChat = () => {
+    chatWidget?.classList.toggle('hidden');
+    if (chatWidget && !chatWidget.classList.contains('hidden')) {
+      chatInput?.focus();
+    }
+  };
+
+  if (chatFab) chatFab.onclick = toggleChat;
+  if (chatClose) chatClose.onclick = () => chatWidget?.classList.add('hidden');
+
+  const appendChatMessage = (sender, text) => {
+    if (!chatMessages) return;
+    const bubble = document.createElement('div');
+    bubble.className = sender === 'user' ? 'chat-msg-user' : 'chat-msg-buddy';
+    
+    if (sender === 'buddy-typing') {
+      bubble.id = 'buddy-typing-indicator';
+      bubble.innerHTML = '<div class="chat-typing-dots"><span></span><span></span><span></span></div>';
+    } else {
+      bubble.textContent = text;
+    }
+    
+    chatMessages.appendChild(bubble);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  };
+
+  const typeMessageOut = (text, callback) => {
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-msg-buddy';
+    chatMessages?.appendChild(bubble);
+    
+    let index = 0;
+    const interval = setInterval(() => {
+      bubble.textContent += text[index];
+      index++;
+      if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+      if (index >= text.length) {
+        clearInterval(interval);
+        if (callback) callback();
+      }
+    }, 15);
+  };
+
+  const handleSendChatMessage = async () => {
+    const msg = chatInput?.value.trim();
+    if (!msg) return;
+    
+    chatInput.value = '';
+    appendChatMessage('user', msg);
+    appendChatMessage('buddy-typing');
+
+    const pageText = getCurrentPageText();
+
+    try {
+      const res = await fetch('http://localhost:3000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: msg,
+          history: chatHistory,
+          context: pageText,
+          model: 'github',
+          systemPromptOverride: "You are the user's friendly AI Study Buddy. Help them study the current book page. Keep your responses concise, sharp, and structured. Always answer page-specific questions using the context provided below:\n\n" + pageText
+        })
+      });
+
+      document.getElementById('buddy-typing-indicator')?.remove();
+
+      if (!res.ok) {
+        appendChatMessage('buddy', "Sorry, I encountered an error connecting to NYVRON Intelligence.");
+        return;
+      }
+
+      const data = await res.json();
+      const reply = data.reply || "No response received.";
+      
+      typeMessageOut(reply, () => {
+        chatHistory.push({ who: 'user', text: msg });
+        chatHistory.push({ who: 'buddy', text: reply });
+      });
+
+    } catch (err) {
+      document.getElementById('buddy-typing-indicator')?.remove();
+      appendChatMessage('buddy', "Connection error. Make sure backend is running.");
+    }
+  };
+
+  if (chatSend) chatSend.onclick = handleSendChatMessage;
+  if (chatInput) {
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleSendChatMessage();
+    });
+  }
 
   // Controls bindings
   $('cr-back-btn').onclick = () => {
@@ -1705,6 +2096,7 @@ async function fetchNorthStar(){
 }
 
 // --- renderBooks ---
+// --- renderBooks ---
 function renderBooks() {
   const grid = $('cascara-books-grid'); if (!grid) return;
   grid.innerHTML = '';
@@ -1712,11 +2104,28 @@ function renderBooks() {
     grid.innerHTML = `<p class="panel-hint" style="grid-column: 1/-1; padding: 20px 0;">No books in library. Tap + New Book to add one.</p>`;
     return;
   }
+  
   STATE.books.forEach(b => {
-    const cover = document.createElement('div');
-    cover.className = 'book-cover-card';
-    cover.dataset.id = b.id;
-    cover.innerHTML = `
+    // Outer swipe container matching grid layout cells
+    const container = document.createElement('div');
+    container.className = 'book-swipe-container';
+    
+    // Delete layer behind the card
+    const deleteLayer = document.createElement('div');
+    deleteLayer.className = 'book-delete-layer';
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'book-swipe-delete-btn';
+    deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ff3b30" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+    
+    deleteLayer.appendChild(deleteBtn);
+    container.appendChild(deleteLayer);
+    
+    // Actual card overlay
+    const card = document.createElement('div');
+    card.className = 'book-cover-card';
+    card.dataset.id = b.id;
+    card.innerHTML = `
       <div class="book-cover-art" style="background: linear-gradient(135deg, ${b.fileType === 'pdf' ? '#7f1d1d, #b91c1c' : '#1e3c72, #2a5298'})">
         <span class="book-type-badge">${b.fileType.toUpperCase()}</span>
         <div style="font-size: 13px; line-height: 1.2; font-weight:700; word-break:break-word;">${b.title}</div>
@@ -1730,7 +2139,95 @@ function renderBooks() {
         <div style="font-size: 10px; color: var(--txt3); margin-top: 2px;">${b.progress || 0}% completed</div>
       </div>
     `;
-    grid.appendChild(cover);
+    
+    container.appendChild(card);
+    grid.appendChild(container);
+    
+    // Swipe Touch Gesture Handlers
+    let startY = 0;
+    let currentY = 0;
+    let swiped = false;
+    
+    card.addEventListener('touchstart', (e) => {
+      startY = e.touches[0].clientY;
+      card.style.transition = 'none';
+      deleteLayer.style.transition = 'none';
+    }, {passive: true});
+    
+    card.addEventListener('touchmove', (e) => {
+      currentY = e.touches[0].clientY;
+      let deltaY = currentY - startY;
+      if (deltaY < 0) {
+        let translateVal = Math.max(-60, deltaY);
+        card.style.transform = `translateY(${translateVal}px)`;
+        deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
+      }
+    }, {passive: true});
+    
+    card.addEventListener('touchend', () => {
+      card.style.transition = 'transform 0.2s ease';
+      deleteLayer.style.transition = 'opacity 0.2s ease';
+      let deltaY = currentY - startY;
+      if (deltaY < -25) {
+        card.style.transform = 'translateY(-60px)';
+        deleteLayer.style.opacity = '1';
+        swiped = true;
+      } else {
+        card.style.transform = 'translateY(0px)';
+        deleteLayer.style.opacity = '0';
+        swiped = false;
+      }
+    });
+    
+    // Swipe Mouse Fallback Gestures (Desktop Support)
+    let isMouseDown = false;
+    card.addEventListener('mousedown', (e) => {
+      startY = e.clientY;
+      isMouseDown = true;
+      card.style.transition = 'none';
+      deleteLayer.style.transition = 'none';
+    });
+    
+    window.addEventListener('mousemove', (e) => {
+      if (!isMouseDown) return;
+      currentY = e.clientY;
+      let deltaY = currentY - startY;
+      if (deltaY < 0) {
+        let translateVal = Math.max(-60, deltaY);
+        card.style.transform = `translateY(${translateVal}px)`;
+        deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
+      }
+    });
+    
+    window.addEventListener('mouseup', () => {
+      if (!isMouseDown) return;
+      isMouseDown = false;
+      card.style.transition = 'transform 0.2s ease';
+      deleteLayer.style.transition = 'opacity 0.2s ease';
+      let deltaY = currentY - startY;
+      if (deltaY < -25) {
+        card.style.transform = 'translateY(-60px)';
+        deleteLayer.style.opacity = '1';
+        swiped = true;
+      } else {
+        card.style.transform = 'translateY(0px)';
+        deleteLayer.style.opacity = '0';
+        swiped = false;
+      }
+    });
+    
+    // Wire Delete action
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (confirm('Are you sure you want to delete this book?')) {
+        const bookId = b.id;
+        STATE.books = STATE.books.filter(x => x.id !== bookId);
+        save();
+        deleteFile(bookId).then(() => {
+          renderBooks();
+        });
+      }
+    });
   });
 }
 
@@ -1748,7 +2245,7 @@ document.addEventListener('DOMContentLoaded', () => {
   BLOOM = $('nyvron-bloom-svg');
   // Theme selector
   const themeSel = $('settings-theme');
-  const savedTheme = localStorage.getItem('nv-theme') || 'dark';
+  const savedTheme = localStorage.getItem('nv-theme') || 'light';
   document.documentElement.dataset.theme = savedTheme;
   if(themeSel) themeSel.value = savedTheme;
   themeSel?.addEventListener('change', () => {
@@ -2124,7 +2621,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Book cover click to open reader
     if (e.target.closest('.book-cover-card')) {
-      const bid = e.target.closest('.book-cover-card').dataset.id;
+      const card = e.target.closest('.book-cover-card');
+      // If the card is swiped, clicking resets it
+      if (card.style.transform === 'translateY(-60px)') {
+        card.style.transform = 'translateY(0px)';
+        const deleteLayer = card.previousElementSibling;
+        if (deleteLayer) deleteLayer.style.opacity = '0';
+        return;
+      }
+      const bid = card.dataset.id;
       const book = STATE.books.find(b => b.id === bid);
       if(book) {
         openBookReader(book);

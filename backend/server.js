@@ -110,6 +110,7 @@ async function generateChatTitle(firstMessage, apiKey) {
   } else {
     const isOpenAI = apiKey.startsWith("sk-");
     const isGroq = apiKey.startsWith("gsk_");
+    const isGitHub = apiKey.startsWith("ghp_") || apiKey.startsWith("github_pat_");
     
     let url = "";
     let modelName = "";
@@ -119,6 +120,9 @@ async function generateChatTitle(firstMessage, apiKey) {
     } else if (isGroq) {
       url = "https://api.groq.com/openai/v1/chat/completions";
       modelName = "llama-3.1-8b-instant";
+    } else if (isGitHub) {
+      url = "https://models.inference.ai.azure.com/chat/completions";
+      modelName = "gpt-4o-mini";
     } else {
       url = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct/v1/chat/completions";
       modelName = "meta-llama/Meta-Llama-3-8B-Instruct";
@@ -160,7 +164,7 @@ app.post("/api/chat", async (req, res) => {
     });
   }
 
-  const { message, history, context, model } = req.body || {};
+  const { message, history, context, model, systemPromptOverride } = req.body || {};
   if (!message) {
     return res.status(400).json({ error: "Missing 'message' parameter." });
   }
@@ -190,7 +194,7 @@ app.post("/api/chat", async (req, res) => {
     : "No custom knowledge base file uploaded.";
 
   // Dynamic system prompt incorporating the workspace context
-  const systemPrompt = `You are NYVRON, a calm, precise, Apple-inspired personal command center assistant.
+  const systemPrompt = systemPromptOverride || `You are NYVRON, a calm, precise, Apple-inspired personal command center assistant.
 You help the user plan their day, organize task priorities, review schedules, log reflection journals, and answer queries.
 
 Here is the user's active context from their local dashboard:
@@ -218,6 +222,7 @@ INSTRUCTIONS:
   const isKeyOpenAI = apiKey.startsWith("sk-");
   const isKeyGemini = apiKey.startsWith("AIzaSy") || apiKey.startsWith("AQ.");
   const isKeyGroq = apiKey.startsWith("gsk_");
+  const isKeyGitHub = apiKey.startsWith("ghp_") || apiKey.startsWith("github_pat_");
   
   let targetProvider = "huggingface"; // default fallback
   if (model && model !== "auto") {
@@ -229,12 +234,15 @@ INSTRUCTIONS:
       targetProvider = "groq";
     } else if (model === "llama-3") {
       targetProvider = "huggingface";
+    } else if (model === "github" || model.startsWith("github-")) {
+      targetProvider = "github";
     }
   } else {
     // Auto-detect based on key prefix
     if (isKeyGemini) targetProvider = "gemini";
     else if (isKeyOpenAI) targetProvider = "openai";
     else if (isKeyGroq) targetProvider = "groq";
+    else if (isKeyGitHub) targetProvider = "github";
   }
 
   // Key validation
@@ -253,9 +261,14 @@ INSTRUCTIONS:
       error: "You selected a Groq model, but your saved API key is not a Groq key (starts with gsk_). Please save a Groq key (starts with gsk_) or change the model dropdown."
     });
   }
+  if (targetProvider === "github" && !isKeyGitHub) {
+    return res.status(400).json({
+      error: "You selected a GitHub model, but your saved API key is not a GitHub key (starts with ghp_ or github_pat_). Please save a GitHub key or change the model dropdown."
+    });
+  }
 
   let generatedTitle = null;
-  if (!history || history.length === 0) {
+  if ((!history || history.length === 0) && !systemPromptOverride) {
     generatedTitle = await generateChatTitle(message, apiKey);
   }
 
@@ -325,7 +338,7 @@ INSTRUCTIONS:
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
-          ...history.map((h) => ({
+          ...(history || []).map((h) => ({
             role: h.who === "user" ? "user" : "assistant",
             content: h.text,
           })),
@@ -339,7 +352,21 @@ INSTRUCTIONS:
         model: "llama-3.1-8b-instant",
         messages: [
           { role: "system", content: systemPrompt },
-          ...history.map((h) => ({
+          ...(history || []).map((h) => ({
+            role: h.who === "user" ? "user" : "assistant",
+            content: h.text,
+          })),
+          { role: "user", content: message },
+        ],
+        temperature: 0.7,
+      };
+    } else if (targetProvider === "github") {
+      apiUrl = "https://models.inference.ai.azure.com/chat/completions";
+      payload = {
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...(history || []).map((h) => ({
             role: h.who === "user" ? "user" : "assistant",
             content: h.text,
           })),
@@ -353,7 +380,7 @@ INSTRUCTIONS:
         model: "meta-llama/Meta-Llama-3-8B-Instruct",
         messages: [
           { role: "system", content: systemPrompt },
-          ...history.map((h) => ({
+          ...(history || []).map((h) => ({
             role: h.who === "user" ? "user" : "assistant",
             content: h.text,
           })),

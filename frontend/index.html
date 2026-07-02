@@ -638,13 +638,25 @@
         <button id="cr-tool-zoom-out" class="cr-tool-btn" title="Zoom Out">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
         </button>
+        <button id="cr-tool-font" class="cr-tool-btn" title="Font Settings">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+        </button>
+        <button id="cr-tool-speech" class="cr-tool-btn" title="Voice Reader">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+        </button>
+        <button id="cr-tool-spread" class="cr-tool-btn" title="Two-Page View">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+        </button>
+        <button id="cr-tool-mcq" class="cr-tool-btn" title="Practice Quiz">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        </button>
       </div>
 
       <div class="cr-settings-group">
         <select id="cr-theme-select" class="cr-theme-select">
-          <option value="light">☀️ Light</option>
+          <option value="light" selected="">☀️ Light</option>
           <option value="sepia">📖 Sepia</option>
-          <option value="dark" selected="">🌙 Dark</option>
+          <option value="dark">🌙 Dark</option>
         </select>
         <button id="cr-delete-book-btn" style="background:none; border:none; color:var(--danger); font-size:15px; cursor:pointer; display:flex; align-items:center;" title="Delete Book from Library">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
@@ -687,6 +699,76 @@
       <button id="cr-next-page" class="cr-page-nav-btn">›</button>
       <span id="cr-page-label" class="cr-page-label">Page 16 of 50 (32%)</span>
     </div>
+
+    <!-- Floating Markup Pen Settings Popover -->
+    <div id="cr-pen-settings" class="cr-floating-panel hidden" style="position: absolute; right: 200px; bottom: 65px; background: rgba(28,28,30,0.95); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); backdrop-filter: blur(10px); z-index: 1020; width: 180px;">
+      <div class="cr-panel-label" style="font-size:12px; font-weight:600; color:var(--txt3); margin-bottom:8px;">Pen Color</div>
+      <div class="cr-pen-colors" style="display:flex; gap:8px; margin-bottom:12px;">
+        <span class="cr-pen-color active" style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#ffcc00; cursor:pointer; border:2px solid transparent;" data-color="rgba(255, 204, 0, 0.75)"></span>
+        <span class="cr-pen-color" style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#ff3b30; cursor:pointer; border:2px solid transparent;" data-color="rgba(255, 59, 48, 0.75)"></span>
+        <span class="cr-pen-color" style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#007aff; cursor:pointer; border:2px solid transparent;" data-color="rgba(0, 122, 255, 0.75)"></span>
+        <span class="cr-pen-color" style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#34c759; cursor:pointer; border:2px solid transparent;" data-color="rgba(52, 199, 89, 0.75)"></span>
+        <span class="cr-pen-color" style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#000000; cursor:pointer; border:2px solid transparent;" data-color="rgba(0, 0, 0, 0.75)"></span>
+      </div>
+      <div class="cr-panel-divider" style="height:1px; background:rgba(255,255,255,0.08); margin:10px 0;"></div>
+      <div class="cr-panel-label" style="font-size:12px; font-weight:600; color:var(--txt3); margin-bottom:8px;">Brush Size</div>
+      <input type="range" id="cr-pen-width" min="3" max="24" value="8" style="width:100%; accent-color:var(--cascara); cursor:pointer;" />
+    </div>
+
+    <!-- Floating Typography Settings Popover -->
+    <div id="cr-font-settings" class="cr-floating-panel hidden" style="position: absolute; right: 150px; bottom: 65px; background: rgba(28,28,30,0.95); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); backdrop-filter: blur(10px); z-index: 1020; width: 220px;">
+      <div class="cr-panel-label" style="font-size:12px; font-weight:600; color:var(--txt3); margin-bottom:8px;">Font Family</div>
+      <div class="cr-font-options" style="display:flex; gap:6px; margin-bottom:12px;">
+        <button class="cr-font-family-btn active" data-family="Georgia, serif" style="flex:1; padding:6px; font-size:11px; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:none; color:#fff; cursor:pointer;">Georgia</button>
+        <button class="cr-font-family-btn" data-family="-apple-system, BlinkMacSystemFont, sans-serif" style="flex:1; padding:6px; font-size:11px; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:none; color:#fff; cursor:pointer;">System</button>
+        <button class="cr-font-family-btn" data-family="Courier New, monospace" style="flex:1; padding:6px; font-size:11px; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:none; color:#fff; cursor:pointer;">Mono</button>
+      </div>
+      <div class="cr-panel-divider" style="height:1px; background:rgba(255,255,255,0.08); margin:10px 0;"></div>
+      <div class="cr-panel-label" style="font-size:12px; font-weight:600; color:var(--txt3); margin-bottom:8px;">Font Size</div>
+      <input type="range" id="cr-font-size-slider" min="12" max="26" value="16" style="width:100%; accent-color:var(--cascara); cursor:pointer;" />
+      <div class="cr-panel-divider" style="height:1px; background:rgba(255,255,255,0.08); margin:10px 0;"></div>
+      <div class="cr-panel-label" style="font-size:12px; font-weight:600; color:var(--txt3); margin-bottom:8px;">Line Spacing</div>
+      <input type="range" id="cr-line-height-slider" min="1.2" max="2.2" step="0.1" value="1.6" style="width:100%; accent-color:var(--cascara); cursor:pointer;" />
+    </div>
+
+    <!-- Floating Speech Settings Popover -->
+    <div id="cr-speech-settings" class="cr-floating-panel hidden" style="position: absolute; right: 100px; bottom: 65px; background: rgba(28,28,30,0.95); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); backdrop-filter: blur(10px); z-index: 1020; width: 200px;">
+      <div class="cr-panel-label" style="font-size:12px; font-weight:600; color:var(--txt3); margin-bottom:8px;">Speech Reader</div>
+      <button id="cr-speech-play-btn" style="width:100%; padding:8px; font-size:12px; border-radius:6px; border:none; background:var(--cascara); color:#fff; cursor:pointer; font-weight:600; margin-bottom:12px; display:flex; align-items:center; justify-content:center; gap:6px;">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span id="cr-speech-play-text">Start Reading</span>
+      </button>
+      <div class="cr-panel-divider" style="height:1px; background:rgba(255,255,255,0.08); margin:10px 0;"></div>
+      <div class="cr-panel-label" style="font-size:12px; font-weight:600; color:var(--txt3); margin-bottom:6px;">Speech Voice</div>
+      <select id="cr-speech-voice-select" style="width:100%; padding:6px; font-size:11px; border-radius:6px; background:#1e1e20; border:1px solid rgba(255,255,255,0.15); color:#fff; cursor:pointer;">
+        <option value="">Default System Voice</option>
+      </select>
+    </div>
+
+    <!-- Floating AI Study Buddy Chat FAB -->
+    <button id="cr-chat-fab" style="position:fixed; right:24px; bottom:80px; width:56px; height:56px; border-radius:50%; background:var(--cascara); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,0.3); z-index:1050; transition:all 0.2s var(--spring);">
+      <img src="cascara_logo.jpg" style="width:40px; height:40px; border-radius:50%; object-fit:cover;" />
+    </button>
+
+    <!-- AI Study Buddy Chat Widget -->
+    <div id="cr-chat-widget" class="cr-floating-panel hidden" style="position:fixed; right:24px; bottom:150px; width:320px; height:420px; display:flex; flex-direction:column; background:rgba(28,28,30,0.95); border:1px solid var(--border); border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.4); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); z-index:1060; overflow:hidden;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); background:rgba(0,0,0,0.2);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <img src="cascara_logo.jpg" style="width:24px; height:24px; border-radius:50%; object-fit:cover;" />
+          <span style="font-size:13px; font-weight:700; color:#fff;">AI Study Buddy</span>
+        </div>
+        <button id="cr-chat-close-btn" style="background:none; border:none; color:var(--txt3); cursor:pointer; font-size:16px;">×</button>
+      </div>
+      <div id="cr-chat-messages" style="flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px;">
+        <div class="chat-msg-buddy" style="background:rgba(255,255,255,0.05); color:#fff; align-self:flex-start; max-width:85%; padding:10px 12px; border-radius:12px 12px 12px 2px; line-height:1.4; border:1px solid rgba(255,255,255,0.08); box-shadow:0 2px 6px rgba(0,0,0,0.15); font-size:12px;">
+          Hi! I am your AI Study Buddy. Ask me anything about the content of this page!
+        </div>
+      </div>
+      <div style="padding:12px; border-top:1px solid var(--border); display:flex; gap:8px; background:rgba(0,0,0,0.2);">
+        <input type="text" id="cr-chat-input" placeholder="Type a message..." style="flex:1; padding:8px 12px; border-radius:20px; background:var(--surface); border:1px solid var(--border); color:#fff; font-size:13px; outline:none;" />
+        <button id="cr-chat-send" style="background:var(--cascara); border:none; color:#000; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold;">→</button>
+      </div>
+    </div>
   </div>
 
   <!-- ══ TELEGRAM-STYLE DOCK ══ -->
@@ -703,11 +785,7 @@
       </button>
 
       <button class="tb-item" data-tab="tab-cascara" aria-label="Cascara Study Timer">
-        <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
-          <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
-          <line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line>
-        </svg>
+        <img src="cascara_logo.jpg" class="tb-icon" style="border-radius: 50%; object-fit: cover;" />
         <span class="tb-label">Cascara</span>
       </button>
 
