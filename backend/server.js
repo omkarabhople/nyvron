@@ -25,13 +25,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static frontend files on '/'
+// Serve static frontend files on '/' with no-cache headers to prevent stale loads
 const frontendPath = path.join(__dirname, "..", "frontend");
-app.use(express.static(frontendPath));
+app.use((req, res, next) => {
+  // Disable caching for all responses so Electron always loads fresh files
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+app.use(express.static(frontendPath, { etag: false, lastModified: false }));
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(frontendPath, "index.html"));
 });
+
 
 // Helper to find and read the API key from 'insert api key here'
 // Helper to find and read the API key from 'insert api key here'

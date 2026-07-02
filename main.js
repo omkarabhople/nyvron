@@ -28,6 +28,11 @@ function createWindow() {
     }
   });
 
+  // Clear HTTP disk cache every launch so stale frontend files never appear
+  mainWindow.webContents.session.clearCache().then(() => {
+    console.log('Electron cache cleared.');
+  });
+
   // Give backend 1.5 seconds to start up before loading page
   setTimeout(() => {
     mainWindow.loadURL('http://localhost:3000').catch((err) => {

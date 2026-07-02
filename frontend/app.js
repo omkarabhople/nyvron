@@ -307,6 +307,82 @@ async function sendAI(userText){
   if(localStorage.getItem('nv-remember')!=='false')save();
 }
 
+// ==========================================
+// APPLE-STYLE DIALOG HELPERS
+// ==========================================
+let _dialogResolve = null;
+
+function _openAppleDialog({ title, message, hasInput, inputDefault, okLabel, cancelLabel, onOk, onCancel }) {
+  const overlay = $('apple-dialog-overlay');
+  const box = overlay?.querySelector('.apple-dialog-box');
+  if (!overlay) return;
+
+  $('apple-dialog-title').textContent = title || 'Alert';
+  $('apple-dialog-msg').textContent = message || '';
+
+  const inputContainer = $('apple-dialog-input-container');
+  const inputEl = $('apple-dialog-input');
+
+  if (hasInput) {
+    inputContainer.classList.remove('hidden');
+    inputEl.value = inputDefault || '';
+    setTimeout(() => inputEl.focus(), 120);
+  } else {
+    inputContainer.classList.add('hidden');
+  }
+
+  const okBtn = $('apple-dialog-btn-ok');
+  const cancelBtn = $('apple-dialog-btn-cancel');
+
+  okBtn.textContent = okLabel || 'OK';
+  cancelBtn.textContent = cancelLabel || 'Cancel';
+
+  if (onCancel) {
+    cancelBtn.style.display = '';
+  } else {
+    cancelBtn.style.display = 'none';
+  }
+
+  // Clear old listeners
+  const newOk = okBtn.cloneNode(true);
+  const newCancel = cancelBtn.cloneNode(true);
+  okBtn.parentNode.replaceChild(newOk, okBtn);
+  cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+  newOk.addEventListener('click', () => {
+    overlay.classList.add('hidden');
+    if (box) box.style.transform = 'scale(0.85)';
+    if (onOk) onOk(hasInput ? inputEl.value : undefined);
+  });
+
+  newCancel.addEventListener('click', () => {
+    overlay.classList.add('hidden');
+    if (box) box.style.transform = 'scale(0.85)';
+    if (onCancel) onCancel();
+  });
+
+  overlay.classList.remove('hidden');
+  // Animate in
+  overlay.style.opacity = '0';
+  if (box) box.style.transform = 'scale(0.85)';
+  requestAnimationFrame(() => {
+    overlay.style.opacity = '1';
+    if (box) box.style.transform = 'scale(1)';
+  });
+}
+
+function showAlert(title, message) {
+  _openAppleDialog({ title, message, hasInput: false, okLabel: 'OK' });
+}
+
+function showConfirm(title, message, onOk, onCancel) {
+  _openAppleDialog({ title, message, hasInput: false, okLabel: 'Confirm', cancelLabel: 'Cancel', onOk, onCancel: onCancel || (() => {}) });
+}
+
+function showPrompt(title, message, defaultValue, onOk, onCancel) {
+  _openAppleDialog({ title, message, hasInput: true, inputDefault: defaultValue, okLabel: 'Done', cancelLabel: 'Cancel', onOk, onCancel: onCancel || (() => {}) });
+}
+
 // --- openModal ---
 function openModal(title,bodyHTML){
   const m=$('generic-modal'); if(!m)return;
@@ -397,13 +473,27 @@ function renderPlanner() {
     const plan = STATE.planner[day] || "No plans scheduled. Tap Edit to add your plan.";
     const div = document.createElement('div');
     div.style = 'background:var(--surface); border-radius:12px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid var(--border); margin-bottom: 8px;';
+    const editBtn = document.createElement('button');
+    editBtn.className = 'planner-edit-btn';
+    editBtn.dataset.day = day;
+    editBtn.style = 'background:var(--surface2); border:none; border-radius:8px; color:var(--txt2); font-size:12px; padding:6px 12px; cursor:pointer;';
+    editBtn.textContent = 'Edit';
+    editBtn.addEventListener('click', () => {
+      showPrompt(`Edit ${day}`, `Enter plan for ${day}:`, STATE.planner[day] || '', (val) => {
+        if (val !== null && val !== undefined) {
+          STATE.planner[day] = val.trim();
+          save();
+          renderPlanner();
+        }
+      });
+    });
     div.innerHTML = `
       <div style="flex:1;">
         <div style="font-weight:700; color:var(--cascara); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">${day}</div>
         <div style="color:var(--txt1); font-size:15px; margin-top:4px;">${plan}</div>
       </div>
-      <button class="planner-edit-btn" data-day="${day}" style="background:var(--surface2); border:none; border-radius:8px; color:var(--txt2); font-size:12px; padding:6px 12px; cursor:pointer;">Edit</button>
     `;
+    div.appendChild(editBtn);
     wrap.appendChild(div);
   });
 }
@@ -2128,8 +2218,8 @@ async function fetchNorthStar(force = false){
 }
 
 // --- renderBooks ---
-// --- renderBooks ---
 function renderBooks() {
+
   const grid = $('cascara-books-grid'); if (!grid) return;
   grid.innerHTML = '';
   if (!STATE.books.length) {
@@ -2795,14 +2885,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Book cover click to open reader
-    if (e.target.closest('.book-cover-card')) {
+    if (e.target.closest('.book-cover-card') && !e.target.closest('.book-dots-btn')) {
       try {
         const card = e.target.closest('.book-cover-card');
-        // If the card is swiped, clicking resets it
-        if (card.style.transform === 'translateY(-60px)') {
+        // If the card is swiped (delete revealed), clicking resets it
+        const transform = card.style.transform;
+        if (transform && transform.includes('translateY') && parseFloat(transform.replace(/[^0-9\-]/g,'')) < -20) {
+          card.style.transition = 'transform 0.2s ease';
           card.style.transform = 'translateY(0px)';
           const deleteLayer = card.previousElementSibling;
-          if (deleteLayer) deleteLayer.style.opacity = '0';
+          if (deleteLayer) { deleteLayer.style.transition = 'opacity 0.2s ease'; deleteLayer.style.opacity = '0'; }
           return;
         }
         const bid = card.dataset.id;
@@ -2811,9 +2903,11 @@ document.addEventListener('DOMContentLoaded', () => {
           openBookReader(book);
         } else {
           console.warn("Book not found in STATE.books:", bid);
+          showAlert("Book Error", "Could not find book data. Please re-import the book.");
         }
       } catch (err) {
         showAlert("Error", "Error opening book reader: " + err.message);
+        console.error(err);
       }
     }
 
@@ -2887,6 +2981,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderJournal();
   renderBooks();
   renderProfile();
+  renderPlanner();
+
   
   // Load initial active tab
   switchTab(STATE.activeTab);
