@@ -2147,9 +2147,12 @@ function renderBooks() {
     let startY = 0;
     let currentY = 0;
     let swiped = false;
+    let hasDragged = false;
     
     card.addEventListener('touchstart', (e) => {
       startY = e.touches[0].clientY;
+      currentY = startY;
+      hasDragged = false;
       card.style.transition = 'none';
       deleteLayer.style.transition = 'none';
     }, {passive: true});
@@ -2157,7 +2160,10 @@ function renderBooks() {
     card.addEventListener('touchmove', (e) => {
       currentY = e.touches[0].clientY;
       let deltaY = currentY - startY;
-      if (deltaY < 0) {
+      if (Math.abs(deltaY) > 5) {
+        hasDragged = true;
+      }
+      if (hasDragged && deltaY < 0) {
         let translateVal = Math.max(-60, deltaY);
         card.style.transform = `translateY(${translateVal}px)`;
         deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
@@ -2165,6 +2171,8 @@ function renderBooks() {
     }, {passive: true});
     
     card.addEventListener('touchend', () => {
+      if (!hasDragged) return;
+      
       card.style.transition = 'transform 0.2s ease';
       deleteLayer.style.transition = 'opacity 0.2s ease';
       let deltaY = currentY - startY;
@@ -2183,7 +2191,9 @@ function renderBooks() {
     let isMouseDown = false;
     card.addEventListener('mousedown', (e) => {
       startY = e.clientY;
+      currentY = startY;
       isMouseDown = true;
+      hasDragged = false;
       card.style.transition = 'none';
       deleteLayer.style.transition = 'none';
     });
@@ -2192,7 +2202,10 @@ function renderBooks() {
       if (!isMouseDown) return;
       currentY = e.clientY;
       let deltaY = currentY - startY;
-      if (deltaY < 0) {
+      if (Math.abs(deltaY) > 5) {
+        hasDragged = true;
+      }
+      if (hasDragged && deltaY < 0) {
         let translateVal = Math.max(-60, deltaY);
         card.style.transform = `translateY(${translateVal}px)`;
         deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
@@ -2202,6 +2215,8 @@ function renderBooks() {
     window.addEventListener('mouseup', () => {
       if (!isMouseDown) return;
       isMouseDown = false;
+      if (!hasDragged) return;
+      
       card.style.transition = 'transform 0.2s ease';
       deleteLayer.style.transition = 'opacity 0.2s ease';
       let deltaY = currentY - startY;
