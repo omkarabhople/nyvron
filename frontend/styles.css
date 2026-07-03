@@ -1038,28 +1038,87 @@ ul { list-style: none; }
 ========================================== */
 .journal-feature-bar {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   padding: 4px 16px 12px;
   overflow-x: auto;
   scrollbar-width: none;
+  position: relative;
 }
 .journal-feature-bar::-webkit-scrollbar { display: none; }
 .jfb-btn {
   flex-shrink: 0;
-  padding: 8px 14px;
-  border-radius: 20px;
-  background: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 50px;
+  background: var(--bg3);
   border: 1px solid var(--border);
   color: var(--txt1);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s var(--spring);
-  backdrop-filter: blur(8px);
+  transition: all 0.18s cubic-bezier(0.34,1.56,0.64,1);
+  letter-spacing: -0.1px;
+  height: 32px;
 }
-.jfb-btn:active { transform: scale(0.92); background: var(--cascara); color: white; }
-.jfb-btn:hover { background: var(--surface2); }
+.jfb-btn svg { flex-shrink: 0; }
+.jfb-btn:active { transform: scale(0.9); background: var(--cascara); color: white; }
+.jfb-btn:hover { background: var(--surface2); transform: translateY(-1px); }
+
+/* More menu popover */
+#journal-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 16px;
+  width: 200px;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 9999;
+  transform-origin: top right;
+  transition: opacity 0.22s cubic-bezier(0.34,1.56,0.64,1), transform 0.22s cubic-bezier(0.34,1.56,0.64,1);
+  opacity: 0;
+  transform: scale(0.88) translateY(-8px);
+  pointer-events: none;
+}
+#journal-more-menu.active {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+.jfb-menu-item {
+  background: transparent;
+  border: none;
+  color: var(--txt1);
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  transition: background 0.15s;
+}
+.jfb-menu-item:hover { background: var(--bg3); }
+.jfb-menu-item:active { background: var(--cascara); color: white; }
+.jfb-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 6px;
+}
 
 .otd-banner {
   margin: 0 16px 16px;

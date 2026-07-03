@@ -4811,47 +4811,20 @@ document.addEventListener('DOMContentLoaded', () => {
     $('export-backdrop').classList.remove('hidden');
   });
 
-  // More Menu Logic
-  $('jfb-more-btn')?.addEventListener('click', (e) => {
+  // More Menu — toggle .active class (CSS handles animation)
+  const moreBtn = $('jfb-more-btn');
+  const moreMenu = $('journal-more-menu');
+  moreBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
-    const menu = $('journal-more-menu');
-    if (menu.classList.contains('active')) {
-      menu.classList.remove('active');
-      menu.style.opacity = '0';
-      menu.style.transform = 'scale(0.9) translateY(-10px)';
-      menu.style.pointerEvents = 'none';
-    } else {
-      menu.classList.add('active');
-      menu.style.opacity = '1';
-      menu.style.transform = 'scale(1) translateY(0)';
-      menu.style.pointerEvents = 'auto';
-    }
+    moreMenu?.classList.toggle('active');
   });
-  
-  // Close menu on outside click
   document.addEventListener('click', (e) => {
-    const menu = $('journal-more-menu');
-    const btn = $('jfb-more-btn');
-    if (menu && menu.classList.contains('active') && e.target !== btn && !menu.contains(e.target)) {
-      menu.classList.remove('active');
-      menu.style.opacity = '0';
-      menu.style.transform = 'scale(0.9) translateY(-10px)';
-      menu.style.pointerEvents = 'none';
+    if (moreMenu && !moreMenu.contains(e.target) && e.target !== moreBtn) {
+      moreMenu.classList.remove('active');
     }
   });
-
-  // Highlight menu items on hover
   document.querySelectorAll('.jfb-menu-item').forEach(item => {
-    item.addEventListener('mouseenter', () => item.style.background = 'var(--bg3)');
-    item.addEventListener('mouseleave', () => item.style.background = 'transparent');
-    // Close menu when item clicked
-    item.addEventListener('click', () => {
-      const menu = $('journal-more-menu');
-      menu.classList.remove('active');
-      menu.style.opacity = '0';
-      menu.style.transform = 'scale(0.9) translateY(-10px)';
-      menu.style.pointerEvents = 'none';
-    });
+    item.addEventListener('click', () => moreMenu?.classList.remove('active'));
   });
 
   $('export-close')?.addEventListener('click', closeExport);
