@@ -738,8 +738,23 @@ function updateDockIndicator(tabId) {
   if(btn && ind) {
     const left = btn.offsetLeft;
     const width = btn.offsetWidth;
-    ind.style.transform = `translateX(${left - 6}px)`;
-    ind.style.width = `${width}px`;
+    const currentLeft = parseFloat(ind.style.transform.replace(/[^0-9.-]/g, '')) || 0;
+
+    // Stretch effect
+    const distance = Math.abs(left - 6 - currentLeft);
+    if (distance > 10) {
+        ind.style.width = `${width + distance * 0.2}px`;
+        if (left - 6 > currentLeft) {
+             ind.style.transformOrigin = 'left center';
+        } else {
+             ind.style.transformOrigin = 'right center';
+        }
+    }
+
+    setTimeout(() => {
+        ind.style.transform = `translateX(${left - 6}px)`;
+        ind.style.width = `${width}px`;
+    }, 50);
   }
 }
 
@@ -948,8 +963,19 @@ function openBookReader(book) {
     return;
   }
   console.log("openBookReader: overlay element found, removing hidden class");
-  overlay.classList.remove('hidden');
-  document.querySelector('.tab-bar')?.classList.add('hidden');
+
+  if (!document.startViewTransition) {
+    overlay.classList.remove('hidden');
+    document.querySelector('.tab-bar')?.classList.add('hidden');
+  } else {
+    // Set view-transition-name on the clicked card dynamically if possible, or just the overlay
+    overlay.style.viewTransitionName = 'reader-overlay';
+    document.startViewTransition(() => {
+      overlay.classList.remove('hidden');
+      document.querySelector('.tab-bar')?.classList.add('hidden');
+    });
+  }
+
   const selectedTheme = $('cr-theme-select')?.value || 'dark';
   overlay.className = `cascara-reader-overlay theme-${selectedTheme}`;
   
@@ -2775,8 +2801,14 @@ function openBookReader(book) {
   };
 
   $('cr-theme-select').onchange = function() {
+  if (!document.startViewTransition) {
     overlay.className = `cascara-reader-overlay theme-${this.value}`;
-  };
+    return;
+  }
+  document.startViewTransition(() => {
+    overlay.className = `cascara-reader-overlay theme-${this.value}`;
+  });
+};
 
   $('cr-prev-page').onclick = () => {
     if (book.currentPage > 1) renderReaderPage(book.currentPage - 1);
@@ -3425,90 +3457,108 @@ function openSpotlight(){$('spotlight').classList.remove('hidden');setTimeout(()
 function renderCalEvents(dateStr){
   const list=$('cal-events-list'),empty=$('cal-events-empty');if(!list)return;
   const events=STATE.events[dateStr]||[];list.innerHTML='';
-  if(!events.length){empty?.classList.remove('hidden');return;}
-  empty?.classList.add('hidden');
-  events.forEach((ev,i)=>{
-    const li=document.createElement('li');
-    li.className='cal-event-item swipe-wrap';
-    li.style.animationDelay=`${i*.06}s`;
-    li.style.padding = '0';
-    
-    let extraHTML = '';
-    if (ev.url) {
-      extraHTML += `<div style="font-size: 11px; color: var(--cascara); margin-top: 2px;"><a href="${ev.url}" target="_blank" style="color:var(--cascara); text-decoration:underline;">${ev.url}</a></div>`;
+
+  // Also collect any journal entries, captures, highlights from this date
+  const dateStrMatch = dateStr; // e.g. "2026-07-02"
+
+  const allEvents = [...events];
+
+  // Add journal entries as events
+  STATE.journalEntries.forEach(entry => {
+    const entryDateStr = new Date(entry.timestamp || entry.date).toISOString().split('T')[0];
+    if (entryDateStr === dateStrMatch) {
+       allEvents.push({
+           type: 'journal',
+           time: new Date(entry.timestamp || entry.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+           title: entry.title || 'Journal Entry',
+           color: '#0a84ff', // blue
+           id: entry.id,
+           timestamp: entry.timestamp || entry.date
+       });
     }
-    if (ev.notes) {
-      extraHTML += `<div style="font-size: 11px; color: var(--txt3); margin-top: 2px;">${ev.notes}</div>`;
-    }
-    
-    li.innerHTML=`
-      <div class="swipe-content" style="display:flex;align-items:center;width:100%;transition:transform 0.3s var(--spring);padding:14px;background:var(--surface);position:relative;">
-        <button class="glassy-del-btn rem-del-swipe" data-id="${ev.id}" data-type="calevent" title="Delete Event"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
-        <div class="cal-event-dot"></div>
-        <div style="flex:1;">
-          <div><span class="cal-event-time">${ev.time||'All day'}</span><span class="cal-event-title" style="margin-left: 6px; font-weight: 500;">${ev.title}</span></div>
-          ${extraHTML}
-        </div>
-      </div>
-      <div class="ios-swipe-actions">
-        <button class="ios-swipe-btn delete rem-del-swipe" data-id="${ev.id}" data-type="calevent" aria-label="Delete">
-          <div class="ios-swipe-btn-icon delete"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
-        </button>
-      </div>
-    `;
-    setupSwipeGesture(li, { direction: 'x', maxDistance: -80 });
-    list.appendChild(li);
   });
 
-  // Append interaction history timelines (Feature 6)
-  const dayLogs = STATE.interactionLog.filter(l => l.dateStr === dateStr);
-  if (dayLogs.length > 0) {
-    const divider = document.createElement('div');
-    divider.style = 'margin: 20px 0 10px; font-size:11px; font-weight:700; color:var(--txt3); text-transform:uppercase; letter-spacing:1px;';
-    divider.textContent = 'Activity Log';
-    list.appendChild(divider);
+  // Include Interaction Log events (highlights, margin drawings, voice captures, etc)
+  STATE.interactionLog.forEach(log => {
+      const logDate = new Date(log.timestamp);
+      if (logDate.toISOString().split('T')[0] === dateStrMatch) {
+          allEvents.push({
+              type: log.action || 'interaction',
+              time: logDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+              title: log.action === 'highlight' ? 'Highlight Created' :
+                     log.action === 'dictation' ? 'Voice Capture' :
+                     log.action === 'margin' ? 'Margin Drawing' : log.action,
+              desc: log.payload || '',
+              color: log.action === 'highlight' ? '#ffcc00' :
+                     log.action === 'dictation' ? '#30d158' : '#ff9500',
+              timestamp: log.timestamp
+          });
+      }
+  });
 
-    dayLogs.forEach(l => {
-      const logLi = document.createElement('li');
-      logLi.style = 'padding: 10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:12px; margin-bottom:8px; font-size:12px; display:flex; align-items:center; gap:10px; list-style:none;';
-      
-      let icon = '📖';
-      if (l.type === 'highlight') icon = '🖍';
-      else if (l.type === 'smart-capture') icon = '🎙';
-      else if (l.type === 'flashcard-create') icon = '⚡';
-      else if (l.type === 'synthesis-drop') icon = '📝';
+  if(!allEvents.length){empty?.classList.remove('hidden');return;}
+  empty?.classList.add('hidden');
 
-      let timeText = new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      let desc = '';
-      if (l.type === 'page-turn') desc = `Read page ${l.detail.page} of ${l.detail.bookTitle}`;
-      else if (l.type === 'highlight') desc = `Highlighted text in book: "${l.detail.text.substring(0, 30)}..."`;
-      else if (l.type === 'smart-capture') desc = `Spoken log dictation: "${l.detail.transcription.substring(0, 35)}..."`;
-      else if (l.type === 'flashcard-create') desc = `Created flashcard: "${l.detail.front.substring(0, 30)}..."`;
-      else if (l.type === 'synthesis-drop') desc = `Synthesized snippet: "${l.detail.payload.substring(0, 30)}..."`;
+  // Sort by timestamp
+  allEvents.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
 
-      logLi.innerHTML = `
-        <span style="font-size:16px;">${icon}</span>
-        <div style="flex:1;">
-          <div style="color:var(--txt2); font-weight:500;">${desc}</div>
-          <div style="font-size:10px; color:var(--txt3); margin-top:2px;">${timeText}</div>
-        </div>
-      `;
-      list.appendChild(logLi);
-    });
-    empty?.classList.add('hidden');
-  }
+  allEvents.forEach((ev,i)=>{
+    const li=document.createElement('li');
+    li.className = 'cal-timeline-item';
+    li.style.animationDelay = `${i * 0.05}s`;
+    
+    // Determine color based on event type if not provided
+    let glowColor = ev.color || '#30d158'; // default green
+    if (ev.type === 'journal') glowColor = '#0a84ff';
+    if (ev.type === 'margin') glowColor = '#ff9500'; // orange
+    if (ev.type === 'highlight') glowColor = '#ffcc00'; // yellow
+    
+    const timeText = ev.time || '12:00 PM';
+
+    li.innerHTML = `
+      <div class="cal-timeline-track">
+        <div class="cal-timeline-dot" style="background: ${glowColor}; box-shadow: 0 0 10px ${glowColor};"></div>
+        <div class="cal-timeline-line"></div>
+      </div>
+      <div class="cal-timeline-card">
+        <div class="cal-timeline-time">${timeText}</div>
+        <div class="cal-timeline-title">${ev.title}</div>
+        ${ev.desc ? `<div class="cal-timeline-desc">${ev.desc}</div>` : ''}
+      </div>
+    `;
+    list.appendChild(li);
+  });
 }
 
+
+
 function applyManualTheme(theme) {
+  if (!document.startViewTransition) {
+
   document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
   if (theme === 'light') {
     document.body.classList.add('theme-paper');
   } else if (theme === 'dark') {
     document.body.classList.add('theme-dark-vault');
   }
+
+    return;
+  }
+  document.startViewTransition(() => {
+
+  document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
+  if (theme === 'light') {
+    document.body.classList.add('theme-paper');
+  } else if (theme === 'dark') {
+    document.body.classList.add('theme-dark-vault');
+  }
+
+  });
 }
 
 function applyAutoTheme() {
+  if (!document.startViewTransition) {
+
   const h = new Date().getHours();
   document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
   if (h >= 6 && h < 18) {
@@ -3516,6 +3566,20 @@ function applyAutoTheme() {
   } else {
     document.body.classList.add('theme-dark-vault');
   }
+
+    return;
+  }
+  document.startViewTransition(() => {
+
+  const h = new Date().getHours();
+  document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
+  if (h >= 6 && h < 18) {
+    document.body.classList.add('theme-paper');
+  } else {
+    document.body.classList.add('theme-dark-vault');
+  }
+
+  });
 }
 
 // --- updateClock ---
@@ -3778,6 +3842,27 @@ function renderBooks() {
     const card = document.createElement('div');
     card.className = 'book-cover-card';
     card.dataset.id = b.id;
+    card.style.transformStyle = 'preserve-3d';
+    card.style.perspective = '1000px';
+
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      const rotateX = ((y - centerY) / centerY) * -10; // Max 10 deg
+      const rotateY = ((x - centerX) / centerX) * 10;
+
+      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.05, 1.05, 1.05)`;
+    });
+
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+    });
+
     card.innerHTML = `
       <div class="book-cover-art" style="background: linear-gradient(135deg, ${b.fileType === 'pdf' ? '#7f1d1d, #b91c1c' : '#1e3c72, #2a5298'})">
         <span class="book-type-badge">${b.fileType.toUpperCase()}</span>
@@ -7202,7 +7287,7 @@ function initEReaderAdvancedFeatures() {
     micBtn.addEventListener('click', () => {
       const isRecording = micBtn.classList.toggle('active');
       if (isRecording) {
-        micBtn.style.color = '#ff3b30';
+        micBtn.style.color = '#ffffff';
         triggerNotification('Smart Capture Active', 'Listening to ambient audio logs... 🎙');
         showRecordingModal();
       } else {
@@ -7462,10 +7547,100 @@ function initEReaderAdvancedFeatures() {
 
     renderActiveCard();
 
-    $('fc-carousel-card').onclick = () => {
-      const isFlipped = cardInner.style.transform === 'rotateY(180deg)';
+
+    let touchStartX = 0;
+    let touchCurrentX = 0;
+    let isDraggingCard = false;
+    let lastTap = 0;
+    const cardEl = $('fc-carousel-card');
+
+    cardEl.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchCurrentX = touchStartX;
+      isDraggingCard = true;
+      cardEl.style.transition = 'none';
+
+      const now = Date.now();
+      if (now - lastTap < 300) { // Double tap
+         const isFlipped = cardInner.style.transform.includes('rotateY(180deg)');
+         cardInner.style.transform = isFlipped ? 'none' : 'rotateY(180deg)';
+      }
+      lastTap = now;
+    }, {passive: true});
+
+    cardEl.addEventListener('touchmove', (e) => {
+      if (!isDraggingCard) return;
+      touchCurrentX = e.touches[0].clientX;
+      const diff = touchCurrentX - touchStartX;
+      const rotate = diff * 0.1;
+      cardEl.style.transform = `translateX(${diff}px) rotate(${rotate}deg)`;
+    }, {passive: true});
+
+    cardEl.addEventListener('touchend', (e) => {
+      if (!isDraggingCard) return;
+      isDraggingCard = false;
+      cardEl.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+
+      const diff = touchCurrentX - touchStartX;
+      if (diff < -100) { // Swipe Left (Hard/Again)
+         cardEl.style.transform = `translateX(-150%) rotate(-15deg)`;
+         setTimeout(() => processGrade(1), 300);
+      } else if (diff > 100) { // Swipe Right (Good/Easy)
+         cardEl.style.transform = `translateX(150%) rotate(15deg)`;
+         setTimeout(() => processGrade(4), 300);
+      } else {
+         cardEl.style.transform = 'translateX(0) rotate(0)'; // snap back
+      }
+    });
+
+    // Handle mouse double click for desktop testing
+    cardEl.ondblclick = () => {
+      const isFlipped = cardInner.style.transform.includes('rotateY(180deg)');
       cardInner.style.transform = isFlipped ? 'none' : 'rotateY(180deg)';
     };
+
+    // Add process grade logic proxy
+    function processGrade(grade) {
+       // Mock the click logic for grading
+       const c = dueCards[currentIdx];
+       let easiness = c.easiness || 2.5;
+       let interval = c.interval || 0;
+       let reps = c.reps || 0;
+
+       if (grade >= 3) {
+         if (reps === 0) interval = 1;
+         else if (reps === 1) interval = 6;
+         else interval = Math.round(interval * easiness);
+         reps++;
+       } else {
+         reps = 0;
+         interval = 1;
+       }
+       easiness = easiness + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
+       if (easiness < 1.3) easiness = 1.3;
+
+       c.interval = interval;
+       c.reps = reps;
+       c.easiness = easiness;
+       c.nextReview = Date.now() + interval * 24 * 60 * 60 * 1000;
+
+       currentIdx++;
+
+       // Reset card visually
+       cardEl.style.transition = 'none';
+       cardEl.style.transform = 'translateX(0) rotate(0) scale(0.8)';
+       cardEl.style.opacity = '0';
+
+       setTimeout(() => {
+         renderActiveCard();
+         cardEl.style.transition = 'transform 0.4s var(--spring), opacity 0.4s ease';
+         cardEl.style.transform = 'translateX(0) rotate(0) scale(1)';
+         cardEl.style.opacity = '1';
+       }, 50);
+
+       save();
+    }
+
 
     document.querySelectorAll('.fc-grade-btn').forEach(btn => {
       btn.onclick = () => {
@@ -7786,3 +7961,52 @@ function initEReaderAdvancedFeatures() {
   // Initial renders
   renderSmartCaptureList();
 }
+
+// 8. iOS-Style Drag-to-Dismiss Sheets (Chapters Sidebar)
+function initDragToDismissSidebar() {
+  const sidebar = document.getElementById('cr-sidebar');
+  if (!sidebar) return;
+
+  let startX = 0;
+  let currentX = 0;
+  let isDragging = false;
+  let startTime = 0;
+
+  sidebar.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    currentX = startX;
+    isDragging = true;
+    startTime = Date.now();
+    sidebar.style.transition = 'none'; // Disable CSS transition for 1:1 tracking
+  }, { passive: true });
+
+  sidebar.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    currentX = e.touches[0].clientX;
+    const diff = currentX - startX;
+
+    // Only drag to the left
+    if (diff < 0) {
+      sidebar.style.transform = `translateX(${diff}px)`;
+    }
+  }, { passive: true });
+
+  sidebar.addEventListener('touchend', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    sidebar.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+
+    const diff = currentX - startX;
+    const timeDiff = Date.now() - startTime;
+    const velocity = Math.abs(diff) / timeDiff;
+
+    // Threshold: swipe left by 100px OR fast flick left
+    if (diff < -100 || (diff < -30 && velocity > 0.5)) {
+      sidebar.classList.add('hidden');
+      sidebar.style.transform = ''; // reset inline style
+    } else {
+      sidebar.style.transform = ''; // snap back
+    }
+  });
+}
+document.addEventListener('DOMContentLoaded', initDragToDismissSidebar);
