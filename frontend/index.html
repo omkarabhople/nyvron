@@ -426,11 +426,11 @@
 
         <!-- iOS-style More Popover -->
         <div id="journal-more-menu">
-          <button class="jfb-menu-item" id="jfb-otd">⏳ Throwback</button>
-          <button class="jfb-menu-item" id="jfb-constellation">✦ Life Map</button>
-          <button class="jfb-menu-item" id="jfb-heatmap">🗓 Mood Heatmap</button>
+          <button class="jfb-menu-item" onclick="openOnThisDay(); document.getElementById('journal-more-menu').classList.remove('active');">⏳ Throwback</button>
+          <button class="jfb-menu-item" onclick="openConstellation(); document.getElementById('journal-more-menu').classList.remove('active');">✦ Life Map</button>
+          <button class="jfb-menu-item" onclick="openMoodHeatmap(); document.getElementById('journal-more-menu').classList.remove('active');">🗓 Mood Heatmap</button>
           <div class="jfb-menu-divider"></div>
-          <button class="jfb-menu-item" id="jfb-export">📤 Export Journal</button>
+          <button class="jfb-menu-item" onclick="openExport(); document.getElementById('journal-more-menu').classList.remove('active');">📤 Export Journal</button>
         </div>
       </div>
       <!-- On This Day Banner -->

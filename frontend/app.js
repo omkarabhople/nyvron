@@ -4773,11 +4773,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   $('jfb-burn')?.addEventListener('click', openBurnOverlay);
   $('jfb-commute')?.addEventListener('click', openCommuteTherapy);
-  $('jfb-constellation')?.addEventListener('click', openConstellation);
   $('jfb-ai')?.addEventListener('click', openJournalAI);
-  $('jfb-otd')?.addEventListener('click', openOnThisDay);
-  $('jfb-export')?.addEventListener('click', openExport);
-  $('jfb-heatmap')?.addEventListener('click', openMoodHeatmap);
   $('otd-banner-btn')?.addEventListener('click', openOnThisDay);
   $('burn-close-btn')?.addEventListener('click', closeBurnOverlay);
   $('burn-save-btn')?.addEventListener('click', saveBurnEntry);
@@ -4822,9 +4818,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (moreMenu && !moreMenu.contains(e.target) && e.target !== moreBtn) {
       moreMenu.classList.remove('active');
     }
-  });
-  document.querySelectorAll('.jfb-menu-item').forEach(item => {
-    item.addEventListener('click', () => moreMenu?.classList.remove('active'));
   });
 
   $('export-close')?.addEventListener('click', closeExport);
