@@ -3545,14 +3545,19 @@ function sendJournalAIQuery(query) {
     if (scored.length === 0) {
       addJAIMessage('ai', "My powers are strictly limited to your journal, as intended by my developer. For general questions, please consult the main NYVRON AI.");
       const btnContainer = document.createElement('div');
-      btnContainer.style.cssText = 'display:flex; justify-content:center; margin-top:12px; margin-bottom:12px;';
+      btnContainer.style.cssText = 'display:flex; justify-content:center; margin-top:24px; margin-bottom:24px; width: 100%;';
       btnContainer.innerHTML = `
-        <button id="switch-main-ai-btn" style="position:relative; overflow:hidden; background:#1e1e20; border:1px solid rgba(255,255,255,0.1); color:#fff; padding:12px 24px; border-radius:24px; font-weight:600; cursor:pointer; font-size:14px; box-shadow:0 4px 12px rgba(0,0,0,0.3); transition: transform 0.2s;">
+        <button id="switch-main-ai-btn" style="position:relative; overflow:hidden; background:linear-gradient(180deg, #0a0a0c, #050505); border:1px solid rgba(255,255,255,0.08); color:#fff; width: 100%; max-width: 340px; padding:32px 24px; border-radius:24px; cursor:pointer; box-shadow:0 16px 40px rgba(0,0,0,0.4); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); text-align: left;">
           <canvas class="main-ai-btn-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; mix-blend-mode:screen;"></canvas>
-          <span style="position:relative; z-index:2; display:flex; align-items:center; gap:8px;">
-            <svg style="width:16px;height:16px;animation:spin-fast 1s linear infinite;" viewBox="-20 -20 40 40"><g><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path></g></svg>
-            Open Main AI
-          </span>
+          
+          <div style="position:relative; z-index:2; display:flex; flex-direction: column; gap:16px;">
+            <svg style="width:48px;height:48px;animation:spin-fast 6s linear infinite;" viewBox="-20 -20 40 40"><g><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path></g></svg>
+            
+            <div>
+                <h3 style="margin:0 0 6px 0; font-size:22px; font-weight:600; letter-spacing:-0.5px;">Consult Main AI</h3>
+                <p style="margin:0; font-size:14px; opacity:0.6; font-weight:400; line-height:1.4;">Switch to the main assistant for general knowledge and deep reasoning.</p>
+            </div>
+          </div>
         </button>
       `;
       const feed = $('jai-feed');
@@ -3563,27 +3568,37 @@ function sendJournalAIQuery(query) {
       
       const btn = btnContainer.querySelector('#switch-main-ai-btn');
       const canvas = btnContainer.querySelector('.main-ai-btn-canvas');
+      
+      btn.addEventListener('mouseenter', () => btn.style.transform = 'scale(1.02) translateY(-2px)');
+      btn.addEventListener('mouseleave', () => btn.style.transform = 'scale(1) translateY(0)');
+      btn.addEventListener('mousedown', () => btn.style.transform = 'scale(0.97)');
+      
       btn.addEventListener('click', () => {
         $('journal-ai-overlay').classList.add('hidden');
         switchTab('tab-ai');
       });
       
       const ctx = canvas.getContext('2d');
-      let w = canvas.width = 200;
-      let h = canvas.height = 50;
+      // High-res canvas for crisp rendering, scaled down via CSS
+      canvas.width = 680;
+      canvas.height = 360;
+      let w = canvas.width;
+      let h = canvas.height;
       let particles = [];
       let mouseX = w/2, mouseY = h/2;
       
       btn.addEventListener('mousemove', (e) => {
         const rect = btn.getBoundingClientRect();
-        mouseX = e.clientX - rect.left;
-        mouseY = e.clientY - rect.top;
-        for(let k=0; k<2; k++) {
+        // Map mouse position correctly to canvas internal resolution
+        mouseX = ((e.clientX - rect.left) / rect.width) * w;
+        mouseY = ((e.clientY - rect.top) / rect.height) * h;
+        
+        for(let k=0; k<4; k++) {
           particles.push({
-            x: mouseX + (Math.random()-0.5)*10, 
-            y: mouseY + (Math.random()-0.5)*10, 
-            vx: (Math.random()-0.5)*2, 
-            vy: (Math.random()-0.5)*2, 
+            x: mouseX + (Math.random()-0.5)*30, 
+            y: mouseY + (Math.random()-0.5)*30, 
+            vx: (Math.random()-0.5)*6, 
+            vy: (Math.random()-0.5)*6, 
             life: 1,
             color: Math.random() > 0.5 ? '#2ECC71' : '#30B0C7'
           });
@@ -3593,13 +3608,22 @@ function sendJournalAIQuery(query) {
       function animateBtn() {
         if (!document.body.contains(canvas)) return;
         ctx.clearRect(0, 0, w, h);
+        
+        // Render subtle static starfield
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        for(let i=0; i<40; i++) {
+           ctx.beginPath();
+           ctx.arc((i*113)%w, (i*197)%h, 1.5, 0, Math.PI*2);
+           ctx.fill();
+        }
+
         for(let i=particles.length-1; i>=0; i--) {
           let p = particles[i];
           p.x += p.vx; p.y += p.vy;
-          p.life -= 0.04;
+          p.life -= 0.025;
           if(p.life <= 0) { particles.splice(i, 1); continue; }
           ctx.beginPath();
-          ctx.arc(p.x, p.y, p.life*2.5, 0, Math.PI*2);
+          ctx.arc(p.x, p.y, p.life * 4.5, 0, Math.PI * 2);
           ctx.fillStyle = p.color;
           ctx.globalAlpha = p.life;
           ctx.fill();
