@@ -14,7 +14,7 @@ const markupCanvas = document.getElementById('cr-markup-canvas');
 const textLayer = document.getElementById('cr-pdf-text-layer');
 const stickyLayer = document.getElementById('cr-sticky-notes-layer');
 const pageView = document.getElementById('cr-page-view');
-const viewportContainer = document.getElementById('cr-page-viewport-container');
+const viewportContainer = document.getElementById('cr-page-view');
 
 // State
 let pdfTextCache = {}; // page -> text
@@ -137,14 +137,7 @@ async function renderPage(num) {
     textDivs: []
   });
 
-  // Mobile Centering Fix
-  if(window.innerWidth < 768) {
-     const ratio = (window.innerWidth - 20) / viewport.width;
-     wrapper.style.transform = `scale(${ratio})`;
-     wrapper.style.transformOrigin = 'top center';
-  } else {
-     wrapper.style.transform = 'none';
-  }
+  wrapper.style.transform = 'none';
 
   // Caching for search
   pdfTextCache[num] = textContent.items.map(i=>i.str).join(' ');

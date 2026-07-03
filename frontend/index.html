@@ -667,11 +667,11 @@
     </div>
     
     <!-- Bottom Accessory Toolbars -->
-    <div id="jw-accessory-toolbar" class="jw-accessory-toolbar" style="display:flex; justify-content:flex-end; padding:12px 20px;">
-      <div style="display:flex; gap:12px; align-items:center;">
+    <div id="jw-accessory-toolbar" class="jw-accessory-toolbar">
+      <div class="jw-accessory-container">
         <!-- Format Text -->
         <button class="jw-acc-btn btn-format" id="jw-tool-format-toggle" title="Format Text">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14M12 6v14"/></svg>
         </button>
 
         <!-- Typewriter Mode (green glow) -->
@@ -1008,7 +1008,10 @@
     <div class="cr-workspace">
       <!-- Sidebar (Outline) -->
       <aside id="cr-sidebar" class="cr-sidebar hidden">
-        <div class="cr-sidebar-header">Chapters &amp; Outline</div>
+        <div class="cr-sidebar-header">
+          <span>Chapters &amp; Outline</span>
+          <button id="cr-sidebar-close" class="cr-sidebar-close" title="Close Sidebar">✕</button>
+        </div>
         <div style="padding: 10px 16px; border-bottom: 1px solid var(--border);">
           <input type="text" id="cr-search-input" placeholder="Search in book..." style="width:100%; padding:8px 12px; border-radius:8px; background:var(--surface); border:1px solid var(--border); color:var(--txt1); font-size:13px; box-sizing:border-box;">
         </div>
@@ -1070,6 +1073,7 @@
           </div>
         </div>
       </div>
+    </div>
       
       <!-- Bottom iPad Pagebar -->
     <div class="cr-bottom-bar">

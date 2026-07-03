@@ -23,6 +23,7 @@ const STATE = {
     sessions: JSON.parse(localStorage.getItem('nv-cascara-sessions')||'[]'),
     activeSubjectId:null, activeStart:null, activeInterval:null, maxFocusMs:0,
   },
+  isDecoySession: false,
   calendarYear:  new Date().getFullYear(),
   calendarMonth: new Date().getMonth(),
   selectedDate:  null,
@@ -302,23 +303,35 @@ const DECOY_ENTRIES = [
 
 function encryptData(text, key) {
   if (!text) return '';
+  // v2: encode first so emojis become ASCII, avoiding invalid surrogate pairs during XOR
+  const safeText = encodeURIComponent(text);
   let res = '';
-  for (let i = 0; i < text.length; i++) {
-    res += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  for (let i = 0; i < safeText.length; i++) {
+    res += String.fromCharCode(safeText.charCodeAt(i) ^ key.charCodeAt(i % key.length));
   }
-  return btoa(encodeURIComponent(res));
+  return 'v2|' + btoa(res);
 }
 
 function decryptData(encoded, key) {
   if (!encoded) return '';
   try {
-    const text = decodeURIComponent(atob(encoded));
-    let res = '';
-    for (let i = 0; i < text.length; i++) {
-      res += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+    if (encoded.startsWith('v2|')) {
+      const text = atob(encoded.substring(3));
+      let res = '';
+      for (let i = 0; i < text.length; i++) {
+        res += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+      }
+      return decodeURIComponent(res);
+    } else {
+      // Legacy decryption
+      const text = decodeURIComponent(atob(encoded));
+      let res = '';
+      for (let i = 0; i < text.length; i++) {
+        res += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+      }
+      return res;
     }
-    return res;
-  } catch (e) {
+  } catch(e) {
     return '';
   }
 }
@@ -337,11 +350,10 @@ const save = () => {
   localStorage.setItem('nv-direction',  STATE.direction);
   localStorage.setItem('nv-profile',    JSON.stringify(STATE.profile));
   
-  // Encrypt journal entries with key '1234'
-  const isDecoy = STATE.priorities.some(p => p.id === 'dp1');
-  if (!isDecoy) {
+  // Encrypt journal entries with current passcode
+  if (!STATE.isDecoySession) {
     const serialized = JSON.stringify(STATE.journalEntries);
-    localStorage.setItem('nv-journal-enc', encryptData(serialized, '1234'));
+    localStorage.setItem('nv-journal-enc', encryptData(serialized, STATE.passcode));
   }
 };
 
@@ -881,6 +893,7 @@ function openBookReader(book) {
   }, 60000);
   const overlay = $('cascara-reader-overlay'); if(!overlay) return;
   overlay.classList.remove('hidden');
+  document.querySelector('.tab-bar')?.classList.add('hidden');
   const selectedTheme = $('cr-theme-select')?.value || 'dark';
   overlay.className = `cascara-reader-overlay theme-${selectedTheme}`;
   
@@ -916,19 +929,68 @@ function openBookReader(book) {
   let currentZoom = 1.0;
   
   function adjustReaderResponsiveScale() {
+    const isMobile = window.innerWidth <= 768;
     const container = $('cr-page-view');
     const wrapper = $('cr-page-wrapper');
     if (!container || !wrapper) return;
     
+    if (isMobile) {
+      const containerDiv = $('cr-page-container');
+      if (containerDiv) {
+        containerDiv.style.transform = 'none';
+        containerDiv.style.width = '100%';
+        containerDiv.style.height = 'auto';
+        containerDiv.style.display = 'flex';
+        containerDiv.style.flexDirection = 'column';
+        containerDiv.style.gap = '15px';
+        containerDiv.style.alignItems = 'center';
+        
+        const baseWidth = container.clientWidth - 20;
+        const targetWidth = baseWidth * currentZoom;
+        
+        const wrappers = containerDiv.querySelectorAll('.cr-page-wrapper');
+        wrappers.forEach(pw => {
+          const pageNum = parseInt(pw.dataset.page);
+          pw.style.width = `${targetWidth}px`;
+          
+          if (book.fileType === 'pdf' && pdfDoc) {
+            pdfDoc.getPage(pageNum).then(page => {
+              const vp = page.getViewport({ scale: 1 });
+              const ar = vp.width / vp.height;
+              const actualHeight = targetWidth / ar;
+              pw.style.height = `${actualHeight}px`;
+              if (pw.dataset.rendered) {
+                renderMobilePageContent(pw, pageNum);
+              }
+            });
+          }
+        });
+      }
+      return;
+    }
+    
+    const rightWrapper = $('cr-page-wrapper-right');
+    const isSpread = rightWrapper && !rightWrapper.classList.contains('hidden');
+    const baseWidth = isSpread ? 1220 : 600;
+    
     const containerWidth = container.clientWidth - 20;
     const containerHeight = container.clientHeight - 20;
     
-    const scaleX = containerWidth / 600;
+    const scaleX = containerWidth / baseWidth;
     const scaleY = containerHeight / 780;
     const scaleFactor = Math.min(scaleX, scaleY, 1.0);
     
     const finalScale = scaleFactor * currentZoom;
     wrapper.style.transform = `scale(${finalScale})`;
+    if (rightWrapper) {
+      rightWrapper.style.transform = `scale(${finalScale})`;
+    }
+    
+    const containerDiv = $('cr-page-container');
+    if (containerDiv) {
+      containerDiv.style.width = `${baseWidth * finalScale}px`;
+      containerDiv.style.height = `${780 * finalScale}px`;
+    }
   }
 
   function updateZoom() {
@@ -942,8 +1004,16 @@ function openBookReader(book) {
     const selectedText = selection.toString().trim();
     if (!selectedText) return;
     
-    const contentDiv = $('cr-page-content');
-    if (!contentDiv.contains(range.commonAncestorContainer)) return;
+    let contentDiv = $('cr-page-content');
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      const node = range.commonAncestorContainer;
+      const pageWrapper = node.nodeType === Node.ELEMENT_NODE ? node.closest('.cr-page-wrapper') : node.parentElement?.closest('.cr-page-wrapper');
+      if (pageWrapper) {
+        contentDiv = pageWrapper.querySelector('.cr-page-content');
+      }
+    }
+    if (!contentDiv || !contentDiv.contains(range.commonAncestorContainer)) return;
     
     if (book.fileType === 'pdf') {
       const spans = contentDiv.querySelectorAll('span');
@@ -974,7 +1044,12 @@ function openBookReader(book) {
     }
     
     book.highlights = book.highlights || {};
-    book.highlights[book.currentPage] = contentDiv.innerHTML;
+    let pageNum = book.currentPage;
+    if (isMobile && contentDiv) {
+      const pw = contentDiv.closest('.cr-page-wrapper');
+      if (pw) pageNum = parseInt(pw.dataset.page) || pageNum;
+    }
+    book.highlights[pageNum] = contentDiv.innerHTML;
     save();
     selection.removeAllRanges();
     $('cr-selection-menu')?.classList.remove('active');
@@ -1014,7 +1089,7 @@ function openBookReader(book) {
     // Debounce slightly to wait for mouseup, handled below
   });
 
-  const contentDivEl = $('cr-page-content');
+  const contentDivEl = $('cr-page-container');
   if (contentDivEl) {
     contentDivEl.addEventListener('mouseup', () => setTimeout(handleSelection, 50));
     contentDivEl.addEventListener('touchend', () => setTimeout(handleSelection, 50));
@@ -1086,9 +1161,443 @@ function openBookReader(book) {
   let pdfDoc = null;
   const outline = $('cr-sidebar-outline');
 
+  function setupMobileContinuousScroll() {
+    const container = $('cr-page-view');
+    const containerDiv = $('cr-page-container');
+    if (!container || !containerDiv) return;
+    
+    containerDiv.style.transform = 'none';
+    containerDiv.style.width = '100%';
+    containerDiv.style.height = 'auto';
+    containerDiv.style.display = 'flex';
+    containerDiv.style.flexDirection = 'column';
+    containerDiv.style.gap = '15px';
+    containerDiv.style.alignItems = 'center';
+    containerDiv.style.paddingBottom = '80px';
+    
+    containerDiv.innerHTML = '';
+    const containerWidth = container.clientWidth - 20;
+    
+    if (book.fileType === 'pdf') {
+      const defaultAspectRatio = 600 / 780;
+      const defaultPageHeight = containerWidth / defaultAspectRatio;
+      
+      for (let pageNum = 1; pageNum <= book.totalPages; pageNum++) {
+        const pageWrapper = document.createElement('div');
+        pageWrapper.className = 'cr-page-wrapper';
+        pageWrapper.dataset.page = pageNum;
+        pageWrapper.style.position = 'relative';
+        pageWrapper.style.width = `${containerWidth}px`;
+        pageWrapper.style.height = `${defaultPageHeight}px`;
+        pageWrapper.style.marginBottom = '15px';
+        pageWrapper.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        pageWrapper.style.background = 'var(--surface2)';
+        pageWrapper.style.borderRadius = '8px';
+        pageWrapper.style.overflow = 'hidden';
+        
+        pageWrapper.innerHTML = `
+          <canvas class="cr-pdf-canvas" style="position: absolute; left:0; top:0; z-index:1; width: 100%; height: 100%;"></canvas>
+          <div class="cr-page-content" style="position: absolute; inset:0; z-index: 2; background: none; padding: 0; overflow: hidden;"></div>
+          <canvas class="cr-markup-canvas cr-canvas" style="position: absolute; left:0; top:0; z-index:5; width: 100%; height: 100%;"></canvas>
+        `;
+        containerDiv.appendChild(pageWrapper);
+        
+        if (pdfDoc) {
+          pdfDoc.getPage(pageNum).then(page => {
+            const vp = page.getViewport({ scale: 1 });
+            const ar = vp.width / vp.height;
+            const actualHeight = containerWidth / ar;
+            pageWrapper.style.height = `${actualHeight}px`;
+          });
+        }
+      }
+    } else {
+      for (let pageNum = 1; pageNum <= book.totalPages; pageNum++) {
+        const pageWrapper = document.createElement('div');
+        pageWrapper.className = 'cr-page-wrapper';
+        pageWrapper.dataset.page = pageNum;
+        pageWrapper.style.position = 'relative';
+        pageWrapper.style.width = `${containerWidth}px`;
+        pageWrapper.style.minHeight = '200px';
+        pageWrapper.style.height = 'auto';
+        pageWrapper.style.marginBottom = '15px';
+        pageWrapper.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        pageWrapper.style.background = 'var(--surface2)';
+        pageWrapper.style.borderRadius = '8px';
+        pageWrapper.style.padding = '20px';
+        pageWrapper.style.boxSizing = 'border-box';
+        
+        pageWrapper.innerHTML = `
+          <div class="cr-page-content" style="position: static; inset: auto; background: none; padding: 0; overflow: visible;"></div>
+        `;
+        containerDiv.appendChild(pageWrapper);
+      }
+    }
+    
+    const observerOptions = {
+      root: container,
+      rootMargin: '100% 0px 100% 0px',
+      threshold: 0.05
+    };
+    
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const pw = entry.target;
+        const pageNum = parseInt(pw.dataset.page);
+        if (entry.isIntersecting) {
+          if (!pw.dataset.rendered) {
+            renderMobilePageContent(pw, pageNum);
+          }
+        }
+      });
+    }, observerOptions);
+    
+    containerDiv.querySelectorAll('.cr-page-wrapper').forEach(pw => {
+      observer.observe(pw);
+    });
+    
+    let activePageTimeout = null;
+    container.addEventListener('scroll', () => {
+      if (activePageTimeout) clearTimeout(activePageTimeout);
+      activePageTimeout = setTimeout(() => {
+        const wrappers = containerDiv.querySelectorAll('.cr-page-wrapper');
+        const containerRect = container.getBoundingClientRect();
+        const containerCenter = containerRect.top + containerRect.height / 2;
+        
+        let closestPageNum = 1;
+        let minDistance = Infinity;
+        
+        wrappers.forEach(pw => {
+          const rect = pw.getBoundingClientRect();
+          const pageCenter = rect.top + rect.height / 2;
+          const distance = Math.abs(containerCenter - pageCenter);
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestPageNum = parseInt(pw.dataset.page);
+          }
+        });
+        
+        if (closestPageNum && book.currentPage !== closestPageNum) {
+          book.currentPage = closestPageNum;
+          book.progress = Math.round((book.currentPage / book.totalPages) * 100);
+          save();
+          
+          const slider = $('cr-page-slider');
+          if (slider) slider.value = closestPageNum;
+          
+          const label = $('cr-page-label');
+          if (label) label.textContent = `Page ${closestPageNum} of ${book.totalPages} (${book.progress}%)`;
+          
+          document.querySelectorAll('.cr-outline-item').forEach(li => {
+            const p = parseInt(li.dataset.page);
+            if (p) {
+              const step = Math.max(5, Math.ceil(book.totalPages / 5));
+              li.classList.toggle('active', closestPageNum >= p && closestPageNum < p + step);
+            }
+          });
+        }
+      }, 100);
+    });
+  }
+
+  function renderMobilePageContent(pageWrapper, pageNum) {
+    pageWrapper.dataset.rendered = "true";
+    
+    const canvasPdf = pageWrapper.querySelector('.cr-pdf-canvas');
+    const contentDiv = pageWrapper.querySelector('.cr-page-content');
+    const canvasMarkup = pageWrapper.querySelector('.cr-markup-canvas');
+    
+    if (book.fileType === 'pdf') {
+      if (pdfDoc) {
+        pdfDoc.getPage(pageNum).then(page => {
+          const viewport = page.getViewport({ scale: 1 });
+          const targetWidth = pageWrapper.clientWidth || ($('cr-page-view').clientWidth - 20);
+          const scale = targetWidth / viewport.width;
+          const scaledViewport = page.getViewport({ scale: scale });
+          
+          canvasPdf.width = targetWidth;
+          canvasPdf.height = targetWidth / (viewport.width / viewport.height);
+          
+          const ctxPdf = canvasPdf.getContext('2d');
+          ctxPdf.clearRect(0, 0, canvasPdf.width, canvasPdf.height);
+          
+          page.render({
+            canvasContext: ctxPdf,
+            viewport: scaledViewport
+          }).promise.then(() => {
+            book.highlights = book.highlights || {};
+            if (book.highlights[pageNum]) {
+              contentDiv.innerHTML = book.highlights[pageNum];
+            } else {
+              page.getTextContent().then(textContent => {
+                const nativeText = textContent.items.map(item => item.str).join(' ').trim();
+                book.pdfTextCache = book.pdfTextCache || {};
+                book.pdfTextCache[pageNum] = nativeText;
+                
+                if (nativeText.length > 10) {
+                  contentDiv.innerHTML = '';
+                  let charCounter = 0;
+                  textContent.items.forEach(item => {
+                    const len = item.str.length;
+                    const spanStart = charCounter;
+                    const spanEnd = charCounter + len;
+                    
+                    let isMatch = false;
+                    if (book.selectedSearchMatch && book.selectedSearchMatch.page === pageNum) {
+                      const mStart = book.selectedSearchMatch.charOffset;
+                      const mEnd = mStart + book.selectedSearchMatch.query.length;
+                      if (spanStart < mEnd && spanEnd > mStart) {
+                        isMatch = true;
+                      }
+                    }
+
+                    const [left, top] = scaledViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
+                    const fontHeight = Math.abs(item.transform[3] * scale);
+                    
+                    const span = document.createElement('span');
+                    span.textContent = item.str;
+                    span.style.position = 'absolute';
+                    span.style.fontFamily = 'sans-serif';
+                    span.style.fontSize = fontHeight + 'px';
+                    span.style.left = left + 'px';
+                    span.style.top = (top - fontHeight) + 'px';
+                    span.style.color = 'transparent';
+                    span.style.whiteSpace = 'pre';
+                    span.style.cursor = 'text';
+                    if (item.width) {
+                      span.style.width = (item.width * scale) + 'px';
+                    }
+                    if (isMatch) {
+                      span.style.backgroundColor = 'rgba(0, 122, 255, 0.38)';
+                    }
+                    
+                    contentDiv.appendChild(span);
+                    charCounter += len + 1;
+                  });
+                } else {
+                  book.ocrData = book.ocrData || {};
+                  if (book.ocrData[pageNum]) {
+                    renderMobileOcrTextOverlay(pageWrapper, book.ocrData[pageNum], book.selectedSearchMatch, scale);
+                  } else {
+                    runMobileOcrOnCanvas(pageWrapper, pageNum, scale);
+                  }
+                }
+              });
+            }
+          });
+          
+          if (canvasMarkup) {
+            canvasMarkup.width = canvasPdf.width;
+            canvasMarkup.height = canvasPdf.height;
+            const ctxMarkup = canvasMarkup.getContext('2d');
+            ctxMarkup.clearRect(0, 0, canvasMarkup.width, canvasMarkup.height);
+            book.drawings = book.drawings || {};
+            if (book.drawings[pageNum]) {
+              const img = new Image();
+              img.onload = () => {
+                ctxMarkup.drawImage(img, 0, 0, canvasMarkup.width, canvasMarkup.height);
+              };
+              img.src = book.drawings[pageNum];
+            }
+            
+            // Re-bind touch/mouse drawing to this page canvas
+            let pageIsDrawing = false;
+            let pLastX = 0, pLastY = 0;
+            
+            const startDrawPage = (e) => {
+              if (activeTool !== 'pen' && activeTool !== 'eraser') return;
+              pageIsDrawing = true;
+              const rect = canvasMarkup.getBoundingClientRect();
+              const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+              const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+              pLastX = clientX - rect.left;
+              pLastY = clientY - rect.top;
+            };
+            
+            const drawPage = (e) => {
+              if (!pageIsDrawing) return;
+              const ctxM = canvasMarkup.getContext('2d');
+              const rect = canvasMarkup.getBoundingClientRect();
+              const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+              const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+              const x = clientX - rect.left;
+              const y = clientY - rect.top;
+              
+              ctxM.beginPath();
+              ctxM.moveTo(pLastX, pLastY);
+              ctxM.lineTo(x, y);
+              if (activeTool === 'eraser') {
+                ctxM.globalCompositeOperation = 'destination-out';
+                ctxM.lineWidth = 20;
+              } else {
+                ctxM.globalCompositeOperation = 'source-over';
+                ctxM.strokeStyle = '#e8652a';
+                ctxM.lineWidth = 3;
+              }
+              ctxM.lineCap = 'round';
+              ctxM.stroke();
+              
+              pLastX = x;
+              pLastY = y;
+            };
+            
+            const endDrawPage = () => {
+              if (pageIsDrawing) {
+                pageIsDrawing = false;
+                book.drawings = book.drawings || {};
+                book.drawings[pageNum] = canvasMarkup.toDataURL();
+                save();
+              }
+            };
+            
+            canvasMarkup.addEventListener('mousedown', startDrawPage);
+            canvasMarkup.addEventListener('mousemove', drawPage);
+            canvasMarkup.addEventListener('mouseup', endDrawPage);
+            canvasMarkup.addEventListener('mouseleave', endDrawPage);
+            
+            canvasMarkup.addEventListener('touchstart', (e) => {
+              if (activeTool === 'pen' || activeTool === 'eraser') {
+                startDrawPage(e);
+                e.preventDefault();
+              }
+            }, {passive: false});
+            canvasMarkup.addEventListener('touchmove', (e) => {
+              if (pageIsDrawing) {
+                drawPage(e);
+                e.preventDefault();
+              }
+            }, {passive: false});
+            canvasMarkup.addEventListener('touchend', endDrawPage);
+          }
+        });
+      }
+    } else {
+      if (contentDiv) {
+        book.highlights = book.highlights || {};
+        if (book.highlights[pageNum]) {
+          contentDiv.innerHTML = book.highlights[pageNum];
+        } else if (book.fileContent) {
+          const words = book.fileContent.split(/\s+/);
+          const startIdx = (pageNum - 1) * 200;
+          const pageWords = words.slice(startIdx, startIdx + 200);
+          
+          let htmlContent = pageWords.join(' ');
+          if (book.selectedSearchMatch && book.selectedSearchMatch.page === pageNum) {
+            const query = book.selectedSearchMatch.query;
+            const matchIndex = book.selectedSearchMatch.matchIndex;
+            let occ = 0;
+            htmlContent = htmlContent.replace(new RegExp(escapeRegExp(query), 'gi'), match => {
+              if (occ === matchIndex) {
+                occ++;
+                return `<span class="cr-highlight" style="background-color:rgba(0, 122, 255, 0.38);">${match}</span>`;
+              }
+              occ++;
+              return match;
+            });
+          }
+          contentDiv.innerHTML = `<h3 style="margin-top:0; color:var(--cascara); font-family:var(--font);">${book.title}</h3><p style="white-space: pre-wrap; font-family:Georgia, serif; font-size:16px;">${htmlContent}</p>`;
+        }
+      }
+    }
+  }
+
+  function renderMobileOcrTextOverlay(pageWrapper, words, selectedMatch, scale) {
+    const contentDiv = pageWrapper.querySelector('.cr-page-content');
+    if (!contentDiv) return;
+    contentDiv.innerHTML = '';
+    let charCounter = 0;
+    const pageNum = parseInt(pageWrapper.dataset.page);
+    words.forEach(w => {
+      const len = w.text.length;
+      const spanStart = charCounter;
+      const spanEnd = charCounter + len;
+      
+      let isMatch = false;
+      if (selectedMatch && selectedMatch.page === pageNum) {
+        const mStart = selectedMatch.charOffset;
+        const mEnd = mStart + selectedMatch.query.length;
+        if (spanStart < mEnd && spanEnd > mStart) {
+          isMatch = true;
+        }
+      }
+      
+      const span = document.createElement('span');
+      span.textContent = w.text + ' ';
+      span.style.position = 'absolute';
+      span.style.fontFamily = 'sans-serif';
+      span.style.left = (w.left * scale) + 'px';
+      span.style.top = (w.top * scale) + 'px';
+      span.style.width = (w.width * scale) + 'px';
+      span.style.height = (w.height * scale) + 'px';
+      span.style.fontSize = (w.height * scale * 0.95) + 'px';
+      span.style.color = 'transparent';
+      span.style.whiteSpace = 'nowrap';
+      span.style.cursor = 'text';
+      span.style.transformOrigin = '0 0';
+      if (isMatch) {
+        span.style.backgroundColor = 'rgba(0, 122, 255, 0.38)';
+      }
+      
+      contentDiv.appendChild(span);
+      charCounter += len + 1;
+    });
+  }
+
+  function runMobileOcrOnCanvas(pageWrapper, pageNum, scale) {
+    const canvasPdf = pageWrapper.querySelector('.cr-pdf-canvas');
+    const contentDiv = pageWrapper.querySelector('.cr-page-content');
+    if (!canvasPdf || !contentDiv || typeof Tesseract === 'undefined') return;
+    
+    const ocrIndicator = document.createElement('div');
+    ocrIndicator.className = 'cr-ocr-status';
+    ocrIndicator.style.cssText = 'position:absolute; bottom:16px; right:16px; background:rgba(0,0,0,0.75); color:#fff; font-size:11px; padding:6px 12px; border-radius:6px; z-index:100; font-family:sans-serif; backdrop-filter:blur(5px); display:flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,0.1);';
+    ocrIndicator.innerHTML = `<span class="spinner" style="width:10px; height:10px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; display:inline-block; animation:spin 1s linear infinite;"></span> Extracting text...`;
+    contentDiv.appendChild(ocrIndicator);
+    
+    Tesseract.recognize(
+      canvasPdf,
+      'eng'
+    ).then(({ data: { words } }) => {
+      book.ocrData = book.ocrData || {};
+      const normFactor = 600 / canvasPdf.width;
+      book.ocrData[pageNum] = words.map(w => ({
+        text: w.text,
+        left: w.bbox.x0 * normFactor,
+        top: w.bbox.y0 * normFactor,
+        width: (w.bbox.x1 - w.bbox.x0) * normFactor,
+        height: (w.bbox.y1 - w.bbox.y0) * normFactor
+      }));
+      save();
+      ocrIndicator.remove();
+      renderMobileOcrTextOverlay(pageWrapper, book.ocrData[pageNum], book.selectedSearchMatch, scale);
+    }).catch(err => {
+      console.error("OCR failed", err);
+      ocrIndicator.innerHTML = "⚠️ Extraction failed";
+      setTimeout(() => ocrIndicator.remove(), 2000);
+    });
+  }
+
   function renderReaderPage(pageNum) {
     if (pageNum < 1) pageNum = 1;
     if (pageNum > book.totalPages) pageNum = book.totalPages;
+    
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      const pw = $('cr-page-container')?.querySelector(`.cr-page-wrapper[data-page="${pageNum}"]`);
+      if (pw) {
+        pw.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        book.currentPage = pageNum;
+        book.progress = Math.round((book.currentPage / book.totalPages) * 100);
+        save();
+        
+        const slider = $('cr-page-slider');
+        if (slider) slider.value = pageNum;
+        const label = $('cr-page-label');
+        if (label) label.textContent = `Page ${pageNum} of ${book.totalPages} (${book.progress}%)`;
+      }
+      return;
+    }
     
     book.currentPage = pageNum;
     book.progress = Math.round((book.currentPage / book.totalPages) * 100);
@@ -1651,7 +2160,7 @@ function openBookReader(book) {
     btn.addEventListener('click', () => {
       const toolId = btn.id;
       if (['cr-tool-speech', 'cr-tool-font', 'cr-tool-pen'].includes(toolId)) {
-        const targetPopoverId = toolId.replace('cr-tool-', 'cr-');
+        const targetPopoverId = toolId.replace('cr-tool-', 'cr-') + '-settings';
         const popover = $(targetPopoverId);
         const wasHidden = popover?.classList.contains('hidden');
         hideAllPopovers();
@@ -2032,6 +2541,7 @@ function openBookReader(book) {
     window.removeEventListener('keydown', handleKeyboardNav);
     window.removeEventListener('resize', adjustReaderResponsiveScale);
     overlay.classList.add('hidden');
+    document.querySelector('.tab-bar')?.classList.remove('hidden');
     $('cr-chat-widget')?.classList.add('hidden');
     $('cr-chat-fab')?.classList.add('hidden');
     renderBooks();
@@ -2046,6 +2556,7 @@ function openBookReader(book) {
       save();
       deleteFile(bookId).then(() => {
         overlay.classList.add('hidden');
+        document.querySelector('.tab-bar')?.classList.remove('hidden');
         renderBooks();
       });
     });
@@ -2053,6 +2564,10 @@ function openBookReader(book) {
 
   $('cr-sidebar-toggle').onclick = () => {
     $('cr-sidebar')?.classList.toggle('hidden');
+  };
+
+  $('cr-sidebar-close').onclick = () => {
+    $('cr-sidebar')?.classList.add('hidden');
   };
 
   $('cr-theme-select').onchange = function() {
@@ -2070,6 +2585,15 @@ function openBookReader(book) {
   $('cr-page-slider').oninput = function() {
     renderReaderPage(parseInt(this.value));
   };
+
+  const bottomBar = document.querySelector('.cr-bottom-bar');
+  if (bottomBar) {
+    bottomBar.addEventListener('click', (e) => {
+      if (e.target.closest('#cr-page-slider, .cr-page-nav-btn')) return;
+      bottomBar.classList.toggle('expanded');
+      setTimeout(adjustReaderResponsiveScale, 150);
+    });
+  }
 
   // Searching Inside Book
   let searchTimeout = null;
@@ -2262,7 +2786,15 @@ function openBookReader(book) {
             }
           }
 
-          renderReaderPage(book.currentPage || 1);
+          if (window.innerWidth <= 768) {
+            setupMobileContinuousScroll();
+            setTimeout(() => {
+              const pw = $('cr-page-container')?.querySelector(`.cr-page-wrapper[data-page="${book.currentPage || 1}"]`);
+              if (pw) pw.scrollIntoView({ block: 'start' });
+            }, 300);
+          } else {
+            renderReaderPage(book.currentPage || 1);
+          }
         });
       };
       fileReader.readAsArrayBuffer(blob);
@@ -2283,7 +2815,15 @@ function openBookReader(book) {
         outline.appendChild(li);
       }
     }
-    renderReaderPage(book.currentPage || 1);
+    if (window.innerWidth <= 768) {
+      setupMobileContinuousScroll();
+      setTimeout(() => {
+        const pw = $('cr-page-container')?.querySelector(`.cr-page-wrapper[data-page="${book.currentPage || 1}"]`);
+        if (pw) pw.scrollIntoView({ block: 'start' });
+      }, 300);
+    } else {
+      renderReaderPage(book.currentPage || 1);
+    }
   }
 }
 
@@ -2581,14 +3121,19 @@ function renderCalEvents(dateStr){
     }
     
     li.innerHTML=`
-      <div class="swipe-content" style="display:flex;align-items:center;width:100%;transition:transform 0.3s var(--spring);padding:14px;">
+      <div class="swipe-content" style="display:flex;align-items:center;width:100%;transition:transform 0.3s var(--spring);padding:14px;background:var(--surface);position:relative;">
+        <button class="glassy-del-btn rem-del-swipe" data-id="${ev.id}" data-type="calevent" title="Delete Event"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
         <div class="cal-event-dot"></div>
         <div style="flex:1;">
           <div><span class="cal-event-time">${ev.time||'All day'}</span><span class="cal-event-title" style="margin-left: 6px; font-weight: 500;">${ev.title}</span></div>
           ${extraHTML}
         </div>
       </div>
-      <button class="rem-del-swipe" data-id="${ev.id}" data-type="calevent" aria-label="Delete"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      <div class="ios-swipe-actions">
+        <button class="ios-swipe-btn delete rem-del-swipe" data-id="${ev.id}" data-type="calevent" aria-label="Delete">
+          <div class="ios-swipe-btn-icon delete"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
+        </button>
+      </div>
     `;
     setupSwipeGesture(li, { direction: 'x', maxDistance: -80 });
     list.appendChild(li);
@@ -2722,20 +3267,21 @@ function renderJournal(){
 
     wrapper.innerHTML=`
       <div class="journal-card swipe-content" style="background:#FFFFFF; border:1px solid rgba(0,0,0,0.08); border-left:3.5px solid ${cardBorderColor} !important; border-radius:16px; box-shadow:0 4px 12px rgba(0,0,0,0.02); transition:transform 0.3s var(--spring); padding:20px; cursor:pointer; position:relative; z-index:2; margin-bottom:0 !important; color:#121214;">
-        <button class="jc-hover-del" style="display:none; position:absolute; right:16px; top:16px; width:32px; height:32px; border-radius:50%; background:rgba(255, 69, 58, 0.14); color:#ff453a; border:1px solid rgba(255,69,58,0.3); align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s ease; z-index:15;" title="Delete Entry"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+        <button class="glassy-del-btn jc-hover-del" style="z-index:15;" title="Delete Entry"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
         <div class="jc-top"><span class="jc-date" style="color:rgba(18,18,20,0.55);">${dateText}</span><span class="jc-mood">${e.mood||'🙂'}</span></div>
         <div class="jc-title" style="color:#121214; font-weight:700;">${e.title||'Untitled'}</div>
         <div class="jc-preview" style="color:rgba(18,18,20,0.7);">${e.body||''}</div>
         ${attachHtml}
       </div>
-      <div class="journal-swipe-actions" style="position:absolute; right:0; top:0; bottom:0; display:flex; z-index:1; border-radius:20px; overflow:hidden;">
-        <button class="journal-swipe-share" data-id="${e.id}" style="width:60px; background:#007AFF; color:#fff; border:none; display:flex; align-items:center; justify-content:center; font-size:18px; cursor:pointer;" title="Share">⎋</button>
-        <button class="journal-swipe-del" data-id="${e.id}" style="width:60px; background:#FF3B30; color:#fff; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Delete"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+      </div>
+      <div class="ios-swipe-actions">
+        <button class="ios-swipe-btn delete journal-swipe-del" data-id="${e.id}" title="Delete">
+          <div class="ios-swipe-btn-icon delete"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></div>
+        </button>
       </div>
     `;
 
     const content = wrapper.querySelector('.journal-card');
-    const shareBtn = wrapper.querySelector('.journal-swipe-share');
     const delBtn = wrapper.querySelector('.journal-swipe-del');
     const hoverDelBtn = wrapper.querySelector('.jc-hover-del');
 
@@ -2749,9 +3295,9 @@ function renderJournal(){
     // Swipe Gesture (Touch: raw physics, Mouse: scaled down friction)
     setupSwipeGesture(wrapper, {
       direction: 'x',
-      maxDistance: -120,
+      maxDistance: -80,
       containerSelector: '.journal-card',
-      deleteLayerSelector: '.journal-swipe-actions',
+      deleteLayerSelector: '.ios-swipe-actions',
       isJournalCard: true,
       onDeleteTrigger: () => {
         STATE.journalEntries = STATE.journalEntries.filter(x => x.id !== e.id);
@@ -2760,23 +3306,12 @@ function renderJournal(){
     });
 
     content.addEventListener('click', (ev) => {
-      if (content.style.transform === 'translateX(-120px)') {
+      if (content.style.transform === 'translateX(-80px)') {
         content.style.transform = 'translateX(0)';
         ev.stopPropagation();
         return;
       }
       openJournalWrite(e.id);
-    });
-
-    shareBtn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      const title = e.title || 'Untitled';
-      const body = e.body || '';
-      const fullText = `${title}\n\n${body}`;
-      navigator.clipboard.writeText(fullText).then(() => {
-        triggerNotification('Note Shared', 'Note text copied to clipboard!');
-      });
-      content.style.transform = 'translateX(0)';
     });
 
     delBtn.addEventListener('click', (ev) => {
@@ -2887,7 +3422,7 @@ function renderBooks() {
     card.innerHTML = `
       <div class="book-cover-art" style="background: linear-gradient(135deg, ${b.fileType === 'pdf' ? '#7f1d1d, #b91c1c' : '#1e3c72, #2a5298'})">
         <span class="book-type-badge">${b.fileType.toUpperCase()}</span>
-        <button class="book-dots-btn" data-id="${b.id}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; display:flex; align-items:center; justify-content:center; color:#fff; cursor:pointer; font-size:14px; font-weight:bold; z-index:10; outline:none; transition: background 0.2s;">⋮</button>
+        <button class="glassy-del-btn book-dots-btn" data-id="${b.id}" style="z-index:10;" title="Delete Book"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
         <div style="font-size: 13px; line-height: 1.2; font-weight:700; word-break:break-word;">${b.title}</div>
       </div>
       <div class="book-meta">
@@ -3043,6 +3578,7 @@ function saveBurnEntry() {
   const expiry = Date.now() + 24 * 60 * 60 * 1000;
   STATE.ephemeralEntries.push({ id: randomId(), title, body, expiry, createdAt: Date.now() });
   saveEphemeral();
+  checkEphemeralExpiry();
   closeBurnOverlay();
   triggerNotification('Ephemeral Entry Saved', 'It will self-destruct in 24 hours 🔥');
 }
@@ -3498,6 +4034,7 @@ function openJournalAI() {
   }
   const overlay = $('journal-ai-overlay'); if (!overlay) return;
   overlay.classList.remove('hidden');
+  document.querySelector('.tab-bar')?.classList.add('hidden');
   document.body.classList.add('theme-dark-vault');
   const feed = $('jai-feed');
   if (feed && feed.children.length === 0) {
@@ -3507,42 +4044,60 @@ function openJournalAI() {
 
 window.createMainAIBanner = function(contextTheme = 'emerald') {
   const btnContainer = document.createElement('div');
-  btnContainer.style.cssText = 'display:flex; justify-content:center; margin-top:16px; margin-bottom:4px; width: 100%;';
+  btnContainer.style.cssText = 'display:flex; justify-content:center; margin-top:32px; margin-bottom:16px; width: 100%;';
   
-  const svgColors = contextTheme === 'fire' 
-    ? ['#F1C40F', '#E74C3C', '#F1C40F', '#E74C3C', '#F1C40F', '#E74C3C'] 
-    : ['#2ECC71', '#52D68A', '#2ECC71', '#52D68A', '#2ECC71', '#52D68A'];
-    
-  const particleColors = contextTheme === 'fire' ? ['#F1C40F', '#E74C3C'] : ['#2ECC71', '#30B0C7'];
+  const particleColors = ['#FFD700', '#FF3B30', '#007AFF', '#AF52DE'];
+  const gemColors = ['#2ECC71', '#30B0C7', '#52D68A']; // Green gems for the button
 
   btnContainer.innerHTML = `
-    <button class="switch-main-ai-btn" style="position:relative; overflow:hidden; background:linear-gradient(180deg, #111, #000); border:1px solid rgba(255,255,255,0.1); color:#fff; width: 100%; padding:16px 20px; border-radius:12px; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,0.2); transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1); text-align: left;">
-      <canvas class="main-ai-btn-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; mix-blend-mode:screen;"></canvas>
+    <div class="main-ai-glass-card" style="position:relative; overflow:hidden; background:rgba(255,255,255,0.85); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,1); width: 100%; max-width: 640px; border-radius:32px; box-shadow:0 16px 50px rgba(0,0,0,0.08); display:flex; flex-direction:column; align-items:center; padding: 60px 32px; text-align:center;">
       
-      <div style="position:relative; z-index:2; display:flex; flex-direction: row; align-items: center; gap:16px;">
-        <svg style="width:32px;height:32px;animation:spin-fast 6s linear infinite; flex-shrink:0;" viewBox="-20 -20 40 40">
-          <g>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[0]}"></path>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[1]}" transform="rotate(60)"></path>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[2]}" transform="rotate(120)"></path>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[3]}" transform="rotate(180)"></path>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[4]}" transform="rotate(240)"></path>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[5]}" transform="rotate(300)"></path>
+      <!-- Particle Background for Card -->
+      <canvas class="main-ai-card-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; mix-blend-mode:multiply;"></canvas>
+      
+      <!-- Rotating Logo (Original) -->
+      <div style="position:relative; z-index:2; margin-bottom:40px; display:flex; justify-content:center; align-items:center;">
+        <svg style="width:96px;height:96px;" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="card-bgr" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(46,204,113,0.15)"></stop><stop offset="100%" stop-color="transparent"></stop></radialGradient>
+            <linearGradient id="card-pg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1a9e4e"></stop><stop offset="100%" stop-color="#2ECC71"></stop></linearGradient>
+            <linearGradient id="card-pg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2ECC71"></stop><stop offset="100%" stop-color="#52D68A"></stop></linearGradient>
+          </defs>
+          <circle cx="0" cy="0" r="45" fill="url(#card-bgr)"></circle>
+          <g class="bloom-inner" style="animation: bloom-rotate 3s linear infinite; transform-origin: center center;">
+            <path class="bloom-petal p1" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#card-pg1)"></path>
+            <path class="bloom-petal p2" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#card-pg2)" transform="rotate(60)"></path>
+            <path class="bloom-petal p3" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#card-pg1)" transform="rotate(120)"></path>
+            <path class="bloom-petal p4" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#card-pg2)" transform="rotate(180)"></path>
+            <path class="bloom-petal p5" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#card-pg1)" transform="rotate(240)"></path>
+            <path class="bloom-petal p6" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#card-pg2)" transform="rotate(300)"></path>
           </g>
         </svg>
-        <div>
-            <h3 style="margin:0 0 4px 0; font-size:15px; font-weight:600; letter-spacing:-0.2px;">Consult Main AI</h3>
-            <p style="margin:0; font-size:12px; opacity:0.6; font-weight:400; line-height:1.3;">Switch to the main assistant for general knowledge.</p>
-        </div>
       </div>
-    </button>
+      
+      <!-- Big Button -->
+      <button class="switch-main-ai-btn" style="position:relative; z-index:2; overflow:hidden; background:#111; color:#fff; width:100%; max-width:340px; padding:24px 32px; border-radius:100px; border:none; cursor:pointer; font-size:18px; font-weight:600; box-shadow:0 8px 32px rgba(0,0,0,0.15); transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1); display:flex; align-items:center; justify-content:center; gap:8px;">
+        <canvas class="main-ai-btn-gems-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; mix-blend-mode:screen;"></canvas>
+        <span style="position:relative; z-index:2;">Consult Main AI</span>
+      </button>
+    </div>
   `;
   
   const btn = btnContainer.querySelector('.switch-main-ai-btn');
-  const canvas = btnContainer.querySelector('.main-ai-btn-canvas');
+  const cardCanvas = btnContainer.querySelector('.main-ai-card-canvas');
+  const btnCanvas = btnContainer.querySelector('.main-ai-btn-gems-canvas');
+  const card = btnContainer.querySelector('.main-ai-glass-card');
   
-  btn.addEventListener('mouseenter', () => btn.style.transform = 'scale(1.02) translateY(-2px)');
-  btn.addEventListener('mouseleave', () => btn.style.transform = 'scale(1) translateY(0)');
+  btn.addEventListener('mouseenter', () => {
+    btn.style.transform = 'scale(1.02) translateY(-2px)';
+    btn.style.background = '#0a2a16'; // darker green background so gems pop
+    btn.style.boxShadow = '0 16px 36px rgba(48, 209, 88, 0.4)';
+  });
+  btn.addEventListener('mouseleave', () => {
+    btn.style.transform = 'scale(1) translateY(0)';
+    btn.style.background = '#111';
+    btn.style.boxShadow = '0 8px 32px rgba(0,0,0,0.15)';
+  });
   btn.addEventListener('mousedown', () => btn.style.transform = 'scale(0.97)');
   
   btn.addEventListener('click', () => {
@@ -3552,12 +4107,62 @@ window.createMainAIBanner = function(contextTheme = 'emerald') {
     switchTab('tab-ai');
   });
   
+  // Card background canvas
   setTimeout(() => {
-    if(!canvas) return;
-    const ctx = canvas.getContext('2d');
-    canvas.width = btn.offsetWidth * 2 || 680;
-    canvas.height = btn.offsetHeight * 2 || 160;
-    let w = canvas.width, h = canvas.height;
+    if(!cardCanvas) return;
+    const ctx = cardCanvas.getContext('2d');
+    cardCanvas.width = card.offsetWidth * 2 || 1280;
+    cardCanvas.height = card.offsetHeight * 2 || 640;
+    let w = cardCanvas.width, h = cardCanvas.height;
+    let particles = [];
+    let mouseX = w/2, mouseY = h/2;
+    
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      mouseX = ((e.clientX - rect.left) / rect.width) * w;
+      mouseY = ((e.clientY - rect.top) / rect.height) * h;
+      for(let k=0; k<4; k++) {
+        particles.push({
+          x: mouseX + (Math.random()-0.5)*50, y: mouseY + (Math.random()-0.5)*50, 
+          vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, 
+          life: 1, color: particleColors[Math.floor(Math.random() * particleColors.length)]
+        });
+      }
+    });
+    
+    function animateCard() {
+      if (!document.body.contains(cardCanvas)) return;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = 'rgba(0,0,0,0.02)';
+      for(let i=0; i<30; i++) {
+         ctx.beginPath();
+         ctx.arc((i*157)%w, (i*211)%h, 1.5, 0, Math.PI*2);
+         ctx.fill();
+      }
+      for(let i=particles.length-1; i>=0; i--) {
+        let p = particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.life -= 0.02;
+        if(p.life <= 0) { particles.splice(i, 1); continue; }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.life * 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(animateCard);
+    }
+    animateCard();
+  }, 100);
+
+  // Button gems canvas
+  setTimeout(() => {
+    if(!btnCanvas) return;
+    const ctx = btnCanvas.getContext('2d');
+    btnCanvas.width = btn.offsetWidth * 2 || 680;
+    btnCanvas.height = btn.offsetHeight * 2 || 160;
+    let w = btnCanvas.width, h = btnCanvas.height;
     let particles = [];
     let mouseX = w/2, mouseY = h/2;
     
@@ -3565,28 +4170,22 @@ window.createMainAIBanner = function(contextTheme = 'emerald') {
       const rect = btn.getBoundingClientRect();
       mouseX = ((e.clientX - rect.left) / rect.width) * w;
       mouseY = ((e.clientY - rect.top) / rect.height) * h;
-      for(let k=0; k<4; k++) {
+      for(let k=0; k<5; k++) {
         particles.push({
-          x: mouseX + (Math.random()-0.5)*30, y: mouseY + (Math.random()-0.5)*30, 
+          x: mouseX + (Math.random()-0.5)*40, y: mouseY + (Math.random()-0.5)*40, 
           vx: (Math.random()-0.5)*6, vy: (Math.random()-0.5)*6, 
-          life: 1, color: particleColors[Math.floor(Math.random() * particleColors.length)]
+          life: 1, color: gemColors[Math.floor(Math.random() * gemColors.length)]
         });
       }
     });
     
     function animateBtn() {
-      if (!document.body.contains(canvas)) return;
+      if (!document.body.contains(btnCanvas)) return;
       ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      for(let i=0; i<25; i++) {
-         ctx.beginPath();
-         ctx.arc((i*113)%w, (i*197)%h, 1.5, 0, Math.PI*2);
-         ctx.fill();
-      }
       for(let i=particles.length-1; i>=0; i--) {
         let p = particles[i];
         p.x += p.vx; p.y += p.vy;
-        p.life -= 0.025;
+        p.life -= 0.03;
         if(p.life <= 0) { particles.splice(i, 1); continue; }
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.life * 4.5, 0, Math.PI * 2);
@@ -4830,6 +5429,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('jai-close')?.addEventListener('click', () => {
     $('journal-ai-overlay')?.classList.add('hidden');
+    document.querySelector('.tab-bar')?.classList.remove('hidden');
+  });
+  $('jai-close-floating')?.addEventListener('click', () => {
+    $('journal-ai-overlay')?.classList.add('hidden');
+    document.querySelector('.tab-bar')?.classList.remove('hidden');
   });
   $('jai-send')?.addEventListener('click', () => {
     const inp = $('jai-input');
@@ -5095,6 +5699,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (navigator.vibrate) navigator.vibrate(80);
     
     setTimeout(() => {
+      STATE.isDecoySession = isDecoy;
       if (isDecoy) {
         STATE.journalEntries = [...DECOY_ENTRIES];
         STATE.priorities = [
@@ -5110,10 +5715,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const encJournal = localStorage.getItem('nv-journal-enc');
         if (encJournal) {
           try {
-            const raw = decryptData(encJournal, passcode);
+            let raw = decryptData(encJournal, passcode);
+            if (!raw && passcode !== '1234') {
+              raw = decryptData(encJournal, '1234');
+            }
             STATE.journalEntries = JSON.parse(raw || '[]');
           } catch(e) {
-            STATE.journalEntries = [];
+            try {
+              const raw2 = decryptData(encJournal, '1234');
+              STATE.journalEntries = JSON.parse(raw2 || '[]');
+            } catch(e2) {
+              STATE.journalEntries = [];
+            }
           }
         } else {
           const legacy = localStorage.getItem('nv-journal') || '[]';
