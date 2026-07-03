@@ -1950,6 +1950,7 @@ function openBookReader(book) {
     
     chatMessages.appendChild(bubble);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    return bubble;
   };
 
   const typeMessageOut = (text, callback) => {
@@ -2000,7 +2001,8 @@ function openBookReader(book) {
         if (data.error && data.error.includes("API key")) {
           appendChatMessage('buddy', "Missing GitHub PAT! Please paste it into `insert api key here.txt` in the root folder.");
         } else {
-          appendChatMessage('buddy', `Error: ${data.error || 'Failed to connect to NYVRON Intelligence.'}`);
+          const bubble = appendChatMessage('buddy', `Error: ${data.error || 'Failed to connect to NYVRON Intelligence.'}`);
+          if (bubble) bubble.appendChild(window.createMainAIBanner('fire'));
         }
         return;
       }
@@ -3503,8 +3505,106 @@ function openJournalAI() {
   }
 }
 
+window.createMainAIBanner = function(contextTheme = 'emerald') {
+  const btnContainer = document.createElement('div');
+  btnContainer.style.cssText = 'display:flex; justify-content:center; margin-top:16px; margin-bottom:4px; width: 100%;';
+  
+  const svgColors = contextTheme === 'fire' 
+    ? ['#F1C40F', '#E74C3C', '#F1C40F', '#E74C3C', '#F1C40F', '#E74C3C'] 
+    : ['#2ECC71', '#52D68A', '#2ECC71', '#52D68A', '#2ECC71', '#52D68A'];
+    
+  const particleColors = contextTheme === 'fire' ? ['#F1C40F', '#E74C3C'] : ['#2ECC71', '#30B0C7'];
+
+  btnContainer.innerHTML = `
+    <button class="switch-main-ai-btn" style="position:relative; overflow:hidden; background:linear-gradient(180deg, #111, #000); border:1px solid rgba(255,255,255,0.1); color:#fff; width: 100%; padding:16px 20px; border-radius:12px; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,0.2); transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1); text-align: left;">
+      <canvas class="main-ai-btn-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; mix-blend-mode:screen;"></canvas>
+      
+      <div style="position:relative; z-index:2; display:flex; flex-direction: row; align-items: center; gap:16px;">
+        <svg style="width:32px;height:32px;animation:spin-fast 6s linear infinite; flex-shrink:0;" viewBox="-20 -20 40 40">
+          <g>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[0]}"></path>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[1]}" transform="rotate(60)"></path>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[2]}" transform="rotate(120)"></path>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[3]}" transform="rotate(180)"></path>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[4]}" transform="rotate(240)"></path>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="${svgColors[5]}" transform="rotate(300)"></path>
+          </g>
+        </svg>
+        <div>
+            <h3 style="margin:0 0 4px 0; font-size:15px; font-weight:600; letter-spacing:-0.2px;">Consult Main AI</h3>
+            <p style="margin:0; font-size:12px; opacity:0.6; font-weight:400; line-height:1.3;">Switch to the main assistant for general knowledge.</p>
+        </div>
+      </div>
+    </button>
+  `;
+  
+  const btn = btnContainer.querySelector('.switch-main-ai-btn');
+  const canvas = btnContainer.querySelector('.main-ai-btn-canvas');
+  
+  btn.addEventListener('mouseenter', () => btn.style.transform = 'scale(1.02) translateY(-2px)');
+  btn.addEventListener('mouseleave', () => btn.style.transform = 'scale(1) translateY(0)');
+  btn.addEventListener('mousedown', () => btn.style.transform = 'scale(0.97)');
+  
+  btn.addEventListener('click', () => {
+    document.getElementById('journal-ai-overlay')?.classList.add('hidden');
+    document.getElementById('cr-chat-widget')?.classList.add('hidden');
+    document.getElementById('jw-editor-ai-panel')?.classList.add('hidden');
+    switchTab('tab-ai');
+  });
+  
+  setTimeout(() => {
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = btn.offsetWidth * 2 || 680;
+    canvas.height = btn.offsetHeight * 2 || 160;
+    let w = canvas.width, h = canvas.height;
+    let particles = [];
+    let mouseX = w/2, mouseY = h/2;
+    
+    btn.addEventListener('mousemove', (e) => {
+      const rect = btn.getBoundingClientRect();
+      mouseX = ((e.clientX - rect.left) / rect.width) * w;
+      mouseY = ((e.clientY - rect.top) / rect.height) * h;
+      for(let k=0; k<4; k++) {
+        particles.push({
+          x: mouseX + (Math.random()-0.5)*30, y: mouseY + (Math.random()-0.5)*30, 
+          vx: (Math.random()-0.5)*6, vy: (Math.random()-0.5)*6, 
+          life: 1, color: particleColors[Math.floor(Math.random() * particleColors.length)]
+        });
+      }
+    });
+    
+    function animateBtn() {
+      if (!document.body.contains(canvas)) return;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      for(let i=0; i<25; i++) {
+         ctx.beginPath();
+         ctx.arc((i*113)%w, (i*197)%h, 1.5, 0, Math.PI*2);
+         ctx.fill();
+      }
+      for(let i=particles.length-1; i>=0; i--) {
+        let p = particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.life -= 0.025;
+        if(p.life <= 0) { particles.splice(i, 1); continue; }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.life * 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(animateBtn);
+    }
+    animateBtn();
+  }, 100);
+  
+  return btnContainer;
+};
+
 function addJAIMessage(role, text, sourceEntry) {
-  const feed = $('jai-feed'); if (!feed) return;
+  const feed = $('jai-feed'); if (!feed) return null;
   const div = document.createElement('div');
   div.className = `jai-msg ${role}`;
   div.textContent = text;
@@ -3516,6 +3616,7 @@ function addJAIMessage(role, text, sourceEntry) {
   }
   feed.appendChild(div);
   feed.scrollTop = feed.scrollHeight;
+  return div;
 }
 
 function sendJournalAIQuery(query) {
@@ -3543,95 +3644,8 @@ function sendJournalAIQuery(query) {
     $('jai-shimmer-dot')?.classList.remove('thinking');
 
     if (scored.length === 0) {
-      addJAIMessage('ai', "My powers are strictly limited to your journal, as intended by my developer. For general questions, please consult the main NYVRON AI.");
-      const btnContainer = document.createElement('div');
-      btnContainer.style.cssText = 'display:flex; justify-content:center; margin-top:24px; margin-bottom:24px; width: 100%;';
-      btnContainer.innerHTML = `
-        <button id="switch-main-ai-btn" style="position:relative; overflow:hidden; background:linear-gradient(180deg, #0a0a0c, #050505); border:1px solid rgba(255,255,255,0.08); color:#fff; width: 100%; max-width: 340px; padding:32px 24px; border-radius:24px; cursor:pointer; box-shadow:0 16px 40px rgba(0,0,0,0.4); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); text-align: left;">
-          <canvas class="main-ai-btn-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; mix-blend-mode:screen;"></canvas>
-          
-          <div style="position:relative; z-index:2; display:flex; flex-direction: column; gap:16px;">
-            <svg style="width:48px;height:48px;animation:spin-fast 6s linear infinite;" viewBox="-20 -20 40 40"><g><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path></g></svg>
-            
-            <div>
-                <h3 style="margin:0 0 6px 0; font-size:22px; font-weight:600; letter-spacing:-0.5px;">Consult Main AI</h3>
-                <p style="margin:0; font-size:14px; opacity:0.6; font-weight:400; line-height:1.4;">Switch to the main assistant for general knowledge and deep reasoning.</p>
-            </div>
-          </div>
-        </button>
-      `;
-      const feed = $('jai-feed');
-      if (feed) {
-        feed.appendChild(btnContainer);
-        feed.scrollTop = feed.scrollHeight;
-      }
-      
-      const btn = btnContainer.querySelector('#switch-main-ai-btn');
-      const canvas = btnContainer.querySelector('.main-ai-btn-canvas');
-      
-      btn.addEventListener('mouseenter', () => btn.style.transform = 'scale(1.02) translateY(-2px)');
-      btn.addEventListener('mouseleave', () => btn.style.transform = 'scale(1) translateY(0)');
-      btn.addEventListener('mousedown', () => btn.style.transform = 'scale(0.97)');
-      
-      btn.addEventListener('click', () => {
-        $('journal-ai-overlay').classList.add('hidden');
-        switchTab('tab-ai');
-      });
-      
-      const ctx = canvas.getContext('2d');
-      // High-res canvas for crisp rendering, scaled down via CSS
-      canvas.width = 680;
-      canvas.height = 360;
-      let w = canvas.width;
-      let h = canvas.height;
-      let particles = [];
-      let mouseX = w/2, mouseY = h/2;
-      
-      btn.addEventListener('mousemove', (e) => {
-        const rect = btn.getBoundingClientRect();
-        // Map mouse position correctly to canvas internal resolution
-        mouseX = ((e.clientX - rect.left) / rect.width) * w;
-        mouseY = ((e.clientY - rect.top) / rect.height) * h;
-        
-        for(let k=0; k<4; k++) {
-          particles.push({
-            x: mouseX + (Math.random()-0.5)*30, 
-            y: mouseY + (Math.random()-0.5)*30, 
-            vx: (Math.random()-0.5)*6, 
-            vy: (Math.random()-0.5)*6, 
-            life: 1,
-            color: Math.random() > 0.5 ? '#2ECC71' : '#30B0C7'
-          });
-        }
-      });
-      
-      function animateBtn() {
-        if (!document.body.contains(canvas)) return;
-        ctx.clearRect(0, 0, w, h);
-        
-        // Render subtle static starfield
-        ctx.fillStyle = 'rgba(255,255,255,0.06)';
-        for(let i=0; i<40; i++) {
-           ctx.beginPath();
-           ctx.arc((i*113)%w, (i*197)%h, 1.5, 0, Math.PI*2);
-           ctx.fill();
-        }
-
-        for(let i=particles.length-1; i>=0; i--) {
-          let p = particles[i];
-          p.x += p.vx; p.y += p.vy;
-          p.life -= 0.025;
-          if(p.life <= 0) { particles.splice(i, 1); continue; }
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.life * 4.5, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = p.life;
-          ctx.fill();
-        }
-        ctx.globalAlpha = 1;
-        requestAnimationFrame(animateBtn);
-      }
-      animateBtn();
+      const bubble = addJAIMessage('ai', "My powers are strictly limited to your journal, as intended by my developer. For general questions, please consult the main NYVRON AI.");
+      if (bubble) bubble.appendChild(window.createMainAIBanner('emerald'));
       return;
     }
 
@@ -5439,6 +5453,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (scored.length === 0) {
         aiMsg.textContent = "I couldn't find matching entries in your journal history. Write more entries or adjust your keywords!";
+        aiMsg.appendChild(window.createMainAIBanner('fire'));
       } else {
         const top = scored[0].entry;
         const topText = (top.body || '').replace(/<[^>]*>/g, '');
