@@ -84,7 +84,7 @@
       <div class="tab-inner">
         <div class="home-hero">
           <div class="live-pill"><span class="live-dot"></span>NYVRON · Live</div>
-          <div id="home-time" class="home-clock">03:50</div>
+          <div id="home-time" class="home-clock"></div>
           <div id="home-date" class="home-date">Friday, 3 Jul</div>
           <p id="home-greeting" class="home-greeting">Good night</p>
         </div>
@@ -414,14 +414,24 @@
       </div>
 
       <!-- Journal Feature Toolbar -->
-      <div class="journal-feature-bar" id="journal-feature-bar">
+      <div class="journal-feature-bar" id="journal-feature-bar" style="position:relative;">
         <button class="jfb-btn" id="jfb-commute" title="Commute Therapy">🎙 Voice</button>
         <button class="jfb-btn" id="jfb-burn" title="Burn After Reading">🔥 Vent</button>
-        <button class="jfb-btn" id="jfb-otd" title="On This Day">⏳ Throwback</button>
-        <button class="jfb-btn" id="jfb-constellation" title="Life Constellations">✦ Map</button>
-        <button class="jfb-btn" id="jfb-ai" title="Talk to Past Self">🤖 AI Chat</button>
-        <button class="jfb-btn" id="jfb-export" title="Export Journal">📤 Export</button>
-        <button class="jfb-btn" id="jfb-heatmap" title="Mood Heatmap">🗓 Moods</button>
+        <button class="jfb-btn" id="jfb-ai" title="Talk to Past Self">
+          <svg style="width:90px;height:90px;margin-right:4px;animation: ai-orbit 1.2s linear infinite;" viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"><g><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path></g></svg>
+          AI Chat
+          <style>@keyframes ai-orbit { 0%{transform:rotate(0deg) scale(1)} 33%{transform:rotate(137deg) scale(1.1)} 66%{transform:rotate(251deg) scale(0.9)} 100%{transform:rotate(360deg) scale(1)} } @keyframes spin-fast { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+        </button>
+        <button class="jfb-btn" id="jfb-more-btn" style="background:var(--bg3); font-weight:700;">••• More</button>
+        
+        <!-- Sleek Apple-style More Menu -->
+        <div id="journal-more-menu" class="hidden" style="position:absolute; top:calc(100% + 8px); right:0; width:180px; background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:16px; padding:8px; display:flex; flex-direction:column; gap:4px; backdrop-filter:blur(30px) saturate(200%); -webkit-backdrop-filter:blur(30px) saturate(200%); box-shadow:0 10px 40px rgba(0,0,0,0.2); z-index:100; transform-origin:top right; transition:all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); opacity:0; transform:scale(0.9) translateY(-10px); pointer-events:none;">
+          <button class="jfb-menu-item" id="jfb-otd" style="background:transparent; border:none; color:var(--txt1); text-align:left; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:500; font-size:14px; display:flex; align-items:center; gap:8px; transition:background 0.2s;">⏳ Throwback</button>
+          <button class="jfb-menu-item" id="jfb-constellation" style="background:transparent; border:none; color:var(--txt1); text-align:left; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:500; font-size:14px; display:flex; align-items:center; gap:8px; transition:background 0.2s;">✦ Life Map</button>
+          <button class="jfb-menu-item" id="jfb-heatmap" style="background:transparent; border:none; color:var(--txt1); text-align:left; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:500; font-size:14px; display:flex; align-items:center; gap:8px; transition:background 0.2s;">🗓 Mood Heatmap</button>
+          <div style="height:1px; background:var(--border); margin:4px 0;"></div>
+          <button class="jfb-menu-item" id="jfb-export" style="background:transparent; border:none; color:var(--txt1); text-align:left; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:500; font-size:14px; display:flex; align-items:center; gap:8px; transition:background 0.2s;">📤 Export Journal</button>
+        </div>
       </div>
       <!-- On This Day Banner -->
       <div id="otd-banner" class="otd-banner hidden">
@@ -1006,7 +1016,7 @@
       <aside id="cr-sidebar" class="cr-sidebar hidden">
         <div class="cr-sidebar-header">Chapters &amp; Outline</div>
         <div style="padding: 10px 16px; border-bottom: 1px solid var(--border);">
-          <input type="text" id="cr-search-input" placeholder="Search in book..." style="width:100%; padding:8px 12px; border-radius:8px; background:var(--surface); border:1px solid var(--border); color:#fff; font-size:13px; box-sizing:border-box;">
+          <input type="text" id="cr-search-input" placeholder="Search in book..." style="width:100%; padding:8px 12px; border-radius:8px; background:var(--surface); border:1px solid var(--border); color:var(--txt1); font-size:13px; box-sizing:border-box;">
         </div>
         <ul id="cr-sidebar-outline" class="cr-outline-list"><li class="cr-outline-item" data-page="1">Chapter 1 (Page 1)</li><li class="cr-outline-item active" data-page="11">Chapter 2 (Page 11)</li><li class="cr-outline-item" data-page="21">Chapter 3 (Page 21)</li><li class="cr-outline-item" data-page="31">Chapter 4 (Page 31)</li><li class="cr-outline-item" data-page="41">Chapter 5 (Page 41)</li></ul>
       </aside>
@@ -1142,7 +1152,7 @@
         </div>
       </div>
       <div style="padding:12px; border-top:1px solid var(--border); display:flex; gap:8px; background:rgba(0,0,0,0.2);">
-        <input type="text" id="cr-chat-input" placeholder="Type a message..." style="flex:1; padding:8px 12px; border-radius:20px; background:var(--surface); border:1px solid var(--border); color:#fff; font-size:13px; outline:none;" />
+        <input type="text" id="cr-chat-input" placeholder="Type a message..." style="flex:1; padding:8px 12px; border-radius:20px; background:var(--surface); border:1px solid var(--border); color:var(--txt1); font-size:13px; outline:none;" />
         <button id="cr-chat-send" style="background:var(--cascara); border:none; color:#000; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold;">→</button>
       </div>
     </div>

@@ -42,6 +42,7 @@ const STATE = {
   vaultLocked: true,
   lockTargetTab: null,
   lockTargetEditId: null,
+  lockTargetAction: null,
 };
 
 const $ = id => document.getElementById(id);
@@ -2613,7 +2614,10 @@ function applyAutoTheme() {
 
 // --- updateClock ---
 function updateClock(){
-  const now=new Date(),hm=now.toTimeString().slice(0,5);
+  const now=new Date();
+  const hh=String(now.getHours()).padStart(2,'0');
+  const mm=String(now.getMinutes()).padStart(2,'0');
+  const hm=`${hh}:${mm}`;
   const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   
@@ -2981,6 +2985,11 @@ function saveEphemeral() {
 // --- BURN AFTER READING ---
 let burnTimerInterval = null;
 function openBurnOverlay() {
+  if ((STATE.passcodeEnabled || STATE.facelockEnabled || STATE.fingerprintlockEnabled) && STATE.vaultLocked) {
+    STATE.lockTargetAction = 'burn';
+    triggerBiometricOrPasscodeLock();
+    return;
+  }
   const overlay = $('journal-burn-overlay'); if (!overlay) return;
   document.body.classList.add('theme-crimson');
   document.body.classList.remove('theme-paper','theme-dark-vault');
@@ -3070,6 +3079,11 @@ function checkEphemeralExpiry() {
 }
 
 function openStoryViewer(index) {
+  if ((STATE.passcodeEnabled || STATE.facelockEnabled || STATE.fingerprintlockEnabled) && STATE.vaultLocked) {
+    STATE.lockTargetAction = 'story';
+    triggerBiometricOrPasscodeLock();
+    return;
+  }
   const overlay = $('story-viewer-overlay'); if (!overlay) return;
   
   if (activeVents.length === 0) {
@@ -3188,6 +3202,11 @@ let commuteSpeechRec = null;
 let commuteTranscript = '';
 
 function openCommuteTherapy() {
+  if ((STATE.passcodeEnabled || STATE.facelockEnabled || STATE.fingerprintlockEnabled) && STATE.vaultLocked) {
+    STATE.lockTargetAction = 'commute';
+    triggerBiometricOrPasscodeLock();
+    return;
+  }
   const overlay = $('commute-therapy-overlay'); if (!overlay) return;
   document.body.classList.add('theme-dark-vault');
   overlay.classList.remove('hidden');
@@ -3356,6 +3375,11 @@ let constellationDragging = false, constellationDragStart = null;
 let constellationNodes = [];
 
 function openConstellation() {
+  if ((STATE.passcodeEnabled || STATE.facelockEnabled || STATE.fingerprintlockEnabled) && STATE.vaultLocked) {
+    STATE.lockTargetAction = 'map';
+    triggerBiometricOrPasscodeLock();
+    return;
+  }
   const overlay = $('constellation-overlay'); if (!overlay) return;
   document.body.classList.add('theme-dark-vault');
   overlay.classList.remove('hidden');
@@ -3465,6 +3489,11 @@ function drawConstellation() {
 
 // --- JOURNAL AI CHAT (Talk to Past Self) ---
 function openJournalAI() {
+  if ((STATE.passcodeEnabled || STATE.facelockEnabled || STATE.fingerprintlockEnabled) && STATE.vaultLocked) {
+    STATE.lockTargetAction = 'ai';
+    triggerBiometricOrPasscodeLock();
+    return;
+  }
   const overlay = $('journal-ai-overlay'); if (!overlay) return;
   overlay.classList.remove('hidden');
   document.body.classList.add('theme-dark-vault');
@@ -3514,7 +3543,71 @@ function sendJournalAIQuery(query) {
     $('jai-shimmer-dot')?.classList.remove('thinking');
 
     if (scored.length === 0) {
-      addJAIMessage('ai', "I couldn't find matching entries in your journal for that query. Try writing more entries first, or use different keywords.");
+      addJAIMessage('ai', "My powers are strictly limited to your journal, as intended by my developer. For general questions, please consult the main NYVRON AI.");
+      const btnContainer = document.createElement('div');
+      btnContainer.style.cssText = 'display:flex; justify-content:center; margin-top:12px; margin-bottom:12px;';
+      btnContainer.innerHTML = `
+        <button id="switch-main-ai-btn" style="position:relative; overflow:hidden; background:#1e1e20; border:1px solid rgba(255,255,255,0.1); color:#fff; padding:12px 24px; border-radius:24px; font-weight:600; cursor:pointer; font-size:14px; box-shadow:0 4px 12px rgba(0,0,0,0.3); transition: transform 0.2s;">
+          <canvas class="main-ai-btn-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; mix-blend-mode:screen;"></canvas>
+          <span style="position:relative; z-index:2; display:flex; align-items:center; gap:8px;">
+            <svg style="width:16px;height:16px;animation:spin-fast 1s linear infinite;" viewBox="-20 -20 40 40"><g><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path></g></svg>
+            Open Main AI
+          </span>
+        </button>
+      `;
+      const feed = $('jai-feed');
+      if (feed) {
+        feed.appendChild(btnContainer);
+        feed.scrollTop = feed.scrollHeight;
+      }
+      
+      const btn = btnContainer.querySelector('#switch-main-ai-btn');
+      const canvas = btnContainer.querySelector('.main-ai-btn-canvas');
+      btn.addEventListener('click', () => {
+        $('journal-ai-overlay').classList.add('hidden');
+        switchTab('tab-ai');
+      });
+      
+      const ctx = canvas.getContext('2d');
+      let w = canvas.width = 200;
+      let h = canvas.height = 50;
+      let particles = [];
+      let mouseX = w/2, mouseY = h/2;
+      
+      btn.addEventListener('mousemove', (e) => {
+        const rect = btn.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
+        for(let k=0; k<2; k++) {
+          particles.push({
+            x: mouseX + (Math.random()-0.5)*10, 
+            y: mouseY + (Math.random()-0.5)*10, 
+            vx: (Math.random()-0.5)*2, 
+            vy: (Math.random()-0.5)*2, 
+            life: 1,
+            color: Math.random() > 0.5 ? '#2ECC71' : '#30B0C7'
+          });
+        }
+      });
+      
+      function animateBtn() {
+        if (!document.body.contains(canvas)) return;
+        ctx.clearRect(0, 0, w, h);
+        for(let i=particles.length-1; i>=0; i--) {
+          let p = particles[i];
+          p.x += p.vx; p.y += p.vy;
+          p.life -= 0.04;
+          if(p.life <= 0) { particles.splice(i, 1); continue; }
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.life*2.5, 0, Math.PI*2);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = p.life;
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(animateBtn);
+      }
+      animateBtn();
       return;
     }
 
@@ -3534,6 +3627,11 @@ function sendJournalAIQuery(query) {
 
 // --- ON THIS DAY ---
 function openOnThisDay() {
+  if ((STATE.passcodeEnabled || STATE.facelockEnabled || STATE.fingerprintlockEnabled) && STATE.vaultLocked) {
+    STATE.lockTargetAction = 'otd';
+    triggerBiometricOrPasscodeLock();
+    return;
+  }
   const overlay = $('on-this-day-overlay'); if (!overlay) return;
   overlay.classList.remove('hidden');
   const stack = $('otd-stack');
@@ -3594,6 +3692,11 @@ function checkOnThisDay() {
 
 // --- MOOD HEATMAP ---
 function openMoodHeatmap() {
+  if ((STATE.passcodeEnabled || STATE.facelockEnabled || STATE.fingerprintlockEnabled) && STATE.vaultLocked) {
+    STATE.lockTargetAction = 'mood';
+    triggerBiometricOrPasscodeLock();
+    return;
+  }
   const overlay = $('mood-heatmap-overlay'); if (!overlay) return;
   overlay.classList.remove('hidden');
   renderMoodHeatmap();
@@ -4576,7 +4679,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Add priority
   $('add-priority-btn')?.addEventListener('click', () => {
     openModal('Add Priority', `
-      <input id="new-priority-inp" class="modal-input" placeholder="What is your priority?" style="width:100%; padding:10px; margin-bottom:12px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff;" />
+      <input id="new-priority-inp" class="modal-input" placeholder="What is your priority?" style="width:100%; padding:10px; margin-bottom:12px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:var(--txt1);" />
       <button id="save-priority-btn" class="btn-primary" style="width:100%; padding:10px; border-radius:8px; background:var(--cascara); color:#000; font-weight:bold; border:none; cursor:pointer;">Save Priority</button>
     `);
     setTimeout(() => {
@@ -4602,11 +4705,11 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('Add Schedule Block', `
       <div style="margin-bottom:12px;">
         <label style="font-size:11px;color:inherit; opacity:0.7;display:block;margin-bottom:4px;">TIME</label>
-        <input id="new-schedule-time" type="time" class="modal-input" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff;" />
+        <input id="new-schedule-time" type="time" class="modal-input" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:var(--txt1);" />
       </div>
       <div style="margin-bottom:16px;">
         <label style="font-size:11px;color:inherit; opacity:0.7;display:block;margin-bottom:4px;">EVENT TITLE</label>
-        <input id="new-schedule-title" class="modal-input" placeholder="e.g., Mathematics Focus" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff;" />
+        <input id="new-schedule-title" class="modal-input" placeholder="e.g., Mathematics Focus" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:var(--txt1);" />
       </div>
       <button id="save-schedule-btn" class="btn-primary" style="width:100%; padding:10px; border-radius:8px; background:var(--cascara); color:#000; font-weight:bold; border:none; cursor:pointer;">Save Block</button>
     `);
@@ -4632,7 +4735,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Add reminder
   $('add-reminder-btn')?.addEventListener('click', () => {
     openModal('Add Reminder', `
-      <input id="new-reminder-inp" class="modal-input" placeholder="e.g., Drink water, Stretch..." style="width:100%; padding:10px; margin-bottom:12px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff;" />
+      <input id="new-reminder-inp" class="modal-input" placeholder="e.g., Drink water, Stretch..." style="width:100%; padding:10px; margin-bottom:12px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:var(--txt1);" />
       <button id="save-reminder-btn" class="btn-primary" style="width:100%; padding:10px; border-radius:8px; background:var(--cascara); color:#000; font-weight:bold; border:none; cursor:pointer;">Save Reminder</button>
     `);
     setTimeout(() => {
@@ -4703,15 +4806,55 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('otd-close')?.addEventListener('click', () => $('on-this-day-overlay')?.classList.add('hidden'));
   $('mh-close')?.addEventListener('click', () => $('mood-heatmap-overlay')?.classList.add('hidden'));
-  $('export-close')?.addEventListener('click', closeExport);
-  $('export-backdrop')?.addEventListener('click', closeExport);
-  $('export-json-btn')?.addEventListener('click', exportAsJSON);
-  $('export-markdown-btn')?.addEventListener('click', exportAsMarkdown);
+  $('jfb-export')?.addEventListener('click', () => {
+    $('export-overlay').classList.remove('hidden');
+    $('export-backdrop').classList.remove('hidden');
+  });
+
+  // More Menu Logic
+  $('jfb-more-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = $('journal-more-menu');
+    if (menu.classList.contains('active')) {
+      menu.classList.remove('active');
+      menu.style.opacity = '0';
+      menu.style.transform = 'scale(0.9) translateY(-10px)';
+      menu.style.pointerEvents = 'none';
+    } else {
+      menu.classList.add('active');
+      menu.style.opacity = '1';
+      menu.style.transform = 'scale(1) translateY(0)';
+      menu.style.pointerEvents = 'auto';
+    }
+  });
   
-  // --- PDF Export click wiring ---
-  $('export-pdf-btn')?.addEventListener('click', () => {
-    exportAsPDF();
-    closeExport();
+  // Close menu on outside click
+  document.addEventListener('click', (e) => {
+    const menu = $('journal-more-menu');
+    const btn = $('jfb-more-btn');
+    if (menu && menu.classList.contains('active') && e.target !== btn && !menu.contains(e.target)) {
+      menu.classList.remove('active');
+      menu.style.opacity = '0';
+      menu.style.transform = 'scale(0.9) translateY(-10px)';
+      menu.style.pointerEvents = 'none';
+    }
+  });
+
+  // Highlight menu items on hover
+  document.querySelectorAll('.jfb-menu-item').forEach(item => {
+    item.addEventListener('mouseenter', () => item.style.background = 'var(--bg3)');
+    item.addEventListener('mouseleave', () => item.style.background = 'transparent');
+    // Close menu when item clicked
+    item.addEventListener('click', () => {
+      const menu = $('journal-more-menu');
+      menu.classList.remove('active');
+      menu.style.opacity = '0';
+      menu.style.transform = 'scale(0.9) translateY(-10px)';
+      menu.style.pointerEvents = 'none';
+    });
+  });
+
+  $('export-close')?.addEventListener('click', closeExport);
   });
 
   function exportAsPDF() {
@@ -4832,6 +4975,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('biometric-scan-overlay')?.classList.add('hidden');
     STATE.lockTargetTab = null;
     STATE.lockTargetEditId = null;
+    STATE.lockTargetAction = null;
   });
 
   // Simulated Biometric Scanner execution routing
@@ -4900,11 +5044,11 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('Change Passcode', `
       <div style="margin-bottom:12px;">
         <label style="font-size:11px;opacity:0.7;display:block;margin-bottom:4px;">CURRENT 4-DIGIT PASSCODE</label>
-        <input id="old-passcode-inp" type="password" maxlength="4" class="modal-input" placeholder="••••" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff; text-align:center; letter-spacing:8px;" />
+        <input id="old-passcode-inp" type="password" maxlength="4" class="modal-input" placeholder="••••" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:var(--txt1); text-align:center; letter-spacing:8px;" />
       </div>
       <div style="margin-bottom:16px;">
         <label style="font-size:11px;opacity:0.7;display:block;margin-bottom:4px;">NEW 4-DIGIT PASSCODE</label>
-        <input id="new-passcode-inp" type="password" maxlength="4" class="modal-input" placeholder="••••" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff; text-align:center; letter-spacing:8px;" />
+        <input id="new-passcode-inp" type="password" maxlength="4" class="modal-input" placeholder="••••" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:var(--txt1); text-align:center; letter-spacing:8px;" />
       </div>
       <button id="save-passcode-btn" class="btn-primary" style="width:100%; padding:10px; border-radius:8px; background:var(--cascara); color:#000; font-weight:bold; border:none; cursor:pointer;">Update Passcode</button>
     `);
@@ -5004,6 +5148,16 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (STATE.lockTargetEditId) {
         openJournalWrite(STATE.lockTargetEditId === 'new' ? null : STATE.lockTargetEditId);
         STATE.lockTargetEditId = null;
+      } else if (STATE.lockTargetAction) {
+        if (STATE.lockTargetAction === 'burn') openBurnOverlay();
+        else if (STATE.lockTargetAction === 'story') openStoryViewer(0);
+        else if (STATE.lockTargetAction === 'commute') openCommuteTherapy();
+        else if (STATE.lockTargetAction === 'map') openConstellation();
+        else if (STATE.lockTargetAction === 'ai') openJournalAI();
+        else if (STATE.lockTargetAction === 'otd') openOnThisDay();
+        else if (STATE.lockTargetAction === 'mood') openMoodHeatmap();
+        else if (STATE.lockTargetAction === 'export') openExport();
+        STATE.lockTargetAction = null;
       }
       
       inputPasscode = '';
@@ -5035,7 +5189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         switchTab('tab-home');
       }
       
-      $('vault-lock-screen')?.classList.remove('hidden');
+      $('vault-lock-screen')?.classList.add('hidden');
       inputPasscode = '';
       updatePasscodeDots();
       
@@ -5670,8 +5824,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Add countdown
   $('add-countdown-btn')?.addEventListener('click', () => {
     openModal('Set Countdown', `
-      <input class="modal-input" id="cd-title-inp" placeholder="Countdown Title" autofocus style="margin-bottom:12px; width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff;" />
-      <input class="modal-input" id="cd-datetime-inp" type="datetime-local" style="margin-bottom:12px; width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff;" />
+      <input class="modal-input" id="cd-title-inp" placeholder="Countdown Title" autofocus style="margin-bottom:12px; width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:var(--txt1);" />
+      <input class="modal-input" id="cd-datetime-inp" type="datetime-local" style="margin-bottom:12px; width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:var(--txt1);" />
       <button class="btn-primary" id="cd-ok" style="width:100%; padding:10px; border-radius:8px; background:var(--cascara); color:#000; font-weight:bold; border:none; cursor:pointer;">Save Countdown</button>
     `);
     setTimeout(() => {

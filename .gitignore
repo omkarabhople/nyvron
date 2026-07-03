@@ -5,3 +5,5 @@ insert api key here
 backend/.DS_Store
 frontend/.DS_Store
 *.log
+# NEVER commit or run anything from this folder — contains stale 3:50 AM snapshots
+frontend/_recovered/
