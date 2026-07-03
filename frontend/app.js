@@ -4773,7 +4773,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   $('jfb-burn')?.addEventListener('click', openBurnOverlay);
   $('jfb-commute')?.addEventListener('click', openCommuteTherapy);
+  $('jfb-constellation')?.addEventListener('click', openConstellation);
   $('jfb-ai')?.addEventListener('click', openJournalAI);
+  $('jfb-otd')?.addEventListener('click', openOnThisDay);
+  $('jfb-export')?.addEventListener('click', openExport);
+  $('jfb-heatmap')?.addEventListener('click', openMoodHeatmap);
   $('otd-banner-btn')?.addEventListener('click', openOnThisDay);
   $('burn-close-btn')?.addEventListener('click', closeBurnOverlay);
   $('burn-save-btn')?.addEventListener('click', saveBurnEntry);
@@ -4805,19 +4809,6 @@ document.addEventListener('DOMContentLoaded', () => {
   $('jfb-export')?.addEventListener('click', () => {
     $('export-overlay').classList.remove('hidden');
     $('export-backdrop').classList.remove('hidden');
-  });
-
-  // More Menu — toggle .active class (CSS handles animation)
-  const moreBtn = $('jfb-more-btn');
-  const moreMenu = $('journal-more-menu');
-  moreBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    moreMenu?.classList.toggle('active');
-  });
-  document.addEventListener('click', (e) => {
-    if (moreMenu && !moreMenu.contains(e.target) && e.target !== moreBtn) {
-      moreMenu.classList.remove('active');
-    }
   });
 
   $('export-close')?.addEventListener('click', closeExport);

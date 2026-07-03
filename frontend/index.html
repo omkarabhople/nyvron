@@ -417,21 +417,15 @@
       <div class="journal-feature-bar" id="journal-feature-bar">
         <button class="jfb-btn" id="jfb-commute" title="Commute Therapy">🎙 Voice</button>
         <button class="jfb-btn" id="jfb-burn" title="Burn After Reading">🔥 Vent</button>
+        <button class="jfb-btn" id="jfb-otd" title="On This Day">⏳ Throwback</button>
+        <button class="jfb-btn" id="jfb-constellation" title="Life Constellations">✦ Map</button>
         <button class="jfb-btn" id="jfb-ai" title="Talk to Past Self">
           <svg style="width:16px;height:16px;animation:ai-orbit 1.2s linear infinite;" viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"><g><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path></g></svg>
           AI Chat
           <style>@keyframes ai-orbit{0%{transform:rotate(0deg) scale(1)}33%{transform:rotate(137deg) scale(1.1)}66%{transform:rotate(251deg) scale(0.9)}100%{transform:rotate(360deg) scale(1)}} @keyframes spin-fast{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>
         </button>
-        <button class="jfb-btn" id="jfb-more-btn">⋯ More</button>
-
-        <!-- iOS-style More Popover -->
-        <div id="journal-more-menu">
-          <button class="jfb-menu-item" onclick="openOnThisDay(); document.getElementById('journal-more-menu').classList.remove('active');">⏳ Throwback</button>
-          <button class="jfb-menu-item" onclick="openConstellation(); document.getElementById('journal-more-menu').classList.remove('active');">✦ Life Map</button>
-          <button class="jfb-menu-item" onclick="openMoodHeatmap(); document.getElementById('journal-more-menu').classList.remove('active');">🗓 Mood Heatmap</button>
-          <div class="jfb-menu-divider"></div>
-          <button class="jfb-menu-item" onclick="openExport(); document.getElementById('journal-more-menu').classList.remove('active');">📤 Export Journal</button>
-        </div>
+        <button class="jfb-btn" id="jfb-export" title="Export Journal">📤 Export</button>
+        <button class="jfb-btn" id="jfb-heatmap" title="Mood Heatmap">🗓 Moods</button>
       </div>
       <!-- On This Day Banner -->
       <div id="otd-banner" class="otd-banner hidden">
