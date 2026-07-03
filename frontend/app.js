@@ -186,8 +186,47 @@ function renderSchedule(){
   list.innerHTML='';
   if(!STATE.schedule.length){list.innerHTML='<li class="empty-hint">No schedule yet.</li>';return;}
   STATE.schedule.sort((a,b)=>a.time.localeCompare(b.time)).forEach((s,i)=>{
-    const li=document.createElement('li'); li.className='day-block'; li.style.animationDelay=`${i*.05}s`;
-    li.innerHTML=`<span class="day-block-time">${s.time}</span><span class="day-block-title">${s.title}</span>`;
+    const li=document.createElement('li'); li.className='day-block swipe-wrap'; li.style.animationDelay=`${i*.05}s`;
+    li.style.padding = '0'; // reset padding since it's now a wrapper
+    li.innerHTML=`
+      <div class="swipe-content" style="display:flex;align-items:center;width:100%;transition:transform 0.3s var(--spring);padding:14px 16px;">
+        <span class="day-block-time" style="width:70px">${s.time}</span><span class="day-block-title" style="flex:1">${s.title}</span>
+      </div>
+      <button class="rem-del-swipe" data-id="${s.id}" data-type="schedule" aria-label="Delete">Delete</button>
+    `;
+    let startX = 0, currentX = 0;
+    const content = li.querySelector('.swipe-content');
+    content.addEventListener('touchstart', e => { startX = e.touches[0].clientX; content.style.transition = 'none'; });
+    content.addEventListener('touchmove', e => {
+      const delta = e.touches[0].clientX - startX;
+      if(delta < 0 && delta > -80) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
+    });
+    content.addEventListener('touchend', e => {
+      content.style.transition = 'transform 0.3s var(--spring)';
+      if(currentX < -40) { content.style.transform = 'translateX(-80px)'; }
+      else { content.style.transform = 'translateX(0)'; }
+      currentX = 0;
+    });
+    // Desktop swipe support
+    let mouseDragged = false;
+    content.addEventListener('mousedown', e => {
+      startX = e.clientX; currentX = 0; mouseDragged = false; content.style.transition = 'none';
+      const onMouseMove = (moveE) => {
+        const delta = moveE.clientX - startX;
+        if (Math.abs(delta) > 5) mouseDragged = true;
+        if(delta < 0 && delta > -80) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
+      };
+      const onMouseUp = () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        if(!mouseDragged) return;
+        content.style.transition = 'transform 0.3s var(--spring)';
+        if(currentX < -40) { content.style.transform = 'translateX(-80px)'; }
+        else { content.style.transform = 'translateX(0)'; }
+      };
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    });
     list.appendChild(li);
   });
 }
@@ -476,7 +515,7 @@ function renderPlanner() {
     const editBtn = document.createElement('button');
     editBtn.className = 'planner-edit-btn';
     editBtn.dataset.day = day;
-    editBtn.style = 'background:var(--surface2); border:none; border-radius:8px; color:var(--txt2); font-size:12px; padding:6px 12px; cursor:pointer;';
+    editBtn.style = 'background:var(--surface2); border:none; border-radius:8px; color:inherit; opacity:0.8; font-size:12px; padding:6px 12px; cursor:pointer;';
     editBtn.textContent = 'Edit';
     editBtn.addEventListener('click', () => {
       showPrompt(`Edit ${day}`, `Enter plan for ${day}:`, STATE.planner[day] || '', (val) => {
@@ -529,7 +568,7 @@ function showHeatmapDay(dateStr,totalMs){
   const d=new Date(dateStr+'T00:00:00'),label=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   const subjMs={};
   STATE.cascara.sessions.filter(s=>s.date===dateStr).forEach(s=>{if(!subjMs[s.subjectName])subjMs[s.subjectName]=0;subjMs[s.subjectName]+=s.durationMs;});
-  const rows=Object.entries(subjMs).map(([name,ms])=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--separator)"><span style="color:var(--txt2);font-size:15px">${name}</span><span style="color:var(--cascara);font-weight:600">${ms2hms(ms)}</span></div>`).join('');
+  const rows=Object.entries(subjMs).map(([name,ms])=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--separator)"><span style="color:inherit; opacity:0.8;font-size:15px">${name}</span><span style="color:var(--cascara);font-weight:600">${ms2hms(ms)}</span></div>`).join('');
   const sessions=STATE.cascara.sessions.filter(s=>s.date===dateStr);
   const startT=sessions.length?new Date(sessions[0].start).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}):'—';
   const endT=sessions.length?new Date(sessions[sessions.length-1].start+sessions[sessions.length-1].durationMs).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}):'—';
@@ -580,6 +619,16 @@ function stopCascaraSession(){
 
 // --- openBookReader ---
 function openBookReader(book) {
+
+  // Start Time tracker
+  if (window.crTimeTracker) clearInterval(window.crTimeTracker);
+  window.crTimeTracker = setInterval(() => {
+    if (!$('cascara-reader-overlay').classList.contains('hidden')) {
+      book.timeRead = (book.timeRead || 0) + 1;
+      save();
+      if ($('cascara-books-grid')) renderBooks(); // update stats live!
+    }
+  }, 60000);
   const overlay = $('cascara-reader-overlay'); if(!overlay) return;
   overlay.classList.remove('hidden');
   const selectedTheme = $('cr-theme-select')?.value || 'dark';
@@ -678,7 +727,111 @@ function openBookReader(book) {
     book.highlights[book.currentPage] = contentDiv.innerHTML;
     save();
     selection.removeAllRanges();
+    $('cr-selection-menu')?.classList.remove('active');
   }
+
+  // iOS-Style Text Selection Handling
+  const selMenu = $('cr-selection-menu');
+  let currentSelectionText = '';
+  
+  const handleSelection = () => {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
+    if (!text || !selMenu || activeTool === 'pen' || activeTool === 'eraser') {
+      selMenu?.classList.remove('active');
+      currentSelectionText = '';
+      return;
+    }
+    currentSelectionText = text;
+    
+    // Get bounding box of the selection
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    
+    // Position menu above selection
+    // Add offset for the reader container if it is absolutely positioned
+    const wrapperRect = $('cascara-reader-overlay').getBoundingClientRect();
+    const top = rect.top - wrapperRect.top - 50; 
+    const left = rect.left - wrapperRect.left + (rect.width / 2);
+    
+    selMenu.style.top = `${Math.max(10, top)}px`;
+    selMenu.style.left = `${left}px`;
+    selMenu.style.transform = `translateX(-50%)`;
+    selMenu.classList.add('active');
+  };
+
+  document.addEventListener('selectionchange', () => {
+    // Debounce slightly to wait for mouseup, handled below
+  });
+
+  const contentDivEl = $('cr-page-content');
+  if (contentDivEl) {
+    contentDivEl.addEventListener('mouseup', () => setTimeout(handleSelection, 50));
+    contentDivEl.addEventListener('touchend', () => setTimeout(handleSelection, 50));
+  }
+
+  // Hook up menu buttons
+
+  // Initialize Build Date
+  const buildDateEl = $('cr-build-date');
+  if (buildDateEl) {
+    buildDateEl.textContent = new Date(document.lastModified).toLocaleString();
+  }
+  $('cr-sel-highlight')?.addEventListener('click', () => {
+    highlightSelection('rgba(255, 213, 79, 0.45)');
+  });
+  
+  $('cr-sel-speak')?.addEventListener('click', () => {
+    if ('speechSynthesis' in window && currentSelectionText) {
+      window.speechSynthesis.cancel();
+      ttsUtterance = new SpeechSynthesisUtterance(currentSelectionText);
+      const voiceVal = $('cr-speech-voice-select')?.value;
+      if (voiceVal) {
+        const foundVoice = window.speechSynthesis.getVoices().find(v => v.name === voiceVal);
+        if (foundVoice) ttsUtterance.voice = foundVoice;
+      }
+      window.speechSynthesis.speak(ttsUtterance);
+      selMenu?.classList.remove('active');
+    }
+  });
+  
+  $('cr-sel-copy')?.addEventListener('click', () => {
+    if (currentSelectionText) {
+      navigator.clipboard.writeText(currentSelectionText);
+      selMenu?.classList.remove('active');
+      showAlert('Copied', 'Text copied to clipboard!');
+    }
+  });
+  
+  $('cr-sel-lookup')?.addEventListener('click', async () => {
+    selMenu?.classList.remove('active');
+    if (!currentSelectionText) return;
+    
+    const popover = $('cr-lookup-popover');
+    $('cr-lookup-term').textContent = currentSelectionText;
+    $('cr-lookup-body').innerHTML = '<div style="text-align:center;padding:20px"><div class="spinner"></div></div>';
+    
+    // Position popover roughly in center
+    popover.style.top = '20%';
+    popover.style.left = '50%';
+    popover.style.transform = 'translateX(-50%)';
+    popover.classList.add('active');
+    
+    try {
+      const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(currentSelectionText)}`);
+      if (!res.ok) throw new Error('Not found');
+      const data = await res.json();
+      $('cr-lookup-body').innerHTML = `<p><strong>${data.title}</strong></p><p>${data.extract || 'No summary available.'}</p>`;
+      $('cr-lookup-link').href = data.content_urls?.desktop?.page || '#';
+    } catch (err) {
+      $('cr-lookup-body').innerHTML = '<p>No dictionary or Wikipedia entry found for this selection.</p>';
+      $('cr-lookup-link').href = `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(currentSelectionText)}`;
+    }
+  });
+
+  $('cr-lookup-close')?.addEventListener('click', () => {
+    $('cr-lookup-popover')?.classList.remove('active');
+  });
 
   let pdfDoc = null;
   const outline = $('cr-sidebar-outline');
@@ -734,6 +887,8 @@ function openBookReader(book) {
             } else {
               page.getTextContent().then(textContent => {
                 const nativeText = textContent.items.map(item => item.str).join(' ').trim();
+                book.pdfTextCache = book.pdfTextCache || {};
+                book.pdfTextCache[pageNum] = nativeText;
                 
                 if (nativeText.length > 10) {
                   contentDiv.innerHTML = '';
@@ -1290,7 +1445,7 @@ function openBookReader(book) {
 
   function getCurrentPageText() {
     if (book.fileType === 'pdf') {
-      return book.pdfTextCache[book.currentPage] || "";
+      return (book.pdfTextCache && book.pdfTextCache[book.currentPage]) ? book.pdfTextCache[book.currentPage] : "";
     } else {
       if (!book.fileContent) return "";
       const words = book.fileContent.split(/\s+/);
@@ -1303,6 +1458,7 @@ function openBookReader(book) {
     const select = $('cr-speech-voice-select');
     if (!select) return;
     const voices = synthesis.getVoices();
+    if (voices.length === 0) return;
     select.innerHTML = '';
 
     const femaleNames = ["samantha", "siri", "victoria", "fiona", "hazel", "susan", "zira", "google us english", "karen", "moira", "tessa", "veena"];
@@ -1337,33 +1493,66 @@ function openBookReader(book) {
     synthesis.onvoiceschanged = populateVoiceList;
   }
   populateVoiceList();
+  let voiceCheckInterval = setInterval(() => {
+    if(synthesis.getVoices().length > 0) {
+      clearInterval(voiceCheckInterval);
+      populateVoiceList();
+    }
+  }, 500);
 
   const speechPlayBtn = $('cr-speech-play-btn');
   const speechPlayText = $('cr-speech-play-text');
 
   const toggleSpeech = () => {
     if (isSpeaking) {
-      synthesis.cancel();
+      window.speechSynthesis.cancel();
       isSpeaking = false;
       if (speechPlayText) speechPlayText.textContent = "Start Reading";
       if (speechPlayBtn) speechPlayBtn.querySelector('svg').innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
     } else {
-      const text = getCurrentPageText();
-      if (!text || text.trim().length === 0) return;
-
-      ttsUtterance = new SpeechSynthesisUtterance(text);
-      const voiceVal = $('cr-speech-voice-select').value;
-      if (voiceVal) {
-        ttsUtterance.voice = synthesis.getVoices().find(v => v.name === voiceVal);
+      window.speechSynthesis.cancel(); // Flush queue
+      
+      let text = "";
+      if (book.fileType === 'pdf') {
+        text = (book.pdfTextCache && book.pdfTextCache[book.currentPage]) ? book.pdfTextCache[book.currentPage] : "";
+      } else {
+        if (book.fileContent) {
+          const words = book.fileContent.split(/\s+/);
+          const startIdx = (book.currentPage - 1) * 200;
+          text = words.slice(startIdx, startIdx + 200).join(' ');
+        }
       }
 
-      ttsUtterance.onend = () => {
+      if (!text || text.trim().length === 0) {
+        alert("No text detected. Try waiting a moment or reading another page.");
+        return;
+      }
+      
+      console.log('Speaking text of length:', text.length);
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voiceSelect = document.getElementById('cr-speech-voice-select');
+      if (voiceSelect && voiceSelect.value) {
+        const selectedVoice = window.speechSynthesis.getVoices().find(v => v.name === voiceSelect.value);
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+      }
+      
+      utterance.onend = () => {
         isSpeaking = false;
         if (speechPlayText) speechPlayText.textContent = "Start Reading";
         if (speechPlayBtn) speechPlayBtn.querySelector('svg').innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
       };
 
-      synthesis.speak(ttsUtterance);
+      utterance.onerror = (e) => {
+        console.error("TTS Error:", e);
+        window.speechSynthesis.cancel();
+        isSpeaking = false;
+        if (speechPlayText) speechPlayText.textContent = "Start Reading";
+        if (speechPlayBtn) speechPlayBtn.querySelector('svg').innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+      };
+
+      window.speechSynthesis.speak(utterance);
       isSpeaking = true;
       if (speechPlayText) speechPlayText.textContent = "Stop Reading";
       if (speechPlayBtn) speechPlayBtn.querySelector('svg').innerHTML = '<rect x="6" y="6" width="12" height="12"/>';
@@ -1379,16 +1568,16 @@ function openBookReader(book) {
 
     const pageText = getCurrentPageText().trim();
     if (pageText.length < 50) {
-      content.innerHTML = '<div style="color:var(--txt3); font-size:12px; padding:20px;">Not enough text on this page to generate questions.</div>';
+      content.innerHTML = '<div style="color:inherit; opacity:0.7; font-size:12px; padding:20px;">Not enough text on this page to generate questions.</div>';
       return;
     }
 
-    content.innerHTML = '<div style="color:var(--txt2); font-size:12px; padding:20px; text-align:center;">Generating 10 questions using NYVRON Intelligence...</div>';
+    content.innerHTML = '<div style="color:inherit; opacity:0.8; font-size:12px; padding:20px; text-align:center;">Generating 10 questions using NYVRON Intelligence...</div>';
 
     setTimeout(() => {
       let sentences = pageText.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 25);
       if (sentences.length === 0) {
-        content.innerHTML = '<div style="color:var(--txt3); font-size:12px; padding:20px;">Could not identify clear sentences to generate quiz questions.</div>';
+        content.innerHTML = '<div style="color:inherit; opacity:0.7; font-size:12px; padding:20px;">Could not identify clear sentences to generate quiz questions.</div>';
         return;
       }
 
@@ -1424,13 +1613,13 @@ function openBookReader(book) {
         options.sort(() => Math.random() - 0.5);
 
         const card = document.createElement('div');
-        card.style.cssText = 'background:rgba(255,255,255,0.03); border:1px solid var(--border); padding:14px; border-radius:10px; display:flex; flex-direction:column; gap:10px; margin-bottom:12px;';
+        card.style.cssText = 'background:rgba(127,127,127,0.05); border:1px solid rgba(127,127,127,0.1); padding:14px; border-radius:10px; display:flex; flex-direction:column; gap:10px; margin-bottom:12px;';
         card.innerHTML = `
           <div style="font-size:11px; color:var(--cascara); font-weight:700;">QUESTION ${idx + 1} OF 10</div>
-          <div style="font-size:12px; line-height:1.4; color:#fff;">"${question}"</div>
+          <div style="font-size:12px; line-height:1.4; color:inherit;">"${question}"</div>
           <div class="mcq-opts-list" style="display:flex; flex-direction:column; gap:6px;">
             ${options.map((opt, i) => `
-              <button class="mcq-opt" data-opt="${opt}" style="padding:10px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.02); color:var(--txt2); text-align:left; cursor:pointer; font-size:12px; transition:0.2s;">
+              <button class="mcq-opt" data-opt="${opt}" style="padding:10px; border-radius:8px; border:1px solid rgba(127,127,127,0.1); background:rgba(127,127,127,0.05); color:inherit; opacity:0.85; text-align:left; cursor:pointer; font-size:12px; transition:0.2s;">
                 ${String.fromCharCode(65 + i)}. ${opt}
               </button>
             `).join('')}
@@ -1555,12 +1744,17 @@ function openBookReader(book) {
 
       document.getElementById('buddy-typing-indicator')?.remove();
 
+      const data = await res.json();
+      
       if (!res.ok) {
-        appendChatMessage('buddy', "Sorry, I encountered an error connecting to NYVRON Intelligence.");
+        if (data.error && data.error.includes("API key")) {
+          appendChatMessage('buddy', "Missing GitHub PAT! Please paste it into `insert api key here.txt` in the root folder.");
+        } else {
+          appendChatMessage('buddy', `Error: ${data.error || 'Failed to connect to NYVRON Intelligence.'}`);
+        }
         return;
       }
 
-      const data = await res.json();
       const reply = data.reply || "No response received.";
       
       typeMessageOut(reply, () => {
@@ -1570,7 +1764,7 @@ function openBookReader(book) {
 
     } catch (err) {
       document.getElementById('buddy-typing-indicator')?.remove();
-      appendChatMessage('buddy', "Connection error. Make sure backend is running.");
+      appendChatMessage('buddy', "Connection error. Make sure the backend server is running.");
     }
   };
 
@@ -1586,6 +1780,8 @@ function openBookReader(book) {
     window.removeEventListener('keydown', handleKeyboardNav);
     window.removeEventListener('resize', adjustReaderResponsiveScale);
     overlay.classList.add('hidden');
+    $('cr-chat-widget')?.classList.add('hidden');
+    $('cr-chat-fab')?.classList.add('hidden');
     renderBooks();
   };
 
@@ -1665,7 +1861,7 @@ function openBookReader(book) {
 
   async function searchBook(query) {
     if (!outline) return;
-    outline.innerHTML = `<li class="cr-outline-item" style="color:var(--txt3); pointer-events:none; padding:12px;">Searching...</li>`;
+    outline.innerHTML = `<li class="cr-outline-item" style="color:inherit; opacity:0.7; pointer-events:none; padding:12px;">Searching...</li>`;
     
     if (book.fileType === 'pdf') {
       if (!pdfDoc) return;
@@ -1712,7 +1908,7 @@ function openBookReader(book) {
       
       outline.innerHTML = '';
       if (!matches.length) {
-        outline.innerHTML = `<li class="cr-outline-item" style="color:var(--txt3); pointer-events:none; padding:12px;">No matches found</li>`;
+        outline.innerHTML = `<li class="cr-outline-item" style="color:inherit; opacity:0.7; pointer-events:none; padding:12px;">No matches found</li>`;
         return;
       }
       
@@ -1722,7 +1918,7 @@ function openBookReader(book) {
         li.className = 'cr-outline-item';
         const matchIdx = m.charOffset;
         const snippet = m.snippet.slice(Math.max(0, matchIdx - 15), matchIdx + query.length + 20);
-        li.innerHTML = `<div style="font-weight:bold; color:var(--cascara);">Page ${m.page}</div><div style="font-size:11px; color:var(--txt3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">...${snippet}...</div>`;
+        li.innerHTML = `<div style="font-weight:bold; color:var(--cascara);">Page ${m.page}</div><div style="font-size:11px; color:inherit; opacity:0.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">...${snippet}...</div>`;
         li.addEventListener('click', () => {
           book.selectedSearchMatch = {
             page: m.page,
@@ -1758,7 +1954,7 @@ function openBookReader(book) {
         }
       }
       if (!matches.length) {
-        outline.innerHTML = `<li class="cr-outline-item" style="color:var(--txt3); pointer-events:none; padding:12px;">No matches found</li>`;
+        outline.innerHTML = `<li class="cr-outline-item" style="color:inherit; opacity:0.7; pointer-events:none; padding:12px;">No matches found</li>`;
         return;
       }
       matches.sort((a, b) => a.page - b.page || a.charOffset - b.charOffset);
@@ -1767,7 +1963,7 @@ function openBookReader(book) {
         li.className = 'cr-outline-item';
         const matchIdx = m.charOffset;
         const snippet = m.snippet.slice(Math.max(0, matchIdx - 15), matchIdx + query.length + 20);
-        li.innerHTML = `<div style="font-weight:bold; color:var(--cascara);">Page ${m.page}</div><div style="font-size:11px; color:var(--txt3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">...${snippet}...</div>`;
+        li.innerHTML = `<div style="font-weight:bold; color:var(--cascara);">Page ${m.page}</div><div style="font-size:11px; color:inherit; opacity:0.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">...${snippet}...</div>`;
         li.addEventListener('click', () => {
           book.selectedSearchMatch = {
             page: m.page,
@@ -1998,7 +2194,7 @@ function renderReminders(){
     li.innerHTML=`
       <div class="swipe-content" style="display:flex;align-items:center;gap:12px;width:100%;transition:transform 0.3s var(--spring)">
         <div class="rem-check${r.done?' done':''}" data-id="${r.id}" role="checkbox" aria-checked="${r.done}" tabindex="0"></div>
-        <span class="rem-text${r.done?' done':''}" style="flex:1">${r.text}${r.time ? ` <span style="font-size:12px;color:var(--txt3);">(${r.time})</span>` : ''}</span>
+        <span class="rem-text${r.done?' done':''}" style="flex:1">${r.text}${r.time ? ` <span style="font-size:12px;color:inherit; opacity:0.7;">(${r.time})</span>` : ''}</span>
       </div>
       <button class="rem-del-swipe" data-id="${r.id}" aria-label="Delete">Delete</button>
     `;
@@ -2031,8 +2227,9 @@ function renderCalEvents(dateStr){
   empty?.classList.add('hidden');
   events.forEach((ev,i)=>{
     const li=document.createElement('li');
-    li.className='cal-event-item';
+    li.className='cal-event-item swipe-wrap';
     li.style.animationDelay=`${i*.06}s`;
+    li.style.padding = '0';
     
     let extraHTML = '';
     if (ev.url) {
@@ -2042,7 +2239,49 @@ function renderCalEvents(dateStr){
       extraHTML += `<div style="font-size: 11px; color: var(--txt3); margin-top: 2px;">${ev.notes}</div>`;
     }
     
-    li.innerHTML=`<div class="cal-event-dot"></div><div style="flex:1;"><div><span class="cal-event-time">${ev.time||'All day'}</span><span class="cal-event-title" style="margin-left: 6px; font-weight: 500;">${ev.title}</span></div>${extraHTML}</div><button class="cal-event-del" data-id="${ev.id}">✕</button>`;
+    li.innerHTML=`
+      <div class="swipe-content" style="display:flex;align-items:center;width:100%;transition:transform 0.3s var(--spring);padding:14px;">
+        <div class="cal-event-dot"></div>
+        <div style="flex:1;">
+          <div><span class="cal-event-time">${ev.time||'All day'}</span><span class="cal-event-title" style="margin-left: 6px; font-weight: 500;">${ev.title}</span></div>
+          ${extraHTML}
+        </div>
+      </div>
+      <button class="rem-del-swipe" data-id="${ev.id}" data-type="calevent" aria-label="Delete">Delete</button>
+    `;
+    let startX = 0, currentX = 0;
+    const content = li.querySelector('.swipe-content');
+    content.addEventListener('touchstart', e => { startX = e.touches[0].clientX; content.style.transition = 'none'; });
+    content.addEventListener('touchmove', e => {
+      const delta = e.touches[0].clientX - startX;
+      if(delta < 0 && delta > -80) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
+    });
+    content.addEventListener('touchend', e => {
+      content.style.transition = 'transform 0.3s var(--spring)';
+      if(currentX < -40) { content.style.transform = 'translateX(-80px)'; }
+      else { content.style.transform = 'translateX(0)'; }
+      currentX = 0;
+    });
+    // Desktop swipe support
+    let mouseDragged = false;
+    content.addEventListener('mousedown', e => {
+      startX = e.clientX; currentX = 0; mouseDragged = false; content.style.transition = 'none';
+      const onMouseMove = (moveE) => {
+        const delta = moveE.clientX - startX;
+        if (Math.abs(delta) > 5) mouseDragged = true;
+        if(delta < 0 && delta > -80) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
+      };
+      const onMouseUp = () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        if(!mouseDragged) return;
+        content.style.transition = 'transform 0.3s var(--spring)';
+        if(currentX < -40) { content.style.transform = 'translateX(-80px)'; }
+        else { content.style.transform = 'translateX(0)'; }
+      };
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    });
     list.appendChild(li);
   });
 }
@@ -2220,6 +2459,36 @@ async function fetchNorthStar(force = false){
 // --- renderBooks ---
 function renderBooks() {
 
+  // Update Reading Stats
+  const statProgress = $('stat-total-progress');
+  const statTime = $('stat-time-read');
+  const statPages = $('stat-pages-read');
+  if (statProgress && statTime && statPages) {
+    if (!STATE.books.length) {
+      statProgress.textContent = '0%';
+      statTime.textContent = '0h';
+      statPages.textContent = '0';
+    } else {
+      let totalProgress = 0;
+      let totalPagesRead = 0;
+      let totalTimeMin = 0;
+      STATE.books.forEach(b => {
+        totalProgress += b.progress || 0;
+        totalPagesRead += (b.currentPage > 1 ? b.currentPage - 1 : 0);
+        totalTimeMin += b.timeRead || 0;
+      });
+      
+      const avgProgress = Math.round(totalProgress / STATE.books.length);
+      statProgress.textContent = avgProgress + '%';
+      statPages.textContent = totalPagesRead;
+      
+      const hours = Math.floor(totalTimeMin / 60);
+      const mins = totalTimeMin % 60;
+      statTime.textContent = hours > 0 ? hours + 'h ' + mins + 'm' : mins + 'm';
+    }
+  }
+
+
   const grid = $('cascara-books-grid'); if (!grid) return;
   grid.innerHTML = '';
   if (!STATE.books.length) {
@@ -2279,7 +2548,7 @@ function renderBooks() {
       const onTouchMove = (moveEvent) => {
         currentY = moveEvent.touches[0].clientY;
         let deltaY = currentY - startY;
-        if (Math.abs(deltaY) > 5) {
+        if (Math.abs(deltaY) > 15) {
           hasDragged = true;
         }
         if (hasDragged && deltaY < 0) {
@@ -2301,9 +2570,11 @@ function renderBooks() {
         if (deltaY < -25) {
           card.style.transform = 'translateY(-60px)';
           deleteLayer.style.opacity = '1';
+          deleteLayer.style.pointerEvents = 'auto';
         } else {
           card.style.transform = 'translateY(0px)';
           deleteLayer.style.opacity = '0';
+          deleteLayer.style.pointerEvents = 'none';
         }
       };
       
@@ -2311,12 +2582,15 @@ function renderBooks() {
       card.addEventListener('touchend', onTouchEnd);
     }, {passive: true});
     
+    // Track drag state for distinguishing clicks from swipes
+    let _bookDragged = false;
+
     // Swipe Mouse Fallback Gestures (Desktop Support - Leak-free temporary binding pattern)
     card.addEventListener('mousedown', (e) => {
       if (e.target.closest('.book-dots-btn')) return;
       const startY = e.clientY;
       let currentY = startY;
-      let hasDragged = false;
+      _bookDragged = false;
       
       card.style.transition = 'none';
       deleteLayer.style.transition = 'none';
@@ -2324,10 +2598,10 @@ function renderBooks() {
       const onMouseMove = (moveEvent) => {
         currentY = moveEvent.clientY;
         let deltaY = currentY - startY;
-        if (Math.abs(deltaY) > 5) {
-          hasDragged = true;
+        if (Math.abs(deltaY) > 15) {
+          _bookDragged = true;
         }
-        if (hasDragged && deltaY < 0) {
+        if (_bookDragged && deltaY < 0) {
           let translateVal = Math.max(-60, deltaY);
           card.style.transform = `translateY(${translateVal}px)`;
           deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
@@ -2338,7 +2612,7 @@ function renderBooks() {
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
         
-        if (!hasDragged) return;
+        if (!_bookDragged) return;
         
         card.style.transition = 'transform 0.2s ease';
         deleteLayer.style.transition = 'opacity 0.2s ease';
@@ -2346,36 +2620,24 @@ function renderBooks() {
         if (deltaY < -25) {
           card.style.transform = 'translateY(-60px)';
           deleteLayer.style.opacity = '1';
+          deleteLayer.style.pointerEvents = 'auto';
         } else {
           card.style.transform = 'translateY(0px)';
           deleteLayer.style.opacity = '0';
+          deleteLayer.style.pointerEvents = 'none';
         }
       };
       
       window.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseup', onMouseUp);
     });
-    
-    // Wire dots button click
-    const dotsBtn = card.querySelector('.book-dots-btn');
-    if (dotsBtn) {
-      dotsBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        showConfirm('Delete Book', 'Are you sure you want to delete this book?', () => {
-          const bookId = b.id;
-          STATE.books = STATE.books.filter(x => x.id !== bookId);
-          save();
-          deleteFile(bookId).then(() => {
-            renderBooks();
-          });
-        });
-      });
-    }
-    
-    // Wire Delete action
-    deleteBtn.addEventListener('click', (e) => {
+  
+  // Wire dots button click
+  const dotsBtn = card.querySelector('.book-dots-btn');
+  if (dotsBtn) {
+    dotsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      showConfirm('Delete Book', 'Are you sure you want to delete this book?', () => {
+      showConfirm('Delete Book', 'Are you sure you want to delete this book? (Dots)', () => {
         const bookId = b.id;
         STATE.books = STATE.books.filter(x => x.id !== bookId);
         save();
@@ -2383,6 +2645,46 @@ function renderBooks() {
           renderBooks();
         });
       });
+    });
+  }
+  
+  // Wire Delete action
+  deleteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showConfirm('Delete Book', 'Are you sure you want to delete this book? (Swipe)', () => {
+      const bookId = b.id;
+      STATE.books = STATE.books.filter(x => x.id !== bookId);
+      save();
+      deleteFile(bookId).then(() => {
+        renderBooks();
+      });
+    });
+  });
+
+  // DIRECT click handler on card to open book reader (not body delegation)
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.book-dots-btn')) return;
+
+      
+      // If card is swiped open (delete layer visible), reset instead of opening
+      const transform = card.style.transform;
+      if (transform && transform.includes('translateY') && transform !== 'translateY(0px)') {
+        const val = parseFloat(transform.replace(/[^0-9\-]/g, ''));
+        if (val < -20) {
+          card.style.transition = 'transform 0.2s ease';
+          card.style.transform = 'translateY(0px)';
+          deleteLayer.style.transition = 'opacity 0.2s ease';
+          deleteLayer.style.opacity = '0';
+          deleteLayer.style.pointerEvents = 'none';
+          return;
+        }
+      }
+      try {
+        openBookReader(b);
+      } catch (err) {
+        console.error('Error opening book:', err);
+        showAlert('Error', 'Could not open book: ' + err.message);
+      }
     });
   });
 }
@@ -2463,7 +2765,15 @@ document.addEventListener('DOMContentLoaded', () => {
   $('modal-backdrop')?.addEventListener('click', closeModal);
   $('cal-creator-backdrop')?.addEventListener('click', closeCalCreator);
   // Focus overlay close button
-  $('cfo-close')?.addEventListener('click', stopCascaraSession);
+  $('cfo-close')?.addEventListener('click', () => {
+    showConfirm('Stop Session', 'Are you sure you want to stop this study session?', () => {
+      stopCascaraSession();
+    });
+  });
+  
+  $('cfo-minimize')?.addEventListener('click', () => {
+    $('cascara-focus-overlay')?.classList.add('hidden');
+  });
 
   // Journal Editor text formatting buttons
   const formatTextarea = (fmt) => {
@@ -2580,11 +2890,11 @@ document.addEventListener('DOMContentLoaded', () => {
   $('add-schedule-btn')?.addEventListener('click', () => {
     openModal('Add Schedule Block', `
       <div style="margin-bottom:12px;">
-        <label style="font-size:11px;color:var(--txt3);display:block;margin-bottom:4px;">TIME</label>
+        <label style="font-size:11px;color:inherit; opacity:0.7;display:block;margin-bottom:4px;">TIME</label>
         <input id="new-schedule-time" type="time" class="modal-input" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff;" />
       </div>
       <div style="margin-bottom:16px;">
-        <label style="font-size:11px;color:var(--txt3);display:block;margin-bottom:4px;">EVENT TITLE</label>
+        <label style="font-size:11px;color:inherit; opacity:0.7;display:block;margin-bottom:4px;">EVENT TITLE</label>
         <input id="new-schedule-title" class="modal-input" placeholder="e.g., Mathematics Focus" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff;" />
       </div>
       <button id="save-schedule-btn" class="btn-primary" style="width:100%; padding:10px; border-radius:8px; background:var(--cascara); color:#000; font-weight:bold; border:none; cursor:pointer;">Save Block</button>
@@ -2821,6 +3131,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // Swipe delete buttons
     if (e.target.classList.contains('rem-del-swipe')) {
       const id = e.target.dataset.id;
+      const type = e.target.dataset.type;
+
+      if (type === 'schedule') {
+        STATE.schedule = STATE.schedule.filter(s => s.id !== id);
+        save();
+        renderSchedule();
+        return;
+      }
+      if (type === 'calevent') {
+        const dateStr = STATE.selectedDate || today();
+        if (STATE.events[dateStr]) {
+          STATE.events[dateStr] = STATE.events[dateStr].filter(ev => ev.id !== id);
+          save();
+          renderCalendar();
+          renderCalEvents(dateStr);
+        }
+        return;
+      }
+
+      // Default to priorities/reminders
       const pIdx = STATE.priorities.findIndex(p => p.id === id);
       if (pIdx > -1) {
         STATE.priorities.splice(pIdx, 1);
@@ -2884,45 +3214,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 50);
     }
 
-    // Book cover click to open reader
-    if (e.target.closest('.book-cover-card') && !e.target.closest('.book-dots-btn')) {
-      try {
-        const card = e.target.closest('.book-cover-card');
-        // If the card is swiped (delete revealed), clicking resets it
-        const transform = card.style.transform;
-        if (transform && transform.includes('translateY') && parseFloat(transform.replace(/[^0-9\-]/g,'')) < -20) {
-          card.style.transition = 'transform 0.2s ease';
-          card.style.transform = 'translateY(0px)';
-          const deleteLayer = card.previousElementSibling;
-          if (deleteLayer) { deleteLayer.style.transition = 'opacity 0.2s ease'; deleteLayer.style.opacity = '0'; }
-          return;
-        }
-        const bid = card.dataset.id;
-        const book = STATE.books.find(b => b.id === bid);
-        if(book) {
-          openBookReader(book);
-        } else {
-          console.warn("Book not found in STATE.books:", bid);
-          showAlert("Book Error", "Could not find book data. Please re-import the book.");
-        }
-      } catch (err) {
-        showAlert("Error", "Error opening book reader: " + err.message);
-        console.error(err);
-      }
-    }
+    // Book cover click handled directly in renderBooks() via card.addEventListener('click')
 
-    // Calendar day event deletion
-    if (e.target.closest('.cal-event-del')) {
-      const btn = e.target.closest('.cal-event-del');
-      const evId = btn.dataset.id;
-      const dateStr = STATE.selectedDate || today();
-      if (STATE.events[dateStr]) {
-        STATE.events[dateStr] = STATE.events[dateStr].filter(ev => ev.id !== evId);
-        save();
-        renderCalendar();
-        renderCalEvents(dateStr);
-      }
-    }
+    // Calendar day event deletion handled by rem-del-swipe now
   });
 
   // Spotlight search
@@ -2983,6 +3277,10 @@ document.addEventListener('DOMContentLoaded', () => {
   renderProfile();
   renderPlanner();
 
+  const bd = $('settings-build-date');
+  if(bd) {
+    bd.textContent = new Date(document.lastModified).toLocaleString();
+  }
   
   // Load initial active tab
   switchTab(STATE.activeTab);
