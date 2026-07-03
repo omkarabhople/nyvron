@@ -4855,7 +4855,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   $('export-close')?.addEventListener('click', closeExport);
-  });
 
   function exportAsPDF() {
     const printWindow = window.open('', '_blank');
