@@ -991,7 +991,7 @@ function openBookReader(book) {
   
   function adjustReaderResponsiveScale() {
     const container = $('cr-page-view');
-    const wrapper = $('cr-page-wrapper');
+    const wrapper = container.querySelector('.cr-page-wrapper') || $('cr-page-wrapper');
     if (!container || !wrapper) return;
 
     const isMobile = window.innerWidth <= 768;
@@ -1008,8 +1008,8 @@ function openBookReader(book) {
         container.appendChild(spacer);
       }
 
-      // Base fit scale: fits the 600px wide page to screen
-      const availW = container.clientWidth - 20;
+      // Base fit scale: fits the 600px wide page to screen (occupies 80% width, 10% margins on sides)
+      const availW = container.clientWidth * 0.8;
       const baseScale = availW / 600;
       const finalScale = baseScale * currentZoom;
 
