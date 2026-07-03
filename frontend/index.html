@@ -1,7 +1,7 @@
 <html lang="en" data-theme="light"><head>
   <meta charset="UTF-8">
   <title>NYVRON</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="NYVRON — Your personal command center.">
   <link rel="stylesheet" href="styles.css">
   <style>
@@ -73,6 +73,40 @@
     </div>
   </div>
   
+  <!-- Flashcard Review Modal (Spaced Repetition) -->
+  <div id="flashcard-review-modal" class="modal-overlay hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-sheet" style="max-width: 480px; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; z-index: 1300;">
+      <div class="modal-header">
+        <h3 class="modal-title-text" style="display:flex; align-items:center; gap:8px;">⚡ <span>Flashcard Review</span></h3>
+        <button id="fc-close-btn" class="modal-close-btn" style="border:none; cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-body" style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+        <p style="font-size: 13px; color: var(--txt3); margin: 0;">SuperMemo SM-2 Spaced Repetition Session</p>
+        <div id="fc-carousel-card" style="perspective: 1000px; height: 180px; cursor: pointer; position: relative;">
+          <!-- Front / Back Card Layout -->
+          <div id="fc-card-inner" style="width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; position: absolute; border-radius: 12px; border: 1px solid var(--border); background: var(--bg3); box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+            <!-- Front -->
+            <div id="fc-card-front" style="position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; font-size: 16px; font-weight: 600; color: var(--txt1); overflow-y: auto;">
+              Question goes here
+            </div>
+            <!-- Back -->
+            <div id="fc-card-back" style="position: absolute; width: 100%; height: 100%; backface-visibility: hidden; transform: rotateY(180deg); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; font-size: 15px; color: var(--cascara); font-weight: 500; overflow-y: auto;">
+              Answer goes here
+            </div>
+          </div>
+        </div>
+        <p style="font-size: 11px; color: var(--txt3); text-align: center; margin: 0; font-style: italic;">Tap card to flip</p>
+        <div id="fc-actions" style="display: flex; gap: 8px;">
+          <button class="modal-btn-secondary fc-grade-btn" data-grade="1" style="flex: 1; font-size: 12px; background: rgba(255, 69, 58, 0.15); color: #ff453a; border: none; cursor: pointer;">Again (1)</button>
+          <button class="modal-btn-secondary fc-grade-btn" data-grade="3" style="flex: 1; font-size: 12px; background: rgba(255, 149, 0, 0.15); color: #ff9500; border: none; cursor: pointer;">Hard (3)</button>
+          <button class="modal-btn-secondary fc-grade-btn" data-grade="4" style="flex: 1; font-size: 12px; background: rgba(48, 209, 88, 0.15); color: #30d158; border: none; cursor: pointer;">Good (4)</button>
+          <button class="modal-btn-secondary fc-grade-btn" data-grade="5" style="flex: 1; font-size: 12px; background: rgba(10, 132, 255, 0.15); color: #0a84ff; border: none; cursor: pointer;">Easy (5)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- BACKGROUND MESH -->
 <div id="app">
 
@@ -309,57 +343,76 @@
   <!-- ══ AI ══ -->
   <section id="tab-ai" class="tab">
     <div class="ai-layout">
-      <div id="ai-empty-state" class="ai-empty" style="display: none;">
-        <div class="nyvron-bloom-wrap" id="ai-logo-wrap">
-          <svg class="nyvron-bloom" id="nyvron-bloom-svg" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <radialGradient id="bgr" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(46,204,113,0.08)"></stop><stop offset="100%" stop-color="transparent"></stop></radialGradient>
-              <linearGradient id="pg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1a9e4e"></stop><stop offset="100%" stop-color="#2ECC71"></stop></linearGradient>
-              <linearGradient id="pg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2ECC71"></stop><stop offset="100%" stop-color="#52D68A"></stop></linearGradient>
-            </defs>
-            <circle cx="0" cy="0" r="45" fill="url(#bgr)"></circle>
-            <g class="bloom-inner">
-              <path class="bloom-petal p1" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg1)"></path>
-              <path class="bloom-petal p2" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg2)" transform="rotate(60)"></path>
-              <path class="bloom-petal p3" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg1)" transform="rotate(120)"></path>
-              <path class="bloom-petal p4" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg2)" transform="rotate(180)"></path>
-              <path class="bloom-petal p5" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg1)" transform="rotate(240)"></path>
-              <path class="bloom-petal p6" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg2)" transform="rotate(300)"></path>
-            </g>
-            <circle cx="0" cy="0" r="5" fill="#2ECC71" class="bloom-center"></circle>
-          </svg>
-          <div class="bloom-glow-ring"></div>
+      <!-- AI Mode Switcher Segment -->
+      <div class="ai-segment-control" style="display:flex; padding:4px; background:rgba(255,255,255,0.05); border-radius:10px; margin: 12px 16px; border: 1px solid var(--border);">
+        <button id="ai-btn-chat" class="ai-seg-btn active" style="flex:1; border:none; background:none; color:#fff; padding:8px; font-weight:600; border-radius:6px; cursor:pointer; font-size:13px;">Chat</button>
+        <button id="ai-btn-graph" class="ai-seg-btn" style="flex:1; border:none; background:none; color:rgba(255,255,255,0.5); padding:8px; font-weight:600; border-radius:6px; cursor:pointer; font-size:13px;">Graph</button>
+      </div>
+
+      <!-- Chat View Elements Wrapper -->
+      <div id="ai-chat-view" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+        <div id="ai-empty-state" class="ai-empty" style="display: none;">
+          <div class="nyvron-bloom-wrap" id="ai-logo-wrap">
+            <svg class="nyvron-bloom" id="nyvron-bloom-svg" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="bgr" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(46,204,113,0.08)"></stop><stop offset="100%" stop-color="transparent"></stop></radialGradient>
+                <linearGradient id="pg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1a9e4e"></stop><stop offset="100%" stop-color="#2ECC71"></stop></linearGradient>
+                <linearGradient id="pg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2ECC71"></stop><stop offset="100%" stop-color="#52D68A"></stop></linearGradient>
+              </defs>
+              <circle cx="0" cy="0" r="45" fill="url(#bgr)"></circle>
+              <g class="bloom-inner">
+                <path class="bloom-petal p1" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg1)"></path>
+                <path class="bloom-petal p2" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg2)" transform="rotate(60)"></path>
+                <path class="bloom-petal p3" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg1)" transform="rotate(120)"></path>
+                <path class="bloom-petal p4" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg2)" transform="rotate(180)"></path>
+                <path class="bloom-petal p5" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg1)" transform="rotate(240)"></path>
+                <path class="bloom-petal p6" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg2)" transform="rotate(300)"></path>
+              </g>
+              <circle cx="0" cy="0" r="5" fill="#2ECC71" class="bloom-center"></circle>
+            </svg>
+            <div class="bloom-glow-ring"></div>
+          </div>
+          <h2 class="ai-empty-title">NYVRON</h2>
+          <p class="ai-empty-sub">Your personal command center AI</p>
+          <div class="ai-prompts-grid">
+            <button class="ai-prompt-chip" data-prompt="What should I focus on today?">What should I focus on today?</button>
+            <button class="ai-prompt-chip" data-prompt="Give me a 25-minute study plan.">Give me a study plan.</button>
+            <button class="ai-prompt-chip" data-prompt="Help me reflect on my week.">Reflect on my week.</button>
+            <button class="ai-prompt-chip" data-prompt="Motivate me to start studying.">Motivate me.</button>
+          </div>
         </div>
-        <h2 class="ai-empty-title">NYVRON</h2>
-        <p class="ai-empty-sub">Your personal command center AI</p>
-        <div class="ai-prompts-grid">
-          <button class="ai-prompt-chip" data-prompt="What should I focus on today?">What should I focus on today?</button>
-          <button class="ai-prompt-chip" data-prompt="Give me a 25-minute study plan.">Give me a study plan.</button>
-          <button class="ai-prompt-chip" data-prompt="Help me reflect on my week.">Reflect on my week.</button>
-          <button class="ai-prompt-chip" data-prompt="Motivate me to start studying.">Motivate me.</button>
+        <div id="ai-feed" class="ai-feed" aria-live="polite"><div class="msg user"><div class="msg-bubble">Hi</div></div><div class="msg ai"><div class="msg-avatar"><svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"><g><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path></g></svg></div><div class="msg-bubble">I'm here to help with studying, planning, journaling, and focus. What would you like to do?</div></div></div>
+        <div id="ai-typing" class="ai-typing hidden">
+          <div class="bloom-mini">
+            <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg">
+              <g class="bloom-inner-mini">
+                <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path>
+                <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path>
+                <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path>
+                <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path>
+                <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path>
+                <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path>
+              </g>
+            </svg>
+          </div>
+          <div class="typing-dots"><span class="td1"></span><span class="td2"></span><span class="td3"></span></div>
+        </div>
+        <div class="ai-input-bar">
+          <textarea id="ai-input" class="ai-textarea" placeholder="Message NYVRON…" rows="1" style=""></textarea>
+          <button id="ai-send" class="ai-send-btn" aria-label="Send">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
         </div>
       </div>
-      <div id="ai-feed" class="ai-feed" aria-live="polite"><div class="msg user"><div class="msg-bubble">Hi</div></div><div class="msg ai"><div class="msg-avatar"><svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"><g><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path><path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path></g></svg></div><div class="msg-bubble">I'm here to help with studying, planning, journaling, and focus. What would you like to do?</div></div></div>
-      <div id="ai-typing" class="ai-typing hidden">
-        <div class="bloom-mini">
-          <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg">
-            <g class="bloom-inner-mini">
-              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path>
-              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path>
-              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path>
-              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path>
-              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path>
-              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path>
-            </g>
-          </svg>
+
+      <!-- Graph View Elements Wrapper (Feature 1) -->
+      <div id="ai-graph-view" class="ai-graph-view hidden" style="flex:1; display:flex; flex-direction:column; padding:0 16px 16px; overflow:hidden;">
+        <div style="margin-bottom:12px; display:flex; gap:8px;">
+          <input id="cr-graph-search" class="modal-input" type="text" placeholder="Search the graph..." style="flex:1; margin:0;" />
         </div>
-        <div class="typing-dots"><span class="td1"></span><span class="td2"></span><span class="td3"></span></div>
-      </div>
-      <div class="ai-input-bar">
-        <textarea id="ai-input" class="ai-textarea" placeholder="Message NYVRON…" rows="1" style=""></textarea>
-        <button id="ai-send" class="ai-send-btn" aria-label="Send">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-        </button>
+        <div id="ai-graph-container" style="flex:1; background:rgba(0,0,0,0.25); border:1px solid var(--border); border-radius:12px; position:relative; overflow:hidden; min-height: 250px;">
+          <canvas id="cr-knowledge-graph-canvas" style="position:absolute; inset:0; width:100%; height:100%; cursor:grab;"></canvas>
+        </div>
       </div>
     </div>
   </section>
@@ -434,13 +487,14 @@
         <button id="otd-banner-btn" class="otd-banner-btn">View</button>
       </div>
       <!-- Ephemeral Status Bar (WhatsApp/Instagram style) -->
-      <div id="journal-stories-bar" class="hidden" style="display:flex; gap:16px; align-items:center; padding:12px 24px; margin-bottom:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:16px; overflow-x:auto;">
+      <div id="journal-stories-bar" class="journal-stories-bar hidden">
         <!-- Story item -->
-        <div id="active-story-item" style="display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; position:relative;">
-          <div class="story-ring" style="width:56px; height:56px; border-radius:50%; border:1px solid var(--border); background:var(--bg2); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.05); transition:transform 0.1s var(--spring);">
-            <div style="font-size:24px;">🔥</div>
+        <div id="active-story-item" class="active-story-item">
+          <div class="story-ring">
+            <span class="story-emoji">🔥</span>
+            <div class="story-add-badge">+</div>
           </div>
-          <span style="font-size:11px; font-weight:600; color:var(--txt2);">My Vents</span>
+          <span class="story-label">My Vents</span>
         </div>
       </div>
 
@@ -936,9 +990,7 @@
         </div>
 
         <div class="cc-card">
-          <input id="cc-url" class="cc-input" type="text" placeholder="URL" autocomplete="off">
-          <div class="cc-divider"></div>
-          <textarea id="cc-notes" class="cc-textarea" placeholder="Notes" rows="4"></textarea>
+                    <input id="cc-url" class="cc-input" type="text" placeholder="URL" autocomplete="off">
         </div>
       </div>
     </div>
@@ -948,61 +1000,73 @@
   <div id="cascara-reader-overlay" class="cascara-reader-overlay theme-dark hidden" role="dialog" aria-modal="true">
     <div class="cr-header-toolbar">
       <button id="cr-back-btn" class="cr-back-btn">‹ Library</button>
-      
       <div class="cr-title-group">
         <div id="cr-doc-title" class="cr-doc-title">Hehe</div>
         <div id="cr-doc-author" class="cr-doc-author">by See</div>
       </div>
 
       <div class="cr-tools-panel">
-        <button id="cr-tool-text" class="cr-tool-btn active" title="Text Selection">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="20"></line><line x1="8" y1="4" x2="16" y2="4"></line><line x1="8" y1="20" x2="16" y2="20"></line></svg>
-        </button>
-        <button id="cr-tool-find" class="cr-tool-btn" title="Search Finder">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </button>
-        <button id="cr-tool-pen" class="cr-tool-btn" title="Markup Drawing Pen">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-        </button>
-        <button id="cr-tool-eraser" class="cr-tool-btn" title="Eraser">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16c-1-1-1-2.5 0-3.5L13 2c1-1 2.5-1 3.5 0l4 4c1 1 1 2.5 0 3.5L11 18"></path><path d="M12 11l4 4"></path></svg>
-        </button>
-        <button id="cr-tool-zoom-in" class="cr-tool-btn" title="Zoom In">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-        </button>
-        <button id="cr-tool-zoom-out" class="cr-tool-btn" title="Zoom Out">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-        </button>
-        <button id="cr-tool-font" class="cr-tool-btn" title="Font Settings">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
-        </button>
-        <button id="cr-tool-speech" class="cr-tool-btn" title="Voice Reader">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
-        </button>
-        <button id="cr-tool-spread" class="cr-tool-btn" title="Two-Page View">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-        </button>
-        <button id="cr-tool-mcq" class="cr-tool-btn" title="Practice Quiz">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-        </button>
+          <button id="cr-tool-text" class="cr-tool-btn active" title="Text Selection">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="20"></line><line x1="8" y1="4" x2="16" y2="4"></line><line x1="8" y1="20" x2="16" y2="20"></line></svg>
+          </button>
+          <button id="cr-tool-find" class="cr-tool-btn" title="Search Finder">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+          <button id="cr-tool-pen" class="cr-tool-btn" title="Markup Drawing Pen">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+          </button>
+          <button id="cr-tool-eraser" class="cr-tool-btn" title="Eraser">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16c-1-1-1-2.5 0-3.5L13 2c1-1 2.5-1 3.5 0l4 4c1 1 1 2.5 0 3.5L11 18"></path><path d="M12 11l4 4"></path></svg>
+          </button>
+          <button id="cr-tool-font" class="cr-tool-btn" title="Font Settings">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+          </button>
+          <button id="cr-tool-speech" class="cr-tool-btn" title="Voice Reader">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+          </button>
+          <button id="cr-tool-spread" class="cr-tool-btn" title="Two-Page View">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+          </button>
+          <button id="cr-tool-mcq" class="cr-tool-btn" title="Practice Quiz">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </button>
+          <button id="cr-mic-capture-btn" class="cr-tool-btn" title="Ambient Smart Capture">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          </button>
+          <button id="cr-btn-reflow" class="cr-tool-btn" title="Reflow Layout Mode">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="21" y1="18" x2="3" y2="18"></line></svg>
+          </button>
+          <button id="cr-btn-summary" class="cr-tool-btn" title="Page Summaries">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </button>
+          <div style="width:1px; height:20px; background:rgba(255,255,255,0.12); margin:0 4px; flex-shrink:0;"></div>
+          <button id="cr-tool-zoom-out" class="cr-tool-btn" title="Zoom Out" style="width:24px; height:24px; padding:0;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <input type="range" id="cr-zoom-slider" min="30" max="300" value="100" style="width: 70px; accent-color: var(--cascara); cursor: pointer; height: 4px; flex-shrink:0;" />
+          <span id="cr-zoom-val" style="font-size: 11px; color: var(--txt2); min-width: 32px; text-align: center; flex-shrink:0;">100%</span>
+          <button id="cr-tool-zoom-in" class="cr-tool-btn" title="Zoom In" style="width:24px; height:24px; padding:0;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
       </div>
 
-      <div class="cr-settings-group">
-        <select id="cr-theme-select" class="cr-theme-select">
-          <option value="light" selected="">☀️ Light</option>
-          <option value="sepia">📖 Sepia</option>
-          <option value="dark">🌙 Dark</option>
-        </select>
-        <button id="cr-delete-book-btn" style="background:none; border:none; color:var(--danger); font-size:15px; cursor:pointer; display:flex; align-items:center;" title="Delete Book from Library">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-        </button>
-        <button id="cr-sidebar-toggle" class="cr-sidebar-toggle" style="display:flex; align-items:center;" title="Table of Contents">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-        </button>
-        <div id="cr-build-info" style="font-size: 10px; color: var(--txt3); display: flex; align-items: center; margin-left: 8px;">
-          Build: <span id="cr-build-date" style="margin-left: 4px;">Loading...</span>
+        <div class="cr-settings-group">
+          <select id="cr-theme-select" class="cr-theme-select">
+            <option value="light">☀️ Light</option>
+            <option value="sepia">📖 Sepia</option>
+            <option value="dark" selected>🌙 Dark</option>
+          </select>
+          <button id="cr-delete-book-btn" style="background:none; border:none; color:var(--danger); font-size:15px; cursor:pointer; display:flex; align-items:center;" title="Delete Book from Library">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+          </button>
+          <button id="cr-sidebar-toggle" class="cr-sidebar-toggle" style="display:flex; align-items:center;" title="Table of Contents">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          <div id="cr-build-info" style="font-size: 10px; color: var(--txt3); display: flex; align-items: center; gap:8px;">
+            <span>Build: <span id="cr-build-date">Loading...</span></span>
+            <span id="cr-sync-status-pill" style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:10px; background:rgba(48,209,88,0.12); color:#30d158; font-weight:600; font-size:9px;"><span style="width:5px; height:5px; border-radius:50%; background:#30d158; display:inline-block;"></span>Sync Active</span>
+          </div>
         </div>
-      </div>
     </div>
 
     <div class="cr-workspace">
@@ -1020,17 +1084,31 @@
 
       <!-- Main page workspace -->
       <div id="cr-page-view" class="cr-page-view theme-dark">
-      <div id="cr-page-container" style="display: flex; gap: 20px; justify-content: center; align-items: center; transform-origin: center center; transition: transform 0.2s var(--spring);">
-        <div id="cr-page-wrapper" class="cr-page-wrapper">
-          <canvas id="cr-pdf-canvas" class="cr-pdf-canvas" width="600" height="780" style="position:absolute; left:0; top:0; z-index:1;"></canvas>
-          <div id="cr-page-content" class="cr-page-content" style="position: absolute; inset: 0px; z-index: 2; background: none; padding: 0px; overflow: hidden;"></div>
-          <canvas id="cr-markup-canvas" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute; left:0; top:0; z-index:5;"></canvas>
+        <div id="cr-page-container" style="display: flex; gap: 20px; justify-content: center; align-items: center; transform-origin: center center; transition: transform 0.2s var(--spring);">
+          <div id="cr-page-wrapper" class="cr-page-wrapper">
+            <div id="cr-zoom-layer" style="position:absolute;top:0;left:0;transform-origin:top left;">
+              <canvas id="cr-pdf-canvas" class="cr-pdf-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:1;"></canvas>
+              <div id="cr-page-content" class="cr-page-content" style="position:absolute;inset:0;z-index:2;background:none;padding:0;overflow:hidden;"></div>
+              <canvas id="cr-markup-canvas" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:5;"></canvas>
+            </div>
+          </div>
+
+          <div id="cr-page-wrapper-right" class="cr-page-wrapper hidden">
+            <div id="cr-zoom-layer-right" style="position:absolute;top:0;left:0;transform-origin:top left;">
+              <canvas id="cr-pdf-canvas-right" class="cr-pdf-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:1;"></canvas>
+              <div id="cr-page-content-right" class="cr-page-content" style="position:absolute;inset:0;z-index:2;background:none;padding:0;overflow:hidden;"></div>
+              <canvas id="cr-markup-canvas-right" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:5;"></canvas>
+            </div>
+          </div>
         </div>
-        <div id="cr-page-wrapper-right" class="cr-page-wrapper hidden">
-          <canvas id="cr-pdf-canvas-right" class="cr-pdf-canvas" width="600" height="780" style="position:absolute; left:0; top:0; z-index:1;"></canvas>
-          <div id="cr-page-content-right" class="cr-page-content" style="position: absolute; inset: 0px; z-index: 2; background: none; padding: 0px; overflow: hidden;"></div>
-          <canvas id="cr-markup-canvas-right" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute; left:0; top:0; z-index:5;"></canvas>
-        </div>
+      </div>
+
+      <!-- Mobile Floating Zoom Control -->
+      <div id="cr-mobile-zoom-ctrl" class="cr-mobile-zoom-ctrl">
+        <button id="cr-mzoom-out" class="cr-mzoom-btn" title="Zoom Out">−</button>
+        <input type="range" id="cr-mzoom-slider" min="30" max="300" value="100" style="width: 80px; accent-color: var(--cascara); cursor: pointer;" />
+        <span id="cr-mzoom-val">100%</span>
+        <button id="cr-mzoom-in" class="cr-mzoom-btn" title="Zoom In">+</button>
       </div>
       
         <!-- iOS-Style Selection Menu -->
@@ -1050,6 +1128,11 @@
             Look Up
           </button>
           <div class="cr-selection-divider"></div>
+          <button id="cr-sel-flashcard" class="cr-selection-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17h6M9 12h6M9 7h6"/></svg>
+            Card
+          </button>
+          <div class="cr-selection-divider"></div>
           <button id="cr-sel-copy" class="cr-selection-btn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             Copy
@@ -1067,25 +1150,21 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
+          <!-- Wikipedia Search Input inside Lookup -->
+          <div class="cr-lookup-search-bar" style="display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); align-items: center;">
+            <input type="text" id="cr-lookup-search-input" placeholder="Search Wikipedia..." style="flex: 1; min-width: 0; padding: 6px 12px; border-radius: 6px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: #fff; font-size: 12px; font-family: inherit; outline: none;" />
+            <button id="cr-lookup-search-btn" style="background: var(--cascara); border: none; color: #000; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Search
+            </button>
+          </div>
           <div id="cr-lookup-body" class="cr-lookup-body">Loading...</div>
           <div class="cr-lookup-source">
             <a id="cr-lookup-link" href="#" target="_blank">View on Wikipedia ↗</a>
           </div>
         </div>
-      </div>
-    </div>
-      
-      <!-- Bottom iPad Pagebar -->
-    <div class="cr-bottom-bar">
-      <button id="cr-prev-page" class="cr-page-nav-btn">‹</button>
-      <div class="cr-slider-wrapper">
-        <input type="range" id="cr-page-slider" min="1" max="50" value="1" class="cr-page-slider">
-      </div>
-      <button id="cr-next-page" class="cr-page-nav-btn">›</button>
-      <span id="cr-page-label" class="cr-page-label">Page 16 of 50 (32%)</span>
-    </div>
 
-    <!-- Floating Markup Pen Settings Popover -->
+
     <div id="cr-pen-settings" class="cr-floating-panel hidden" style="position: absolute; right: 200px; bottom: 65px; background: rgba(28,28,30,0.95); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); backdrop-filter: blur(10px); z-index: 1020; width: 180px;">
       <div class="cr-panel-label" style="font-size:12px; font-weight:600; color:var(--txt3); margin-bottom:8px;">Pen Color</div>
       <div class="cr-pen-colors" style="display:flex; gap:8px; margin-bottom:12px;">
@@ -1154,7 +1233,18 @@
         <button id="cr-chat-send" style="background:var(--cascara); border:none; color:#000; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold;">→</button>
       </div>
     </div>
+
     </div> <!-- Close cr-workspace -->
+
+    <!-- Bottom iPad Pagebar -->
+    <div class="cr-bottom-bar">
+      <button id="cr-prev-page" class="cr-page-nav-btn">‹</button>
+      <div class="cr-slider-wrapper">
+        <input type="range" id="cr-page-slider" min="1" max="50" value="1" class="cr-page-slider">
+      </div>
+      <button id="cr-next-page" class="cr-page-nav-btn">›</button>
+      <span id="cr-page-label" class="cr-page-label">Page 1 of 1</span>
+    </div>
 
     <!-- MCQ Sidebar -->
     <aside id="cr-mcq-sidebar" class="cr-sidebar hidden" style="width: 320px; right: 0; left: auto; border-right: none; border-left: 1px solid var(--border); position:absolute; top:0; bottom:0; z-index:100; background:var(--surface);">

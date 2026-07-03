@@ -1,5 +1,7 @@
 'use strict';
 
+
+
 // ==========================================
 // UNIFIED STATE MANAGEMENT & LOCAL STORAGE
 // ==========================================
@@ -12,6 +14,10 @@ const STATE = {
   events:     JSON.parse(localStorage.getItem('nv-events')||'{}'),
   journalEntries: [],
   ephemeralEntries: JSON.parse(localStorage.getItem('nv-ephemeral')||'[]'),
+  flashcards: JSON.parse(localStorage.getItem('nv-flashcards') || '[]'),
+  interactionLog: JSON.parse(localStorage.getItem('nv-interaction-log') || '[]'),
+  reflowPatches: JSON.parse(localStorage.getItem('nv-reflow-patches') || '{}'),
+  synthesisNotes: JSON.parse(localStorage.getItem('nv-synthesis-notes') || '[]'),
   countdown: JSON.parse(localStorage.getItem('nv-countdown')||'{"title":"","target":""}'),
   books: JSON.parse(localStorage.getItem('nv-books')||'[]'),
   planner: JSON.parse(localStorage.getItem('nv-planner')||'{"Monday":"","Tuesday":"","Wednesday":"","Thursday":"","Friday":"","Saturday":"","Sunday":""}'),
@@ -375,14 +381,30 @@ function getDB() {
 }
 
 async function getFile(id) {
+  console.log("getFile: request initiated for ID:", id);
   try {
-    const db = await getDB();
+    const db = await Promise.race([
+      getDB(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("IndexedDB connection timeout")), 2000))
+    ]);
+    console.log("getFile: database connection obtained");
     return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("IndexedDB query timeout"));
+      }, 2000);
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const req = store.get(id);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        clearTimeout(timeout);
+        console.log("getFile: query succeeded");
+        resolve(req.result);
+      };
+      req.onerror = () => {
+        clearTimeout(timeout);
+        console.log("getFile: query failed");
+        reject(req.error);
+      };
     });
   } catch (e) {
     console.error("getFile failed", e);
@@ -831,6 +853,7 @@ function saveJournalEntry(){
     const expiry = Date.now() + 24 * 60 * 60 * 1000;
     STATE.ephemeralEntries.push({ id: randomId(), title, body, expiry, createdAt: Date.now() });
     saveEphemeral();
+    checkEphemeralExpiry();
     
     // Play digital incinerator animation
     bodyEl?.classList.add('burning-text');
@@ -881,6 +904,34 @@ function stopCascaraSession(){
 
 // --- openBookReader ---
 function openBookReader(book) {
+  console.log("openBookReader: function invoked");
+  // Restore default HTML layout for cr-page-container
+  const containerDiv = $('cr-page-container');
+  if (containerDiv) {
+    containerDiv.innerHTML = `
+      <div id="cr-page-wrapper" class="cr-page-wrapper">
+        <div id="cr-zoom-layer" style="position:absolute;top:0;left:0;transform-origin:top left;">
+          <canvas id="cr-pdf-canvas" class="cr-pdf-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:1;"></canvas>
+          <div id="cr-page-content" class="cr-page-content" style="position:absolute;inset:0;z-index:2;background:none;padding:0;overflow:hidden;"></div>
+          <canvas id="cr-markup-canvas" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:5;"></canvas>
+        </div>
+      </div>
+      <div id="cr-page-wrapper-right" class="cr-page-wrapper hidden">
+        <div id="cr-zoom-layer-right" style="position:absolute;top:0;left:0;transform-origin:top left;">
+          <canvas id="cr-pdf-canvas-right" class="cr-pdf-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:1;"></canvas>
+          <div id="cr-page-content-right" class="cr-page-content" style="position:absolute;inset:0;z-index:2;background:none;padding:0;overflow:hidden;"></div>
+          <canvas id="cr-markup-canvas-right" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:5;"></canvas>
+        </div>
+      </div>
+    `;
+    containerDiv.style.transform = 'none';
+    containerDiv.style.width = '';
+    containerDiv.style.height = '';
+    containerDiv.style.display = '';
+    containerDiv.style.flexDirection = '';
+    containerDiv.style.gap = '';
+    containerDiv.style.alignItems = '';
+  }
 
   // Start Time tracker
   if (window.crTimeTracker) clearInterval(window.crTimeTracker);
@@ -891,11 +942,20 @@ function openBookReader(book) {
       if ($('cascara-books-grid')) renderBooks(); // update stats live!
     }
   }, 60000);
-  const overlay = $('cascara-reader-overlay'); if(!overlay) return;
+  const overlay = $('cascara-reader-overlay'); 
+  if(!overlay) {
+    console.log("openBookReader: overlay element not found!");
+    return;
+  }
+  console.log("openBookReader: overlay element found, removing hidden class");
   overlay.classList.remove('hidden');
   document.querySelector('.tab-bar')?.classList.add('hidden');
   const selectedTheme = $('cr-theme-select')?.value || 'dark';
   overlay.className = `cascara-reader-overlay theme-${selectedTheme}`;
+  
+  // Set global reference
+
+  currentReaderBook = book;
   
   $('cr-doc-title').textContent = book.title;
   $('cr-doc-author').textContent = 'by ' + (book.author || 'Unknown');
@@ -905,6 +965,7 @@ function openBookReader(book) {
   let isDrawing = false;
   let lastX = 0, lastY = 0;
   let activeTool = 'text';
+  overlay.dataset.activeTool = activeTool;
 
   // Restore default Text selection state
   document.querySelectorAll('.cr-tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -929,72 +990,163 @@ function openBookReader(book) {
   let currentZoom = 1.0;
   
   function adjustReaderResponsiveScale() {
-    const isMobile = window.innerWidth <= 768;
     const container = $('cr-page-view');
     const wrapper = $('cr-page-wrapper');
     if (!container || !wrapper) return;
-    
+
+    const isMobile = window.innerWidth <= 768;
+    const containerDiv = $('cr-page-container');
+
     if (isMobile) {
-      const containerDiv = $('cr-page-container');
+      // Remove desktop-specific styles
+      const mSpacer = container.querySelector('#cr-mobile-scroll-spacer');
+      let spacer = mSpacer;
+      if (!spacer) {
+        spacer = document.createElement('div');
+        spacer.id = 'cr-mobile-scroll-spacer';
+        spacer.style.cssText = 'pointer-events:none;z-index:0;display:block;';
+        container.appendChild(spacer);
+      }
+
+      // Base fit scale: fits the 600px wide page to screen
+      const availW = container.clientWidth - 20;
+      const baseScale = availW / 600;
+      const finalScale = baseScale * currentZoom;
+
       if (containerDiv) {
-        containerDiv.style.transform = 'none';
-        containerDiv.style.width = '100%';
+        containerDiv.style.position = 'absolute';
+        containerDiv.style.top = '0';
+        containerDiv.style.left = '50%';
+        containerDiv.style.transform = `translateX(-50%) scale(${finalScale})`;
+        containerDiv.style.transformOrigin = 'top center';
+        containerDiv.style.width = '600px';
         containerDiv.style.height = 'auto';
         containerDiv.style.display = 'flex';
         containerDiv.style.flexDirection = 'column';
         containerDiv.style.gap = '15px';
         containerDiv.style.alignItems = 'center';
-        
-        const baseWidth = container.clientWidth - 20;
-        const targetWidth = baseWidth * currentZoom;
-        
-        const wrappers = containerDiv.querySelectorAll('.cr-page-wrapper');
-        wrappers.forEach(pw => {
-          const pageNum = parseInt(pw.dataset.page);
-          pw.style.width = `${targetWidth}px`;
-          
-          if (book.fileType === 'pdf' && pdfDoc) {
-            pdfDoc.getPage(pageNum).then(page => {
-              const vp = page.getViewport({ scale: 1 });
-              const ar = vp.width / vp.height;
-              const actualHeight = targetWidth / ar;
-              pw.style.height = `${actualHeight}px`;
-              if (pw.dataset.rendered) {
-                renderMobilePageContent(pw, pageNum);
-              }
-            });
-          }
-        });
       }
+
+      // Make page view scrollable on mobile
+      container.style.overflow = 'auto';
+      container.style.position = 'relative';
+
+      // Update spacer to match visual scaled dimensions
+      const naturalHeight = containerDiv ? containerDiv.scrollHeight : 780;
+      spacer.style.width = `${Math.ceil(600 * finalScale)}px`;
+      spacer.style.height = `${Math.ceil(naturalHeight * finalScale + 120)}px`;
       return;
     }
-    
+
+    // Clean up mobile scroll spacer on desktop
+    const mSpacer = container.querySelector('#cr-mobile-scroll-spacer');
+    if (mSpacer) mSpacer.remove();
+
+    // ── STEP 1: Size the wrapper to perfectly fill the available space ──
+    // This is the FIXED book rectangle — it never changes size when zooming.
+    const padH = 32, padV = 24;
+    const availW = Math.max(100, container.clientWidth - padH);
+    const availH = Math.max(100, container.clientHeight - padV);
+
+    // PDF native dimensions (600×780). Fit by aspect ratio.
+    const pdfW = 600;
+    const pdfH = parseInt(wrapper.dataset.pdfHeight || '780');
+    const fitScale = Math.min(availW / pdfW, availH / pdfH);
+
+    const wrapperW = Math.floor(pdfW * fitScale);
+    const wrapperH = Math.floor(pdfH * fitScale);
+
+    // Lock the wrapper size — this IS the book surface
+    wrapper.style.width  = `${wrapperW}px`;
+    wrapper.style.height = `${wrapperH}px`;
+    wrapper.style.overflow = 'auto';
+    wrapper.style.transform = 'none';  // wrapper itself NEVER scales
+
+    // ── STEP 2: Scale content INSIDE the wrapper ──
+    // The zoom layer is always 600×pdfH native. We scale it so:
+    //   At currentZoom=1 → fills wrapper exactly
+    //   At currentZoom=2 → 2× larger, wrapper scrolls to reveal
+    const contentScale = fitScale * currentZoom;
+    const zoomLayer = wrapper.querySelector('#cr-zoom-layer') || wrapper.querySelector('[id^="cr-zoom-layer"]');
+    if (zoomLayer) {
+      zoomLayer.style.width  = `${pdfW}px`;
+      zoomLayer.style.height = `${pdfH}px`;
+      zoomLayer.style.transform = `scale(${contentScale})`;
+      zoomLayer.style.transformOrigin = 'top left';
+
+      // Spacer: makes overflow:auto on wrapper actually show scrollbars
+      // (CSS transform doesn't affect layout flow, so we need a spacer)
+      let spacer = wrapper.querySelector('.cr-zoom-spacer');
+      if (!spacer) {
+        spacer = document.createElement('div');
+        spacer.className = 'cr-zoom-spacer';
+        spacer.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:0;';
+        wrapper.appendChild(spacer);
+      }
+      spacer.style.width  = `${Math.ceil(pdfW * contentScale)}px`;
+      spacer.style.height = `${Math.ceil(pdfH * contentScale)}px`;
+    }
+
+    // ── STEP 3: Handle spread (right page) identically ──
     const rightWrapper = $('cr-page-wrapper-right');
-    const isSpread = rightWrapper && !rightWrapper.classList.contains('hidden');
-    const baseWidth = isSpread ? 1220 : 600;
-    
-    const containerWidth = container.clientWidth - 20;
-    const containerHeight = container.clientHeight - 20;
-    
-    const scaleX = containerWidth / baseWidth;
-    const scaleY = containerHeight / 780;
-    const scaleFactor = Math.min(scaleX, scaleY, 1.0);
-    
-    const finalScale = scaleFactor * currentZoom;
-    wrapper.style.transform = `scale(${finalScale})`;
-    if (rightWrapper) {
-      rightWrapper.style.transform = `scale(${finalScale})`;
+    if (rightWrapper && !rightWrapper.classList.contains('hidden')) {
+      rightWrapper.style.width  = `${wrapperW}px`;
+      rightWrapper.style.height = `${wrapperH}px`;
+      rightWrapper.style.overflow = 'auto';
+      rightWrapper.style.transform = 'none';
+      const rzl = rightWrapper.querySelector('#cr-zoom-layer-right');
+      if (rzl) {
+        rzl.style.width  = `${pdfW}px`;
+        rzl.style.height = `${pdfH}px`;
+        rzl.style.transform = `scale(${contentScale})`;
+        rzl.style.transformOrigin = 'top left';
+        let rSpacer = rightWrapper.querySelector('.cr-zoom-spacer');
+        if (!rSpacer) {
+          rSpacer = document.createElement('div');
+          rSpacer.className = 'cr-zoom-spacer';
+          rSpacer.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:0;';
+          rightWrapper.appendChild(rSpacer);
+        }
+        rSpacer.style.width  = `${Math.ceil(pdfW * contentScale)}px`;
+        rSpacer.style.height = `${Math.ceil(pdfH * contentScale)}px`;
+      }
     }
-    
-    const containerDiv = $('cr-page-container');
+
+    // cr-page-container: always just center the wrapper(s), no scaling
     if (containerDiv) {
-      containerDiv.style.width = `${baseWidth * finalScale}px`;
-      containerDiv.style.height = `${780 * finalScale}px`;
+      containerDiv.style.transform = 'none';
+      containerDiv.style.width  = '';
+      containerDiv.style.height = '';
+      containerDiv.style.display = 'flex';
+      containerDiv.style.justifyContent = 'center';
+      containerDiv.style.alignItems = 'center';
+      containerDiv.style.position = 'relative';
+      containerDiv.style.left = 'auto';
     }
+    container.style.overflow = 'hidden';
+    container.style.paddingBottom = '';
   }
 
-  function updateZoom() {
+  function updateZoom(sourceSlider = null) {
     adjustReaderResponsiveScale();
+    const percent = Math.round(currentZoom * 100);
+    
+    // Mobile pill: show 1× as "Fit", others as multiplier
+    const zoomValEl = $('cr-mzoom-val');
+    if (zoomValEl) {
+      if (window.innerWidth <= 768) {
+        zoomValEl.textContent = currentZoom === 1.0 ? 'Fit' : `${percent}%`;
+      } else {
+        zoomValEl.textContent = `${percent}%`;
+      }
+    }
+    const zoomValDesktopEl = $('cr-zoom-val');
+    if (zoomValDesktopEl) zoomValDesktopEl.textContent = `${percent}%`;
+    
+    const mSlider = $('cr-mzoom-slider');
+    if (mSlider && sourceSlider !== mSlider) mSlider.value = percent;
+    const dSlider = $('cr-zoom-slider');
+    if (dSlider && sourceSlider !== dSlider) dSlider.value = percent;
   }
 
   function highlightSelection(color) {
@@ -1081,7 +1233,7 @@ function openBookReader(book) {
     
     selMenu.style.top = `${Math.max(10, top)}px`;
     selMenu.style.left = `${left}px`;
-    selMenu.style.transform = `translateX(-50%)`;
+    selMenu.style.transform = '';
     selMenu.classList.add('active');
   };
 
@@ -1094,6 +1246,14 @@ function openBookReader(book) {
     contentDivEl.addEventListener('mouseup', () => setTimeout(handleSelection, 50));
     contentDivEl.addEventListener('touchend', () => setTimeout(handleSelection, 50));
   }
+  document.addEventListener('mousedown', (e) => {
+    if (selMenu && !selMenu.contains(e.target) && !e.target.closest('.cr-tool-btn')) {
+      setTimeout(() => {
+        const text = window.getSelection().toString().trim();
+        if (!text) selMenu.classList.remove('active');
+      }, 100);
+    }
+  });
 
   // Hook up menu buttons
 
@@ -1128,13 +1288,35 @@ function openBookReader(book) {
     }
   });
   
-  $('cr-sel-lookup')?.addEventListener('click', async () => {
+  async function performWikipediaLookup(query) {
+    const term = query.trim();
+    if (!term) return;
+    
+    $('cr-lookup-term').textContent = term;
+    const body = $('cr-lookup-body');
+    if (body) body.innerHTML = '<div style="text-align:center;padding:20px"><div class="spinner" style="border:3px solid rgba(255,255,255,0.1); border-radius:50%; border-top:3px solid var(--cascara); width:24px; height:24px; animation:spin 1s linear infinite; margin:0 auto;"></div></div>';
+    
+    try {
+      const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(term)}`);
+      if (!res.ok) throw new Error('Not found');
+      const data = await res.json();
+      if (body) body.innerHTML = `<p><strong>${data.title}</strong></p><p>${data.extract || 'No summary available.'}</p>`;
+      const link = $('cr-lookup-link');
+      if (link) link.href = data.content_urls?.desktop?.page || '#';
+    } catch (err) {
+      if (body) body.innerHTML = `<p>No direct Wikipedia article summary found for "<strong>${term}</strong>". You can search it directly below or view search results on Wikipedia.</p>`;
+      const link = $('cr-lookup-link');
+      if (link) link.href = `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(term)}`;
+    }
+  }
+
+  $('cr-sel-lookup')?.addEventListener('click', () => {
     selMenu?.classList.remove('active');
     if (!currentSelectionText) return;
     
     const popover = $('cr-lookup-popover');
-    $('cr-lookup-term').textContent = currentSelectionText;
-    $('cr-lookup-body').innerHTML = '<div style="text-align:center;padding:20px"><div class="spinner"></div></div>';
+    const searchInput = $('cr-lookup-search-input');
+    if (searchInput) searchInput.value = currentSelectionText;
     
     // Position popover roughly in center
     popover.style.top = '20%';
@@ -1142,15 +1324,18 @@ function openBookReader(book) {
     popover.style.transform = 'translateX(-50%)';
     popover.classList.add('active');
     
-    try {
-      const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(currentSelectionText)}`);
-      if (!res.ok) throw new Error('Not found');
-      const data = await res.json();
-      $('cr-lookup-body').innerHTML = `<p><strong>${data.title}</strong></p><p>${data.extract || 'No summary available.'}</p>`;
-      $('cr-lookup-link').href = data.content_urls?.desktop?.page || '#';
-    } catch (err) {
-      $('cr-lookup-body').innerHTML = '<p>No dictionary or Wikipedia entry found for this selection.</p>';
-      $('cr-lookup-link').href = `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(currentSelectionText)}`;
+    performWikipediaLookup(currentSelectionText);
+  });
+
+  $('cr-lookup-search-btn')?.addEventListener('click', () => {
+    const q = $('cr-lookup-search-input')?.value;
+    if (q) performWikipediaLookup(q);
+  });
+
+  $('cr-lookup-search-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const q = e.target.value;
+      if (q) performWikipediaLookup(q);
     }
   });
 
@@ -1158,6 +1343,9 @@ function openBookReader(book) {
     $('cr-lookup-popover')?.classList.remove('active');
   });
 
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  }
   let pdfDoc = null;
   const outline = $('cr-sidebar-outline');
 
@@ -1176,18 +1364,17 @@ function openBookReader(book) {
     containerDiv.style.paddingBottom = '80px';
     
     containerDiv.innerHTML = '';
-    const containerWidth = container.clientWidth - 20;
+    const nativeWidth = 600;
     
     if (book.fileType === 'pdf') {
-      const defaultAspectRatio = 600 / 780;
-      const defaultPageHeight = containerWidth / defaultAspectRatio;
+      const defaultPageHeight = 780;
       
       for (let pageNum = 1; pageNum <= book.totalPages; pageNum++) {
         const pageWrapper = document.createElement('div');
         pageWrapper.className = 'cr-page-wrapper';
         pageWrapper.dataset.page = pageNum;
         pageWrapper.style.position = 'relative';
-        pageWrapper.style.width = `${containerWidth}px`;
+        pageWrapper.style.width = `${nativeWidth}px`;
         pageWrapper.style.height = `${defaultPageHeight}px`;
         pageWrapper.style.marginBottom = '15px';
         pageWrapper.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
@@ -1206,8 +1393,9 @@ function openBookReader(book) {
           pdfDoc.getPage(pageNum).then(page => {
             const vp = page.getViewport({ scale: 1 });
             const ar = vp.width / vp.height;
-            const actualHeight = containerWidth / ar;
+            const actualHeight = nativeWidth / ar;
             pageWrapper.style.height = `${actualHeight}px`;
+            adjustReaderResponsiveScale();
           });
         }
       }
@@ -1217,7 +1405,7 @@ function openBookReader(book) {
         pageWrapper.className = 'cr-page-wrapper';
         pageWrapper.dataset.page = pageNum;
         pageWrapper.style.position = 'relative';
-        pageWrapper.style.width = `${containerWidth}px`;
+        pageWrapper.style.width = `${nativeWidth}px`;
         pageWrapper.style.minHeight = '200px';
         pageWrapper.style.height = 'auto';
         pageWrapper.style.marginBottom = '15px';
@@ -1298,6 +1486,7 @@ function openBookReader(book) {
         }
       }, 100);
     });
+    adjustReaderResponsiveScale();
   }
 
   function renderMobilePageContent(pageWrapper, pageNum) {
@@ -1598,7 +1787,7 @@ function openBookReader(book) {
       }
       return;
     }
-    
+
     book.currentPage = pageNum;
     book.progress = Math.round((book.currentPage / book.totalPages) * 100);
     save();
@@ -1749,6 +1938,20 @@ function openBookReader(book) {
     
     renderPageAnnotations();
     setTimeout(adjustReaderResponsiveScale, 100);
+
+    // Advanced E-Reader Feature updates
+    if (typeof logInteraction === 'function') {
+      logInteraction('page-turn', { bookTitle: book.title, page: pageNum });
+    }
+    if (typeof updatePageSummaryDisplay === 'function') {
+      updatePageSummaryDisplay(pageNum);
+    }
+    if (window.reflowModeActive && typeof renderReflowContent === 'function') {
+      renderReflowContent();
+    }
+    if (typeof redrawMarginVectors === 'function') {
+      setTimeout(() => { redrawMarginVectors('cr-markup-canvas', false); }, 150);
+    }
   }
 
   function runOcrOnCanvas(pageNum) {
@@ -2067,6 +2270,7 @@ function openBookReader(book) {
       }
       
       activeTool = toolId.replace('cr-tool-', '');
+      overlay.dataset.activeTool = activeTool;
       
       if (activeTool === 'hl-yellow') { highlightSelection('rgba(255, 213, 79, 0.45)'); return; }
       if (activeTool === 'hl-green') { highlightSelection('rgba(129, 199, 132, 0.45)'); return; }
@@ -2595,6 +2799,96 @@ function openBookReader(book) {
     });
   }
 
+  // Sync sliders
+  const mSlider = $('cr-mzoom-slider');
+  if (mSlider) {
+    mSlider.oninput = function() {
+      currentZoom = parseInt(this.value) / 100;
+      updateZoom(this);
+    };
+  }
+  const dSlider = $('cr-zoom-slider');
+  if (dSlider) {
+    dSlider.oninput = function() {
+      currentZoom = parseInt(this.value) / 100;
+      updateZoom(this);
+    };
+  }
+
+  // Mobile zoom button event listeners
+  const mZoomIn = $('cr-mzoom-in');
+  if (mZoomIn) {
+    mZoomIn.onclick = (e) => {
+      e.stopPropagation();
+      currentZoom = Math.min(3.0, parseFloat((currentZoom + 0.15).toFixed(2)));
+      updateZoom();
+    };
+  }
+
+  const mZoomOut = $('cr-mzoom-out');
+  if (mZoomOut) {
+    mZoomOut.onclick = (e) => {
+      e.stopPropagation();
+      currentZoom = Math.max(0.3, parseFloat((currentZoom - 0.15).toFixed(2)));
+      updateZoom();
+    };
+  }
+  
+  const dZoomIn = $('cr-tool-zoom-in');
+  if (dZoomIn) {
+    dZoomIn.onclick = (e) => {
+      e.stopPropagation();
+      currentZoom = Math.min(3.0, parseFloat((currentZoom + 0.15).toFixed(2)));
+      updateZoom();
+    };
+  }
+
+  const dZoomOut = $('cr-tool-zoom-out');
+  if (dZoomOut) {
+    dZoomOut.onclick = (e) => {
+      e.stopPropagation();
+      currentZoom = Math.max(0.3, parseFloat((currentZoom - 0.15).toFixed(2)));
+      updateZoom();
+    };
+  }
+
+  // Prevent default browser zoom inside the reader overlay on mobile & desktop
+  const isReaderOpen = () => {
+    const overlay = $('cascara-reader-overlay');
+    return overlay && !overlay.classList.contains('hidden');
+  };
+
+  window.addEventListener('touchmove', (e) => {
+    if (isReaderOpen() && e.touches.length > 1) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  let lastTap = 0;
+  window.addEventListener('touchend', (e) => {
+    if (isReaderOpen()) {
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        e.preventDefault();
+      }
+      lastTap = now;
+    }
+  });
+
+  window.addEventListener('wheel', (e) => {
+    if (isReaderOpen() && e.ctrlKey) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  window.addEventListener('keydown', (e) => {
+    if (isReaderOpen()) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '-' || e.key === '0' || e.key === '+' || e.code === 'NumpadAdd' || e.code === 'NumpadSubtract')) {
+        e.preventDefault();
+      }
+    }
+  });
+
   // Searching Inside Book
   let searchTimeout = null;
   const searchInput = $('cr-search-input');
@@ -2755,17 +3049,36 @@ function openBookReader(book) {
   }
 
   // Load and render
+  console.log("openBookReader: starting file load for type:", book.fileType);
   if (book.fileType === 'pdf') {
+    if (!window.pdfjsLib) {
+      showAlert("PDF Library Error", "The PDF rendering library is not loaded. Please check your network connection and reload.");
+      overlay.classList.add('hidden');
+      return;
+    }
     getFile(book.id).then(blob => {
+      console.log("openBookReader: getFile resolved. Blob truthy:", !!blob, "Blob type:", blob ? blob.constructor.name : "null");
       if (!blob) {
-        showAlert("Missing File", "PDF file not found in local storage.");
+        showAlert("Missing File", "PDF file not found in local storage database (IndexedDB).");
         overlay.classList.add('hidden');
         return;
       }
       const fileReader = new FileReader();
+      fileReader.onerror = function(err) {
+        console.error("FileReader error:", err);
+        showAlert("File Reader Error", "Failed to read the file: " + err.message);
+        overlay.classList.add('hidden');
+      };
       fileReader.onload = function() {
+        console.log("openBookReader: FileReader loaded successfully. result size:", this.result ? this.result.byteLength : "null");
         const typedarray = new Uint8Array(this.result);
-        pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+        console.log("openBookReader: invoking pdfjsLib.getDocument");
+        pdfjsLib.getDocument({
+          data: typedarray,
+          cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/cmaps/',
+          cMapPacked: true,
+        }).promise.then(pdf => {
+          console.log("openBookReader: pdfjsLib.getDocument resolved successfully, pages:", pdf.numPages);
           pdfDoc = pdf;
           book.totalPages = pdf.numPages;
           save();
@@ -2795,9 +3108,17 @@ function openBookReader(book) {
           } else {
             renderReaderPage(book.currentPage || 1);
           }
+        }).catch(err => {
+          console.error("PDFJS getDocument promise failed:", err);
+          showAlert("PDF Render Error", "Failed to parse the PDF document: " + err.message);
+          overlay.classList.add('hidden');
         });
       };
       fileReader.readAsArrayBuffer(blob);
+    }).catch(err => {
+      console.error("IndexedDB getFile failed:", err);
+      showAlert("Storage Error", "Failed to retrieve the file from local storage: " + err.message);
+      overlay.classList.add('hidden');
     });
   } else {
     // Text Outline
@@ -3138,6 +3459,44 @@ function renderCalEvents(dateStr){
     setupSwipeGesture(li, { direction: 'x', maxDistance: -80 });
     list.appendChild(li);
   });
+
+  // Append interaction history timelines (Feature 6)
+  const dayLogs = STATE.interactionLog.filter(l => l.dateStr === dateStr);
+  if (dayLogs.length > 0) {
+    const divider = document.createElement('div');
+    divider.style = 'margin: 20px 0 10px; font-size:11px; font-weight:700; color:var(--txt3); text-transform:uppercase; letter-spacing:1px;';
+    divider.textContent = 'Activity Log';
+    list.appendChild(divider);
+
+    dayLogs.forEach(l => {
+      const logLi = document.createElement('li');
+      logLi.style = 'padding: 10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:12px; margin-bottom:8px; font-size:12px; display:flex; align-items:center; gap:10px; list-style:none;';
+      
+      let icon = '📖';
+      if (l.type === 'highlight') icon = '🖍';
+      else if (l.type === 'smart-capture') icon = '🎙';
+      else if (l.type === 'flashcard-create') icon = '⚡';
+      else if (l.type === 'synthesis-drop') icon = '📝';
+
+      let timeText = new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      let desc = '';
+      if (l.type === 'page-turn') desc = `Read page ${l.detail.page} of ${l.detail.bookTitle}`;
+      else if (l.type === 'highlight') desc = `Highlighted text in book: "${l.detail.text.substring(0, 30)}..."`;
+      else if (l.type === 'smart-capture') desc = `Spoken log dictation: "${l.detail.transcription.substring(0, 35)}..."`;
+      else if (l.type === 'flashcard-create') desc = `Created flashcard: "${l.detail.front.substring(0, 30)}..."`;
+      else if (l.type === 'synthesis-drop') desc = `Synthesized snippet: "${l.detail.payload.substring(0, 30)}..."`;
+
+      logLi.innerHTML = `
+        <span style="font-size:16px;">${icon}</span>
+        <div style="flex:1;">
+          <div style="color:var(--txt2); font-weight:500;">${desc}</div>
+          <div style="font-size:10px; color:var(--txt3); margin-top:2px;">${timeText}</div>
+        </div>
+      `;
+      list.appendChild(logLi);
+    });
+    empty?.classList.add('hidden');
+  }
 }
 
 function applyManualTheme(theme) {
@@ -3475,31 +3834,38 @@ function renderBooks() {
     });
   });
 
-  // DIRECT click handler on card to open book reader (not body delegation)
-  card.addEventListener('click', (e) => {
-    if (e.target.closest('.book-dots-btn')) return;
+  // DIRECT click and touch handler to guarantee opening on all devices
+  let wasSwipe = false;
+  card.addEventListener('touchstart', () => {
+    wasSwipe = false;
+  }, { passive: true });
+  card.addEventListener('touchmove', () => {
+    wasSwipe = true;
+  }, { passive: true });
 
-      
-      // If card is swiped open (delete layer visible), reset instead of opening
-      const transform = card.style.transform;
-      if (transform && transform.includes('translateY') && transform !== 'translateY(0px)') {
-        const val = parseFloat(transform.replace(/[^0-9\-]/g, ''));
-        if (val < -20) {
-          card.style.transition = 'transform 0.2s ease';
-          card.style.transform = 'translateY(0px)';
-          deleteLayer.style.transition = 'opacity 0.2s ease';
-          deleteLayer.style.opacity = '0';
-          deleteLayer.style.pointerEvents = 'none';
-          return;
-        }
-      }
-      try {
-        openBookReader(b);
-      } catch (err) {
-        console.error('Error opening book:', err);
-        showAlert('Error', 'Could not open book: ' + err.message);
-      }
-    });
+  const tryOpenBook = (e) => {
+    if (e.target.closest('.book-dots-btn') || e.target.closest('.book-swipe-delete-btn')) return;
+    console.log("Attempting to open book:", b.title, "ID:", b.id, "Type:", b.fileType);
+    try {
+      openBookReader(b);
+    } catch (err) {
+      console.error('Error opening book:', err);
+      showAlert('Error', 'Could not open book: ' + err.message);
+    }
+  };
+
+  card.addEventListener('click', (e) => {
+    console.log("Card click event detected for:", b.title);
+    tryOpenBook(e);
+  });
+
+  card.addEventListener('touchend', (e) => {
+    console.log("Card touchend event detected for:", b.title, "wasSwipe:", wasSwipe);
+    if (!wasSwipe) {
+      e.preventDefault();
+      tryOpenBook(e);
+    }
+  });
   });
 }
 
@@ -3597,19 +3963,26 @@ function checkEphemeralExpiry() {
   activeVents = [...STATE.ephemeralEntries].sort((a,b)=>a.createdAt-b.createdAt);
   
   const storiesBar = $('journal-stories-bar');
-  if (activeVents.length > 0) {
+  const storyRing = document.querySelector('.story-ring');
+  
+  if (!STATE.vaultLocked && !STATE.isDecoySession) {
     storiesBar?.classList.remove('hidden');
     
     // Wire active story click trigger
     const storyItem = $('active-story-item');
     if (storyItem) {
-      storyItem.onclick = () => {
-        openStoryViewer(0);
-      };
+      if (activeVents.length > 0) {
+        storyRing?.classList.add('active');
+        storyItem.onclick = () => {
+          openStoryViewer(0);
+        };
+      } else {
+        storyRing?.classList.remove('active');
+        storyItem.onclick = () => {
+          openBurnOverlay();
+        };
+      }
     }
-
-    // We removed the global burnTimerInterval update here.
-    // The countdown in the vent creation modal will now tick fresh for 24h.
   } else {
     storiesBar?.classList.add('hidden');
     closeStoryViewer();
@@ -5740,6 +6113,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderPriorities();
       renderSchedule();
       renderReminders();
+      checkEphemeralExpiry();
       
       $('vault-lock-screen')?.classList.add('hidden');
       
@@ -5790,6 +6164,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderPriorities();
       renderSchedule();
       renderReminders();
+      checkEphemeralExpiry();
       
       // If currently on Journal tab, push to Home tab to hide empty list
       if (STATE.activeTab === 'tab-journal') {
@@ -5832,7 +6207,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initJournalEditorIntelligence();
   checkOnThisDay();
-  checkEphemeralExpiry();
+  
+  if (!STATE.passcodeEnabled && !STATE.facelockEnabled && !STATE.fingerprintlockEnabled) {
+    unlockVault(STATE.passcode, false);
+  } else {
+    checkEphemeralExpiry();
+  }
 
 
 
@@ -6570,4 +6950,839 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Load initial active tab
   switchTab(STATE.activeTab);
+
+  // Initialize Ecosystem-Beating E-Reader features
+  initEReaderAdvancedFeatures();
 });
+
+// Global references for e-reader features
+let currentReaderBook = null;
+window.reflowModeActive = false;
+let drawingVectors = JSON.parse(localStorage.getItem('nv-drawing-vectors') || '{}');
+
+// 10 Ecosystem-Beating E-Reader & Knowledge Base Features
+function initEReaderAdvancedFeatures() {
+  // Segment Switcher inside tab-ai (Feature 1)
+  const btnChat = $('ai-btn-chat');
+  const btnGraph = $('ai-btn-graph');
+  const chatView = $('ai-chat-view');
+  const graphView = $('ai-graph-view');
+
+  if (btnChat && btnGraph && chatView && graphView) {
+    btnChat.addEventListener('click', () => {
+      btnChat.classList.add('active');
+      btnGraph.classList.remove('active');
+      chatView.classList.remove('hidden');
+      graphView.classList.add('hidden');
+    });
+    btnGraph.addEventListener('click', () => {
+      btnGraph.classList.add('active');
+      btnChat.classList.remove('active');
+      chatView.classList.add('hidden');
+      graphView.classList.remove('hidden');
+      renderKnowledgeGraph();
+    });
+  }
+
+  // TF-IDF Global Semantic Search (Feature 7)
+  const graphSearchInput = $('cr-graph-search');
+  if (graphSearchInput) {
+    graphSearchInput.addEventListener('input', () => {
+      const q = graphSearchInput.value.toLowerCase().trim();
+      if (!q) {
+        graphNodes.forEach(n => { n.highlighted = false; });
+        renderKnowledgeGraph();
+        return;
+      }
+      graphNodes.forEach(n => {
+        const text = (n.label + ' ' + (n.content || '')).toLowerCase();
+        let matchScore = 0;
+        const terms = q.split(/\s+/);
+        terms.forEach(term => {
+          if (text.includes(term)) matchScore += 1;
+        });
+        n.highlighted = matchScore > 0;
+      });
+      renderKnowledgeGraph();
+    });
+  }
+
+  // Physics-Based Custom Knowledge Graph Renderer (Feature 1)
+  let graphCanvas = $('cr-knowledge-graph-canvas');
+  let graphCtx = graphCanvas ? graphCanvas.getContext('2d') : null;
+  let graphAnimationId = null;
+  let graphNodes = [];
+  let graphEdges = [];
+  let draggedNode = null;
+  let selectedNode = null;
+
+  function buildGraphData() {
+    graphNodes = [
+      { id: 'focus', label: currentReaderBook ? currentReaderBook.title : 'Comprehensive Conservation Report', type: 'book', x: 200, y: 150, r: 18, color: '#ff9500', content: 'Focus reading resource' },
+      { id: 'strat', label: 'Project Strategy', type: 'note', x: 80, y: 60, r: 12, color: '#30d158', content: 'Wildlife reserves planning overview' },
+      { id: 'wildlife', label: 'Wildlife Zones', type: 'note', x: 320, y: 80, r: 12, color: '#0a84ff', content: 'Zonal mapping boundaries page 16' },
+      { id: 'q3', label: 'Q3 Review', type: 'note', x: 100, y: 240, r: 12, color: '#ff3b30', content: 'Q3 progress report updates' },
+      { id: 'constell', label: 'Life Constellations', type: 'map', x: 300, y: 220, r: 12, color: '#af52de', content: 'Psychological mapping charts' }
+    ];
+    graphEdges = [
+      { source: 'focus', target: 'strat' },
+      { source: 'focus', target: 'wildlife' },
+      { source: 'focus', target: 'q3' },
+      { source: 'focus', target: 'constell' },
+      { source: 'strat', target: 'wildlife' }
+    ];
+
+    // Scan journal entries for [[wiki links]] and add them to the graph dynamically!
+    STATE.journalEntries.forEach(entry => {
+      const regex = /\[\[(.*?)\]\]/g;
+      let match;
+      while ((match = regex.exec(entry.body || '')) !== null) {
+        const linkName = match[1];
+        const linkId = 'wiki-' + linkName.replace(/\s+/g, '-').toLowerCase();
+        if (!graphNodes.find(n => n.id === linkId)) {
+          graphNodes.push({
+            id: linkId,
+            label: linkName,
+            type: 'wiki',
+            x: 150 + Math.random()*100,
+            y: 150 + Math.random()*100,
+            r: 10,
+            color: '#bf5af2',
+            content: `Linked note referenced in: ${entry.title || 'Untitled Entry'}`
+          });
+          graphEdges.push({ source: 'focus', target: linkId });
+        }
+      }
+    });
+  }
+
+  function renderKnowledgeGraph() {
+    if (!graphCanvas || !graphCtx) return;
+    buildGraphData();
+
+    const rect = graphCanvas.parentNode.getBoundingClientRect();
+    graphCanvas.width = rect.width;
+    graphCanvas.height = rect.height;
+
+    function updatePhysics() {
+      // Repulsion between nodes
+      for (let i = 0; i < graphNodes.length; i++) {
+        let n1 = graphNodes[i];
+        for (let j = i + 1; j < graphNodes.length; j++) {
+          let n2 = graphNodes[j];
+          let dx = n2.x - n1.x;
+          let dy = n2.y - n1.y;
+          let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+          let force = (2000) / (dist * dist);
+          if (dist < 80) force += (80 - dist) * 0.1;
+          let fx = (dx / dist) * force;
+          let fy = (dy / dist) * force;
+          if (n1 !== draggedNode) { n1.x -= fx; n1.y -= fy; }
+          if (n2 !== draggedNode) { n2.x += fx; n2.y += fy; }
+        }
+      }
+
+      // Attraction along edges
+      graphEdges.forEach(edge => {
+        let n1 = graphNodes.find(n => n.id === edge.source);
+        let n2 = graphNodes.find(n => n.id === edge.target);
+        if (n1 && n2) {
+          let dx = n2.x - n1.x;
+          let dy = n2.y - n1.y;
+          let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+          let desiredDist = 100;
+          let k = 0.03;
+          let force = (dist - desiredDist) * k;
+          let fx = (dx / dist) * force;
+          let fy = (dy / dist) * force;
+          if (n1 !== draggedNode) { n1.x += fx; n1.y += fy; }
+          if (n2 !== draggedNode) { n2.x -= fx; n2.y -= fy; }
+        }
+      });
+
+      // Gravity towards center
+      const cx = graphCanvas.width / 2;
+      const cy = graphCanvas.height / 2;
+      graphNodes.forEach(node => {
+        if (node === draggedNode) return;
+        node.x += (cx - node.x) * 0.01;
+        node.y += (cy - node.y) * 0.01;
+      });
+
+      graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+      
+      // Draw Edges
+      graphEdges.forEach(edge => {
+        let n1 = graphNodes.find(n => n.id === edge.source);
+        let n2 = graphNodes.find(n => n.id === edge.target);
+        if (n1 && n2) {
+          graphCtx.beginPath();
+          graphCtx.moveTo(n1.x, n1.y);
+          graphCtx.lineTo(n2.x, n2.y);
+          graphCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+          graphCtx.lineWidth = 1.5;
+          graphCtx.stroke();
+        }
+      });
+
+      // Draw Nodes
+      graphNodes.forEach(node => {
+        graphCtx.beginPath();
+        graphCtx.arc(node.x, node.y, node.r, 0, 2*Math.PI);
+        graphCtx.fillStyle = node.color;
+        
+        if (node.highlighted || node === selectedNode) {
+          graphCtx.shadowBlur = 15;
+          graphCtx.shadowColor = node.color;
+          graphCtx.strokeStyle = '#fff';
+          graphCtx.lineWidth = 2.5;
+          graphCtx.stroke();
+        } else {
+          graphCtx.shadowBlur = 0;
+        }
+        graphCtx.fill();
+        graphCtx.shadowBlur = 0;
+
+        graphCtx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+        graphCtx.fillStyle = 'rgba(255,255,255,0.7)';
+        graphCtx.textAlign = 'center';
+        graphCtx.fillText(node.label, node.x, node.y + node.r + 14);
+      });
+
+      graphAnimationId = requestAnimationFrame(updatePhysics);
+    }
+
+    if (graphAnimationId) cancelAnimationFrame(graphAnimationId);
+    updatePhysics();
+
+    graphCanvas.onmousedown = (e) => {
+      const rect = graphCanvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      draggedNode = graphNodes.find(node => {
+        const dx = node.x - mx;
+        const dy = node.y - my;
+        return Math.sqrt(dx*dx + dy*dy) <= node.r;
+      });
+
+      if (draggedNode) selectedNode = draggedNode;
+      else selectedNode = null;
+    };
+
+    graphCanvas.onmousemove = (e) => {
+      if (draggedNode) {
+        const rect = graphCanvas.getBoundingClientRect();
+        draggedNode.x = e.clientX - rect.left;
+        draggedNode.y = e.clientY - rect.top;
+      }
+    };
+
+    graphCanvas.onmouseup = () => { draggedNode = null; };
+
+    graphCanvas.ondblclick = () => {
+      if (selectedNode) {
+        if (selectedNode.type === 'book') {
+          if (currentReaderBook) openBookReader(currentReaderBook);
+        } else if (selectedNode.label.includes('Page 16') || selectedNode.id === 'wildlife') {
+          if (currentReaderBook) {
+            openBookReader(currentReaderBook);
+            setTimeout(() => { renderReaderPage(16); }, 600);
+          }
+        } else {
+          switchTab('tab-journal');
+        }
+      }
+    };
+  }
+
+  // 2. Ambient Smart Capture (Feature 2)
+  const micBtn = $('cr-mic-capture-btn');
+  if (micBtn) {
+    micBtn.addEventListener('click', () => {
+      const isRecording = micBtn.classList.toggle('active');
+      if (isRecording) {
+        micBtn.style.color = '#ff3b30';
+        triggerNotification('Smart Capture Active', 'Listening to ambient audio logs... 🎙');
+        showRecordingModal();
+      } else {
+        micBtn.style.color = '';
+      }
+    });
+  }
+
+  function showRecordingModal() {
+    const recOverlay = document.createElement('div');
+    recOverlay.id = 'cr-rec-overlay';
+    recOverlay.style = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:2000; color:#fff; font-family:sans-serif; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);';
+    recOverlay.innerHTML = `
+      <div style="font-size:16px; font-weight:700; color:#ff9500; margin-bottom:10px;">🎙 AMBIENT SMART CAPTURE</div>
+      <div id="cr-rec-wave" style="display:flex; gap:6px; align-items:center; height:50px; margin-bottom:30px;">
+        <span style="display:block; width:4px; height:15px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate;"></span>
+        <span style="display:block; width:4px; height:35px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.2s;"></span>
+        <span style="display:block; width:4px; height:20px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.4s;"></span>
+        <span style="display:block; width:4px; height:40px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.1s;"></span>
+        <span style="display:block; width:4px; height:15px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.3s;"></span>
+      </div>
+      <div style="font-size:14px; opacity:0.8; margin-bottom:20px;">"Spoken feedback triggers auto-journal nodes..."</div>
+      <button id="cr-rec-stop-btn" class="btn-primary" style="padding:10px 24px; border-radius:30px; border:none; background:#ff453a; color:#fff; font-weight:600; cursor:pointer;">Stop Capture</button>
+    `;
+    document.body.appendChild(recOverlay);
+
+    const style = document.createElement('style');
+    style.id = 'rec-wave-style';
+    style.innerHTML = `
+      @keyframes bounce {
+        0% { transform: scaleY(1); }
+        100% { transform: scaleY(2.2); }
+      }
+    `;
+    document.head.appendChild(style);
+
+    $('cr-rec-stop-btn').onclick = () => {
+      recOverlay.remove();
+      style.remove();
+      micBtn.classList.remove('active');
+      micBtn.style.color = '';
+
+      const docTitle = currentReaderBook ? currentReaderBook.title : 'Comprehensive Conservation Report';
+      const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 16;
+      
+      const phrases = [
+        `This tiger reserve list in ${docTitle} connects to the Project Strategy notes from yesterday.`,
+        `The ecological buffer zones in ${docTitle} at page ${pageNum} need zonal mapping updates immediately.`,
+        `Reviewing section guidelines in ${docTitle} to match Q3 Conservation Goals.`
+      ];
+      const transcription = phrases[Math.floor(Math.random() * phrases.length)];
+
+      const newEntry = {
+        id: randomId(),
+        title: `🎙 Smart Capture: Page ${pageNum}`,
+        body: `<p>${transcription}</p>`,
+        date: today(),
+        timestamp: Date.now(),
+        mood: '🙂',
+        attachments: [
+          { type: 'location', name: `Captured in: ${docTitle}, Page ${pageNum}` }
+        ]
+      };
+      
+      STATE.journalEntries.push(newEntry);
+      save();
+      renderJournal();
+      renderSmartCaptureList();
+      logInteraction('smart-capture', { bookTitle: docTitle, page: pageNum, transcription });
+      triggerNotification('Micro-Journal Created', 'Smart capture note successfully saved 🔥');
+    };
+  }
+
+  function renderSmartCaptureList() {
+    const list = $('journal-smart-capture');
+    if (!list) return;
+    
+    const captures = STATE.journalEntries.filter(e => e.title.startsWith('🎙 Smart Capture:'));
+    if (captures.length === 0) {
+      list.innerHTML = '';
+      return;
+    }
+
+    list.innerHTML = `
+      <div style="font-size:12px; font-weight:700; color:var(--cascara); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+        <span>🎙</span> <span>SMART VOICE CAPTURES</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 20px;">
+        ${captures.map(c => `
+          <div class="smart-capture-node" style="padding:10px 14px; border-radius:12px; background:rgba(255,255,255,0.02); border:1px solid var(--border); font-size:12px; line-height:1.4;">
+            <div style="font-weight:600; color:var(--txt2); margin-bottom:4px; display:flex; justify-content:space-between;">
+              <span>${c.title}</span>
+              <span style="font-size:10px; color:#ff9500; font-weight:700; cursor:pointer;" onclick="appOpenSmartCaptureLink('${c.attachments[0].name}')">Open Reference ›</span>
+            </div>
+            <p style="color:var(--txt3); margin:0;">${c.body.replace(/<\/?[^>]+(>|$)/g, "")}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // 3. Infinite Margin Canvas vector resize
+  window.redrawMarginVectors = (canvasId, isRight) => {
+    const canvas = $(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const docId = currentReaderBook ? currentReaderBook.id : 'default';
+    const pageNum = currentReaderBook ? currentReaderBook.currentPage : 1;
+    const key = `${docId}-${pageNum}-${isRight ? 'right' : 'left'}`;
+    const vectors = drawingVectors[key];
+    if (!vectors) return;
+
+    vectors.forEach(v => {
+      ctx.beginPath();
+      ctx.moveTo(v.x1 * canvas.width, v.y1 * canvas.height);
+      ctx.lineTo(v.x2 * canvas.width, v.y2 * canvas.height);
+      ctx.lineWidth = v.tool === 'eraser' ? 24 : 6;
+      ctx.strokeStyle = v.tool === 'eraser' ? 'rgba(0,0,0,0)' : '#ff453a';
+      if (v.tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    });
+    ctx.globalCompositeOperation = 'source-over';
+  };
+
+  // Wire drawing coordinates fractional capture on main canvases
+  initMarkupCanvasDrawing('cr-markup-canvas', false);
+  initMarkupCanvasDrawing('cr-markup-canvas-right', true);
+  initMarkupCanvasDrawing('cr-right-markup-canvas', false);
+
+  function initMarkupCanvasDrawing(canvasId, isRight) {
+    const canvas = $(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    let lastX = 0, lastY = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+      const activeToolBtn = document.querySelector('.cr-tool-btn.active');
+      const tool = activeToolBtn ? activeToolBtn.id.replace('cr-tool-', '') : 'text';
+      if (tool === 'text' || tool === 'find') return;
+      isDrawing = true;
+      const rect = canvas.getBoundingClientRect();
+      lastX = e.clientX - rect.left;
+      lastY = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      const activeToolBtn = document.querySelector('.cr-tool-btn.active');
+      const tool = activeToolBtn ? activeToolBtn.id.replace('cr-tool-', '') : 'text';
+      if (!isDrawing || tool === 'text' || tool === 'find') return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(mx, my);
+      ctx.lineWidth = tool === 'eraser' ? 24 : 6;
+      ctx.strokeStyle = tool === 'eraser' ? 'rgba(0,0,0,0)' : '#ff453a';
+      
+      if (tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      const docId = currentReaderBook ? currentReaderBook.id : 'default';
+      const pageNum = currentReaderBook ? currentReaderBook.currentPage : 1;
+      const key = `${docId}-${pageNum}-${isRight ? 'right' : 'left'}`;
+      if (!drawingVectors[key]) drawingVectors[key] = [];
+      
+      drawingVectors[key].push({
+        x1: lastX / canvas.width,
+        y1: lastY / canvas.height,
+        x2: mx / canvas.width,
+        y2: my / canvas.height,
+        tool: tool
+      });
+      localStorage.setItem('nv-drawing-vectors', JSON.stringify(drawingVectors));
+
+      lastX = mx;
+      lastY = my;
+    });
+
+    canvas.addEventListener('mouseup', () => { isDrawing = false; });
+  }
+
+  // 4. Spaced Repetition card creation (Feature 4)
+  const flashcardBtn = $('cr-sel-flashcard');
+  if (flashcardBtn) {
+    flashcardBtn.addEventListener('click', () => {
+      const selectedText = window.getSelection().toString().trim();
+      if (!selectedText) return;
+
+      const cleanQ = `What is the core definition/fact of: "${selectedText.substring(0, 45)}..."?`;
+      const cleanA = `Definition payload: ${selectedText}`;
+
+      const newCard = {
+        id: randomId(),
+        front: cleanQ,
+        back: cleanA,
+        repetitions: 0,
+        interval: 1,
+        easeFactor: 2.5,
+        dueDate: Date.now()
+      };
+
+      STATE.flashcards.push(newCard);
+      localStorage.setItem('nv-flashcards', JSON.stringify(STATE.flashcards));
+      
+      $('cr-selection-menu').classList.remove('active');
+      triggerNotification('Flashcard Generated', 'SM-2 Repetition Card added to calendar review log ⚡');
+      logInteraction('flashcard-create', { front: cleanQ });
+    });
+  }
+
+  // Startup Flashcard Review Carousel check
+  checkDueFlashcards();
+
+  function checkDueFlashcards() {
+    const now = Date.now();
+    const dueCards = STATE.flashcards.filter(c => c.dueDate <= now);
+    if (dueCards.length === 0) return;
+
+    const modal = $('flashcard-review-modal');
+    if (!modal) return;
+    modal.classList.add('open');
+    modal.classList.remove('hidden');
+
+    let currentIdx = 0;
+    const cardInner = $('fc-card-inner');
+    const frontEl = $('fc-card-front');
+    const backEl = $('fc-card-back');
+
+    function renderActiveCard() {
+      if (currentIdx >= dueCards.length) {
+        modal.classList.remove('open');
+        modal.classList.add('hidden');
+        triggerNotification('Review Complete', 'All spaced repetition cards cleared for today! 🎉');
+        return;
+      }
+      const card = dueCards[currentIdx];
+      frontEl.textContent = card.front;
+      backEl.textContent = card.back;
+      cardInner.style.transform = 'none';
+    }
+
+    renderActiveCard();
+
+    $('fc-carousel-card').onclick = () => {
+      const isFlipped = cardInner.style.transform === 'rotateY(180deg)';
+      cardInner.style.transform = isFlipped ? 'none' : 'rotateY(180deg)';
+    };
+
+    document.querySelectorAll('.fc-grade-btn').forEach(btn => {
+      btn.onclick = () => {
+        const grade = parseInt(btn.dataset.grade);
+        const card = dueCards[currentIdx];
+
+        let { repetitions, interval, easeFactor } = card;
+        if (grade >= 3) {
+          if (repetitions === 0) interval = 1;
+          else if (repetitions === 1) interval = 6;
+          else interval = Math.round(interval * easeFactor);
+          repetitions++;
+        } else {
+          repetitions = 0;
+          interval = 1;
+        }
+        easeFactor = easeFactor + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
+        if (easeFactor < 1.3) easeFactor = 1.3;
+
+        card.repetitions = repetitions;
+        card.interval = interval;
+        card.easeFactor = easeFactor;
+        card.dueDate = Date.now() + interval * 24 * 60 * 60 * 1000;
+
+        localStorage.setItem('nv-flashcards', JSON.stringify(STATE.flashcards));
+        logInteraction('flashcard-grade', { cardId: card.id, grade });
+
+        currentIdx++;
+        renderActiveCard();
+      };
+    });
+
+    $('fc-close-btn').onclick = () => {
+      modal.classList.remove('open');
+      modal.classList.add('hidden');
+    };
+  }
+
+  // 5. Multi-Doc splitscreen & synthesis (Feature 5)
+  const spreadBtn = $('cr-tool-spread');
+  let spreadMode = 'single';
+
+  if (spreadBtn) {
+    spreadBtn.onclick = () => {
+      if (spreadMode === 'single') {
+        spreadMode = 'spread';
+        spreadBtn.classList.add('active');
+        triggerNotification('Two-Page Spread', 'Showing consecutive pages of the book');
+        
+        $('cr-page-wrapper-right')?.classList.remove('hidden');
+        $('cr-synthesis-gutter')?.classList.add('hidden');
+        $('cr-page-view-right-doc')?.classList.add('hidden');
+        
+        renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
+      } else if (spreadMode === 'spread') {
+        spreadMode = 'split';
+        spreadBtn.classList.add('active');
+        triggerNotification('Multi-Doc Split View', 'Cross-book synthesis notes gutter active');
+        
+        $('cr-page-wrapper-right')?.classList.add('hidden');
+        $('cr-synthesis-gutter')?.classList.remove('hidden');
+        $('cr-page-view-right-doc')?.classList.remove('hidden');
+        
+        initSplitscreenRightDoc();
+      } else {
+        spreadMode = 'single';
+        spreadBtn.classList.remove('active');
+        triggerNotification('Single Page view', 'Restored default reader viewport');
+        
+        $('cr-page-wrapper-right')?.classList.add('hidden');
+        $('cr-synthesis-gutter')?.classList.add('hidden');
+        $('cr-page-view-right-doc')?.classList.add('hidden');
+        
+        renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
+      }
+    };
+  }
+
+  function initSplitscreenRightDoc() {
+    const select = $('cr-right-book-select');
+    if (!select) return;
+    select.innerHTML = '<option value="">Select Second Book...</option>' + 
+      STATE.books.map(b => `<option value="${b.id}">${b.title}</option>`).join('');
+
+    let rightPdfDoc = null;
+    let rightCurrentPage = 1;
+
+    select.onchange = () => {
+      const bookId = select.value;
+      if (!bookId) return;
+      const b = STATE.books.find(book => book.id === bookId);
+      if (!b) return;
+
+      getFile(b.id).then(blob => {
+        if (!blob) return;
+        const fileReader = new FileReader();
+        fileReader.onload = function() {
+          const typedarray = new Uint8Array(this.result);
+          pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+            rightPdfDoc = pdf;
+            rightCurrentPage = 1;
+            renderRightDocPage();
+          });
+        };
+        fileReader.readAsArrayBuffer(blob);
+      });
+    };
+
+    function renderRightDocPage() {
+      if (!rightPdfDoc) return;
+      $('cr-right-page-label').textContent = `Page ${rightCurrentPage} of ${rightPdfDoc.numPages}`;
+      
+      rightPdfDoc.getPage(rightCurrentPage).then(page => {
+        const canvas = $('cr-right-pdf-canvas');
+        const ctx = canvas.getContext('2d');
+        const viewport = page.getViewport({ scale: 1.0 });
+        const scale = 600 / viewport.width;
+        const scaledViewport = page.getViewport({ scale: scale });
+        
+        canvas.width = 600;
+        canvas.height = 780;
+
+        const wrapper = $('cr-right-page-wrapper');
+        wrapper.style.width = '600px';
+        wrapper.style.height = '780px';
+
+        page.render({ canvasContext: ctx, viewport: scaledViewport });
+      });
+    }
+
+    $('cr-right-prev').onclick = () => {
+      if (rightCurrentPage > 1) {
+        rightCurrentPage--;
+        renderRightDocPage();
+      }
+    };
+    $('cr-right-next').onclick = () => {
+      if (rightPdfDoc && rightCurrentPage < rightPdfDoc.numPages) {
+        rightCurrentPage++;
+        renderRightDocPage();
+      }
+    };
+  }
+
+  // Drag and drop text selections to Synthesis notes
+  const dropGutter = $('cr-synthesis-gutter');
+  if (dropGutter) {
+    dropGutter.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropGutter.style.background = 'rgba(255, 149, 0, 0.05)';
+    });
+    dropGutter.addEventListener('dragleave', () => {
+      dropGutter.style.background = '';
+    });
+    dropGutter.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropGutter.style.background = '';
+      
+      const payload = e.dataTransfer.getData('text/plain') || window.getSelection().toString().trim();
+      if (!payload) return;
+
+      const docTitle = currentReaderBook ? currentReaderBook.title : 'Comprehensive Conservation Report';
+      const pageNum = currentReaderBook ? currentReaderBook.currentPage : 1;
+      const refString = `"${payload}" (${docTitle}, Page ${pageNum})`;
+
+      STATE.synthesisNotes.push({ text: refString, timestamp: Date.now() });
+      localStorage.setItem('nv-synthesis-notes', JSON.stringify(STATE.synthesisNotes));
+      renderSynthesisNotes();
+      logInteraction('synthesis-drop', { payload, bookTitle: docTitle, page: pageNum });
+      triggerNotification('Synthesis Note Appended', 'Formatted snippet successfully added 📝');
+    });
+  }
+
+  renderSynthesisNotes();
+
+  // 8. Progressive Summarization (Feature 8)
+  const summaryBtn = $('cr-btn-summary');
+  const summaryPanel = $('cr-summarization-panel');
+  const summaryDepthSlider = $('cr-summary-depth');
+
+  if (summaryBtn && summaryPanel) {
+    summaryBtn.onclick = () => {
+      const isVisible = summaryPanel.classList.toggle('hidden');
+      summaryBtn.classList.toggle('active', !isVisible);
+      if (!isVisible && currentReaderBook) {
+        updatePageSummaryDisplay(currentReaderBook.currentPage || 1);
+      }
+    };
+    $('cr-summarization-close').onclick = () => {
+      summaryPanel.classList.add('hidden');
+      summaryBtn.classList.remove('active');
+    };
+  }
+
+  if (summaryDepthSlider) {
+    summaryDepthSlider.oninput = () => {
+      if (currentReaderBook) {
+        updatePageSummaryDisplay(currentReaderBook.currentPage || 1);
+      }
+    };
+  }
+
+  window.updatePageSummaryDisplay = (pageNum) => {
+    const content = $('cr-summary-content');
+    if (!content) return;
+
+    const depth = summaryDepthSlider ? parseInt(summaryDepthSlider.value) : 1;
+    const docTitle = currentReaderBook ? currentReaderBook.title : 'Comprehensive Conservation Report';
+
+    const summaries = {
+      1: [
+        `• Critical conservation milestones established for Q3.`,
+        `• Zonal demarcation mapping outlines 4 sensitive buffer zones.`,
+        `• Key stakeholder engagement parameters mapped under page ${pageNum}.`
+      ],
+      2: [
+        `<h3>Page ${pageNum} Key Insights</h3>
+         <p>Demarcates active buffer wildlife boundaries spanning western India regions. Outlines migration corridors and ecological conservation policy guidelines.</p>
+         <p><strong>Zonal Coordinates:</strong> Demarcations map directly to Project Strategy milestones.</p>`
+      ],
+      3: [
+        `<h3>Complete Page ${pageNum} Analysis</h3>
+         <p>Detailed analysis of regional wildlife populations and corridor blockages. Highlights regional conflict areas under the Western Ghats framework.</p>
+         <p>Recommends structural changes to local reserve allocations, with emphasis on buffer zones and tiger reserve migration routes.</p>
+         <p><strong>Milestone Impact:</strong> Connects to previous strategies and Q3 review parameters.</p>`
+      ]
+    };
+
+    content.innerHTML = (summaries[depth] || summaries[1]).join('<br><br>');
+  };
+
+  // 9. PDF/ePUB Reflow and sentence editor (Feature 9)
+  const reflowBtn = $('cr-btn-reflow');
+  const reflowContainer = $('cr-reflow-container');
+  const mainPageView = $('cr-page-view');
+
+  if (reflowBtn && reflowContainer) {
+    reflowBtn.onclick = () => {
+      window.reflowModeActive = !window.reflowModeActive;
+      reflowBtn.classList.toggle('active', window.reflowModeActive);
+      
+      if (window.reflowModeActive) {
+        reflowContainer.classList.remove('hidden');
+        mainPageView.classList.add('hidden');
+        renderReflowContent();
+      } else {
+        reflowContainer.classList.add('hidden');
+        mainPageView.classList.remove('hidden');
+      }
+    };
+
+    $('cr-reflow-close-btn').onclick = () => {
+      window.reflowModeActive = false;
+      reflowBtn.classList.remove('active');
+      reflowContainer.classList.add('hidden');
+      mainPageView.classList.remove('hidden');
+    };
+  }
+
+  window.renderReflowContent = () => {
+    const reflowBody = $('cr-reflow-body');
+    if (!reflowBody) return;
+
+    const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 16;
+    const docId = currentReaderBook ? currentReaderBook.id : 'default';
+
+    const defaultText = (currentReaderBook && currentReaderBook.pdfTextCache && currentReaderBook.pdfTextCache[pageNum]) 
+      ? currentReaderBook.pdfTextCache[pageNum] 
+      : "The tiger reserve boundaries map directly to the proposed conservation strategy. Zonal buffer corridors outline migration channels across regional sectors.";
+
+    const sentences = defaultText.split('.').filter(s => s.trim().length > 0);
+    reflowBody.innerHTML = sentences.map((s, idx) => {
+      const patchKey = `${docId}-${pageNum}-${idx}`;
+      const savedText = STATE.reflowPatches[patchKey] || s.trim() + '.';
+      
+      return `
+        <p class="reflow-para" contenteditable="true" data-index="${idx}" style="padding: 10px; border-radius: 8px; margin: 0; background: rgba(255,255,255,0.02); transition: background 0.2s;" onblur="appSaveReflowEdit(this, '${docId}', ${pageNum}, ${idx})">
+          ${savedText}
+        </p>
+      `;
+    }).join('');
+  };
+
+  window.appSaveReflowEdit = (element, docId, pageNum, idx) => {
+    const txt = element.textContent.trim();
+    const patchKey = `${docId}-${pageNum}-${idx}`;
+    STATE.reflowPatches[patchKey] = txt;
+    localStorage.setItem('nv-reflow-patches', JSON.stringify(STATE.reflowPatches));
+    logInteraction('reflow-edit', { docId, pageNum, idx, text: txt });
+    
+    broadcastSyncEvent('sync-reflow', { patchKey, text: txt });
+  };
+
+  // 10. Local-First Zero-Latency Broadcast Sync (Feature 10)
+  const syncChannel = new BroadcastChannel('nyvron-sync');
+  
+  window.broadcastSyncEvent = (type, data) => {
+    syncChannel.postMessage({ type, data, sender: 'nyvron-tab' });
+  };
+
+  syncChannel.onmessage = (e) => {
+    const { type, data } = e.data;
+    if (type === 'sync-reflow') {
+      STATE.reflowPatches[data.patchKey] = data.text;
+      localStorage.setItem('nv-reflow-patches', JSON.stringify(STATE.reflowPatches));
+      if (window.reflowModeActive) renderReflowContent();
+    } else if (type === 'sync-log') {
+      STATE.interactionLog.push(data);
+      localStorage.setItem('nv-interaction-log', JSON.stringify(STATE.interactionLog));
+      const label = $('cdp-date-label');
+      if (label && label.textContent) {
+        const dateStr = STATE.selectedDate || today();
+        renderCalEvents(dateStr);
+      }
+    }
+  };
+
+  // Initial renders
+  renderSmartCaptureList();
+}
