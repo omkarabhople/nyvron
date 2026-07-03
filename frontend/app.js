@@ -10,7 +10,8 @@ const STATE = {
   reminders:  JSON.parse(localStorage.getItem('nv-reminders')||'[]'),
   chatMsgs:   JSON.parse(localStorage.getItem('nv-chat')||'[]'),
   events:     JSON.parse(localStorage.getItem('nv-events')||'{}'),
-  journalEntries: JSON.parse(localStorage.getItem('nv-journal')||'[]'),
+  journalEntries: [],
+  ephemeralEntries: JSON.parse(localStorage.getItem('nv-ephemeral')||'[]'),
   countdown: JSON.parse(localStorage.getItem('nv-countdown')||'{"title":"","target":""}'),
   books: JSON.parse(localStorage.getItem('nv-books')||'[]'),
   planner: JSON.parse(localStorage.getItem('nv-planner')||'{"Monday":"","Tuesday":"","Wednesday":"","Thursday":"","Friday":"","Saturday":"","Sunday":""}'),
@@ -27,13 +28,25 @@ const STATE = {
   selectedDate:  null,
   hmYear: new Date().getFullYear(),
   hmMonth: new Date().getMonth(),
-  journalEditId: null, selectedMood: '🙂',
+  selectedMood: '🙂',
+  journalEditId: null,
+  journalEditAttachments: [],
   direction: localStorage.getItem('nv-direction')||'Stability, consistency, and confidence.',
   profile: JSON.parse(localStorage.getItem('nv-profile')||'{"name":"User"}'),
+  
+  // Passcode & Biometric security states
+  passcodeEnabled: localStorage.getItem('nv-passcode-enabled') === 'true',
+  facelockEnabled: localStorage.getItem('nv-facelock-enabled') === 'true',
+  fingerprintlockEnabled: localStorage.getItem('nv-fingerprintlock-enabled') === 'true',
+  passcode: localStorage.getItem('nv-passcode') || '1234',
+  vaultLocked: true,
+  lockTargetTab: null,
+  lockTargetEditId: null,
 };
 
 const $ = id => document.getElementById(id);
 const randomId = () => Math.random().toString(36).substring(2, 11);
+let notifiedItems = JSON.parse(sessionStorage.getItem('nv-notified')) || [];
 const today = () => new Date().toLocaleDateString('sv').substring(0, 10);
 
 const ms2hms = (ms) => {
@@ -57,7 +70,17 @@ const PROMPTS = [
   "What went well today?",
   "What could have been better?",
   "What are you grateful for today?",
-  "Describe a challenging moment and how you handled it."
+  "Describe a challenging moment and how you handled it.",
+  "What's something you've been avoiding? Why?",
+  "Write about the last time you felt genuinely proud of yourself.",
+  "What would make tomorrow better than today?",
+  "Describe your current mood in exactly three words.",
+  "What's one thing you want to remember about today?",
+  "Who made you feel good recently, and why?",
+  "What's a fear you're ready to face?",
+  "Write about a small moment of beauty you noticed today.",
+  "What does your ideal self look like one year from now?",
+  "What do you need to let go of?",
 ];
 
 const GRADIENTS = [
@@ -73,13 +96,238 @@ const GRADIENTS = [
 let BLOOM = null;
 let currentCreatorTab = 'event';
 
+const COMMUTE_QUESTIONS = [
+  "What's the one thing you absolutely must accomplish this week?",
+  "Describe a recent moment that made you smile without expecting it.",
+  "What's a belief you held last year that you've since changed?",
+  "Who's someone you'd like to reconnect with, and what's stopping you?",
+  "If you could change one thing about your daily routine, what would it be?",
+  "What's something you've been learning that excites you?",
+  "Describe the last time you stepped out of your comfort zone.",
+  "What are three things you're grateful for right now?",
+  "What would you do with a free, unplanned Saturday?",
+  "What's a habit you want to build, and why haven't you started yet?",
+];
+
+const MOOD_MAP = {
+  '😔': 'sad', '😐': 'neutral', '🙂': 'good', '😊': 'happy', '🤩': 'amazing',
+  '😫': 'sad', '😀': 'happy', '🥱': 'neutral', '🎨': 'good',
+};
+
+
+// --- Swipe Gesture Utility ---
+function setupSwipeGesture(element, options = {}) {
+  const {
+    direction = 'x', // 'x' or 'y'
+    maxDistance = -80,
+    containerSelector = '.swipe-content',
+    deleteLayerSelector = '.book-delete-layer', // for y direction
+    isJournalCard = false,
+    onDeleteTrigger = null
+  } = options;
+  
+  const content = element.querySelector(containerSelector);
+  const deleteLayer = element.querySelector(deleteLayerSelector);
+  if (!content) return;
+  
+  let startVal = 0;
+  let currentVal = 0;
+  let isDragging = false;
+  let dragMultiplier = 1.0;
+  let wheelTimeout;
+  
+  const setTransform = (val, immediate = false) => {
+    content.style.transition = immediate ? 'none' : `transform 0.3s var(--spring)`;
+    if (direction === 'x') {
+      content.style.transform = `translateX(${val}px)`;
+    } else {
+      content.style.transform = `translateY(${val}px)`;
+      if (deleteLayer) {
+        deleteLayer.style.transition = immediate ? 'none' : 'opacity 0.2s ease';
+        deleteLayer.style.opacity = immediate ? Math.min(1, Math.abs(val) / Math.abs(maxDistance)) : (val <= (maxDistance+20) ? '1' : '0');
+        deleteLayer.style.pointerEvents = val <= (maxDistance+20) ? 'auto' : 'none';
+      }
+    }
+  };
+  
+  const handleStart = (val, multiplier = 1.0) => {
+    startVal = val;
+    isDragging = false;
+    dragMultiplier = multiplier;
+    content.style.userSelect = 'none';
+    content.style.webkitUserSelect = 'none';
+    // Don't overwrite transform, start from whatever the current layout shift is
+    const match = content.style.transform.match(/translateX\(([-\d.]+)px\)/);
+    currentVal = match ? parseFloat(match[1]) : 0;
+  };
+  
+  const handleMove = (val) => {
+    const delta = (val - startVal) * dragMultiplier;
+    if (Math.abs(delta) > 8) isDragging = true;
+    if (isDragging) {
+      if (isJournalCard) {
+        // swipe left only
+        if (delta < 0) {
+          const move = delta;
+          setTransform(move, true);
+          currentVal = move;
+        }
+      } else {
+        if (delta < 0 && delta > maxDistance - 20) {
+          currentVal = delta;
+          setTransform(delta, true);
+        }
+      }
+    }
+  };
+  
+  const handleEnd = () => {
+    content.style.userSelect = '';
+    content.style.webkitUserSelect = '';
+    if (!isDragging) return;
+    
+    if (isJournalCard) {
+      const width = element.offsetWidth || 300;
+      const absVal = Math.abs(currentVal);
+      
+      if (absVal > width * 0.50) {
+        // Swipe > 50%: Instantly slide out & collapse vertical height to 0px
+        content.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+        content.style.transform = 'translateX(-100%)';
+        setTimeout(() => {
+          element.style.transition = 'height 0.25s cubic-bezier(0.16, 1, 0.3, 1), padding 0.25s cubic-bezier(0.16, 1, 0.3, 1), margin-bottom 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+          element.style.height = '0px';
+          element.style.paddingTop = '0px';
+          element.style.paddingBottom = '0px';
+          element.style.marginBottom = '0px';
+          element.style.overflow = 'hidden';
+          setTimeout(() => {
+            if (onDeleteTrigger) onDeleteTrigger();
+          }, 250);
+        }, 150);
+      } else if (absVal >= width * 0.15) {
+        // Swipe between 15% and 50%: Card snaps open to a fixed button width (120px)
+        currentVal = -120;
+        setTransform(currentVal, false);
+      } else {
+        // Swipe < 15%: Snaps back shut
+        currentVal = 0;
+        setTransform(currentVal, false);
+      }
+    } else {
+      if (currentVal < maxDistance / 2) {
+        currentVal = maxDistance;
+      } else {
+        currentVal = 0;
+      }
+      setTransform(currentVal, false);
+    }
+  };
+
+  // Touch triggers
+  element.addEventListener('touchstart', e => {
+    if (e.target.closest('button, .rem-check, .book-dots-btn, .jc-hover-del')) return;
+    handleStart(direction === 'x' ? e.touches[0].clientX : e.touches[0].clientY, 1.0);
+  }, {passive: true});
+
+  element.addEventListener('touchmove', e => {
+    if (e.target.closest('button, .rem-check, .book-dots-btn, .jc-hover-del')) return;
+    handleMove(direction === 'x' ? e.touches[0].clientX : e.touches[0].clientY);
+  }, {passive: true});
+
+  element.addEventListener('touchend', e => {
+    if (e.target.closest('button, .rem-check, .book-dots-btn, .jc-hover-del')) return;
+    handleEnd();
+  });
+
+  // Mouse triggers with scaled resistance (0.6x drag multiplier)
+  element.addEventListener('mousedown', e => {
+    if (e.target.closest('button, .rem-check, .book-dots-btn, .jc-hover-del')) return;
+    handleStart(direction === 'x' ? e.clientX : e.clientY, 0.6);
+    const onMouseMove = (moveE) => handleMove(direction === 'x' ? moveE.clientX : moveE.clientY);
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      handleEnd();
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  });
+  
+  // Trackpad (Wheel)
+  element.addEventListener('wheel', e => {
+    if (e.target.closest('.jw-body, .scroll-area, .book-reader-content')) return;
+    const delta = direction === 'x' ? e.deltaX : e.deltaY;
+    const crossDelta = direction === 'x' ? e.deltaY : e.deltaX;
+    
+    if (Math.abs(delta) > Math.abs(crossDelta) && Math.abs(delta) > 5) {
+      e.preventDefault();
+      currentVal -= delta;
+      if (currentVal > 0) currentVal = 0;
+      if (currentVal < maxDistance - 20) currentVal = maxDistance - 20;
+      
+      setTransform(currentVal, true);
+      
+      clearTimeout(wheelTimeout);
+      wheelTimeout = setTimeout(() => {
+        isDragging = true;
+        handleEnd();
+      }, 50);
+    }
+  }, {passive: false});
+}
+
+// --- ZERO-KNOWLEDGE CRYPTOGRAPHY & DECOY STATE ---
+const DECOY_ENTRIES = [
+  {
+    id: 'decoy-1',
+    date: new Date().toISOString(),
+    title: 'Morning Yoga and Meditation',
+    body: '<p>Felt very calm and relaxed today during the morning stretching sequence. Highly recommend this routine.</p>',
+    mood: '😊',
+    gradient: 'linear-gradient(135deg, #11998e, #38ef7d)',
+    attachments: []
+  },
+  {
+    id: 'decoy-2',
+    date: new Date(Date.now() - 86400000).toISOString(),
+    title: 'Guitar Practice Goals',
+    body: '<p>Practiced the pentatonic scale for 30 minutes. Finger speed is slowly improving. Next up is working on chord changes.</p>',
+    mood: '🙂',
+    gradient: 'linear-gradient(135deg, #4E54C8, #8F94FB)',
+    attachments: []
+  }
+];
+
+function encryptData(text, key) {
+  if (!text) return '';
+  let res = '';
+  for (let i = 0; i < text.length; i++) {
+    res += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  }
+  return btoa(encodeURIComponent(res));
+}
+
+function decryptData(encoded, key) {
+  if (!encoded) return '';
+  try {
+    const text = decodeURIComponent(atob(encoded));
+    let res = '';
+    for (let i = 0; i < text.length; i++) {
+      res += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+    }
+    return res;
+  } catch (e) {
+    return '';
+  }
+}
+
 const save = () => {
   localStorage.setItem('nv-priorities', JSON.stringify(STATE.priorities));
   localStorage.setItem('nv-schedule',   JSON.stringify(STATE.schedule));
   localStorage.setItem('nv-reminders',  JSON.stringify(STATE.reminders));
   localStorage.setItem('nv-chat',       JSON.stringify(STATE.chatMsgs));
   localStorage.setItem('nv-events',     JSON.stringify(STATE.events));
-  localStorage.setItem('nv-journal',    JSON.stringify(STATE.journalEntries));
   localStorage.setItem('nv-countdown',  JSON.stringify(STATE.countdown));
   localStorage.setItem('nv-books',      JSON.stringify(STATE.books));
   localStorage.setItem('nv-planner',    JSON.stringify(STATE.planner));
@@ -87,6 +335,13 @@ const save = () => {
   localStorage.setItem('nv-cascara-sessions', JSON.stringify(STATE.cascara.sessions));
   localStorage.setItem('nv-direction',  STATE.direction);
   localStorage.setItem('nv-profile',    JSON.stringify(STATE.profile));
+  
+  // Encrypt journal entries with key '1234'
+  const isDecoy = STATE.priorities.some(p => p.id === 'dp1');
+  if (!isDecoy) {
+    const serialized = JSON.stringify(STATE.journalEntries);
+    localStorage.setItem('nv-journal-enc', encryptData(serialized, '1234'));
+  }
 };
 
 // ==========================================
@@ -192,41 +447,9 @@ function renderSchedule(){
       <div class="swipe-content" style="display:flex;align-items:center;width:100%;transition:transform 0.3s var(--spring);padding:14px 16px;">
         <span class="day-block-time" style="width:70px">${s.time}</span><span class="day-block-title" style="flex:1">${s.title}</span>
       </div>
-      <button class="rem-del-swipe" data-id="${s.id}" data-type="schedule" aria-label="Delete">Delete</button>
+      <button class="rem-del-swipe" data-id="${s.id}" data-type="schedule" aria-label="Delete"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
     `;
-    let startX = 0, currentX = 0;
-    const content = li.querySelector('.swipe-content');
-    content.addEventListener('touchstart', e => { startX = e.touches[0].clientX; content.style.transition = 'none'; });
-    content.addEventListener('touchmove', e => {
-      const delta = e.touches[0].clientX - startX;
-      if(delta < 0 && delta > -80) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
-    });
-    content.addEventListener('touchend', e => {
-      content.style.transition = 'transform 0.3s var(--spring)';
-      if(currentX < -40) { content.style.transform = 'translateX(-80px)'; }
-      else { content.style.transform = 'translateX(0)'; }
-      currentX = 0;
-    });
-    // Desktop swipe support
-    let mouseDragged = false;
-    content.addEventListener('mousedown', e => {
-      startX = e.clientX; currentX = 0; mouseDragged = false; content.style.transition = 'none';
-      const onMouseMove = (moveE) => {
-        const delta = moveE.clientX - startX;
-        if (Math.abs(delta) > 5) mouseDragged = true;
-        if(delta < 0 && delta > -80) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
-      };
-      const onMouseUp = () => {
-        window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('mouseup', onMouseUp);
-        if(!mouseDragged) return;
-        content.style.transition = 'transform 0.3s var(--spring)';
-        if(currentX < -40) { content.style.transform = 'translateX(-80px)'; }
-        else { content.style.transform = 'translateX(0)'; }
-      };
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-    });
+    setupSwipeGesture(li, { direction: 'x', maxDistance: -80 });
     list.appendChild(li);
   });
 }
@@ -245,22 +468,9 @@ function renderPriorities(){
         <div class="rem-check${p.done?' done':''}" data-id="${p.id}" role="checkbox" aria-checked="${p.done}" tabindex="0"></div>
         <span class="rem-text${p.done?' done':''}" style="flex:1">${p.text}</span>
       </div>
-      <button class="rem-del-swipe" data-id="${p.id}" aria-label="Delete">Delete</button>
+      <button class="rem-del-swipe" data-id="${p.id}" aria-label="Delete"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
     `;
-    // Swipe logic
-    let startX = 0, currentX = 0;
-    const content = li.querySelector('.swipe-content');
-    content.addEventListener('touchstart', e => { startX = e.touches[0].clientX; content.style.transition = 'none'; });
-    content.addEventListener('touchmove', e => {
-      const delta = e.touches[0].clientX - startX;
-      if(delta < 0 && delta > -80) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
-    });
-    content.addEventListener('touchend', e => {
-      content.style.transition = 'transform 0.3s var(--spring)';
-      if(currentX < -40) { content.style.transform = 'translateX(-80px)'; }
-      else { content.style.transform = 'translateX(0)'; }
-      currentX = 0;
-    });
+    setupSwipeGesture(li, { direction: 'x', maxDistance: -80 });
     list.appendChild(li);
   });
 }
@@ -430,8 +640,19 @@ function openModal(title,bodyHTML){
   m.classList.add('open');
 }
 
+let triggerBiometricOrPasscodeLock = () => {};
+
 // --- switchTab ---
 function switchTab(tabId){
+  // Scoped Passcode Lock: if opening journal and lock is active, prompt first
+  if (tabId === 'tab-journal') {
+    if ((STATE.passcodeEnabled || STATE.facelockEnabled || STATE.fingerprintlockEnabled) && STATE.vaultLocked) {
+      STATE.lockTargetTab = 'tab-journal';
+      triggerBiometricOrPasscodeLock();
+      return;
+    }
+  }
+
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('[data-tab]').forEach(b=>b.classList.remove('active'));
   const tab=$(tabId);
@@ -587,12 +808,40 @@ function appendMsg(role,text){
 
 // --- saveJournalEntry ---
 function saveJournalEntry(){
-  const title=$('jw-title').value.trim(),body=$('jw-body').value.trim();if(!title&&!body)return;
+  const titleEl=$('jw-title'), bodyEl=$('jw-body');
+  const title=titleEl?.value.trim()||'', body=bodyEl?.innerHTML.trim()||'';
+  if(!title&&!body&&STATE.journalEditAttachments.length===0)return;
+
+  // Check if Vent Mode is active
+  const isVent = $('jw-tool-burn-toggle')?.classList.contains('active');
+  if (isVent) {
+    const expiry = Date.now() + 24 * 60 * 60 * 1000;
+    STATE.ephemeralEntries.push({ id: randomId(), title, body, expiry, createdAt: Date.now() });
+    saveEphemeral();
+    
+    // Play digital incinerator animation
+    bodyEl?.classList.add('burning-text');
+    if (navigator.vibrate) navigator.vibrate([50, 30, 100]);
+    setTimeout(() => {
+      bodyEl?.classList.remove('burning-text');
+      if (titleEl) titleEl.value = '';
+      if (bodyEl) bodyEl.innerHTML = '';
+      $('journal-write-overlay')?.classList.add('hidden');
+      document.body.classList.remove('theme-crimson');
+      $('jw-tool-burn-toggle')?.classList.remove('active');
+    }, 1600);
+    return;
+  }
+
   const grad=GRADIENTS[STATE.journalEntries.length%GRADIENTS.length];
-  if(STATE.journalEditId){const e=STATE.journalEntries.find(x=>x.id===STATE.journalEditId);if(e){e.title=title;e.body=body;e.mood=STATE.selectedMood;}}
-  else {
-    STATE.journalEditId = randomId();
-    STATE.journalEntries.push({id:STATE.journalEditId,title,body,mood:STATE.selectedMood,date:new Date().toISOString(),gradient:grad});
+  if(STATE.journalEditId){
+    const e=STATE.journalEntries.find(x=>x.id===STATE.journalEditId);
+    if(e){
+      e.title=title;e.body=body;e.mood=STATE.selectedMood;
+      e.attachments=[...STATE.journalEditAttachments];
+    }
+  } else {
+    STATE.journalEntries.push({id:randomId(),date:new Date().toISOString(),title,body,mood:STATE.selectedMood,gradient:grad,attachments:[...STATE.journalEditAttachments]});
   }
   save();renderJournal();
   $('journal-write-overlay')?.classList.add('hidden');
@@ -2042,17 +2291,119 @@ function renderSpotlightResults(q){
   filtered.forEach((item,i)=>{const li=document.createElement('li');li.className='sresult';li.dataset.tab=item.tab;li.innerHTML=`<span class="sresult-icon">${item.icon}</span><span>${item.label}</span>`;li.addEventListener('click',()=>{switchTab(item.tab);closeSpotlight();});list.appendChild(li);});
 }
 
+// --- renderJournalAttachments ---
+function renderJournalAttachments() {
+  const grid = $('jw-attachments-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  
+  STATE.journalEditAttachments.forEach(att => {
+    const wrap = document.createElement('div');
+    wrap.className = 'jw-attach-item';
+    wrap.tabIndex = 0; // make it focusable for keyboard events
+    
+    // Support backspace/delete keys to remove attachment
+    wrap.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        STATE.journalEditAttachments = STATE.journalEditAttachments.filter(a => a.id !== att.id);
+        renderJournalAttachments();
+      }
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'jw-attach-del';
+    delBtn.textContent = '✕';
+    delBtn.setAttribute('aria-label', 'Delete attachment');
+    delBtn.onclick = (e) => {
+      e.stopPropagation(); // prevent focus trigger
+      STATE.journalEditAttachments = STATE.journalEditAttachments.filter(a => a.id !== att.id);
+      renderJournalAttachments();
+    };
+    
+    if (att.type === 'image') {
+      const img = document.createElement('img');
+      getFile(att.fileId).then(blob => {
+        if(blob) img.src = URL.createObjectURL(blob);
+      });
+      wrap.appendChild(img);
+    } else if (att.type === 'audio') {
+      wrap.className = 'jw-attach-item jw-attach-audio';
+      const playBtn = document.createElement('button');
+      playBtn.className = 'jw-audio-play';
+      playBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+      
+      const wave = document.createElement('div');
+      wave.className = 'jw-audio-wave';
+      wave.innerHTML = '<span></span><span></span><span></span><span></span><span></span>';
+      
+      let audio = null;
+      playBtn.onclick = async () => {
+        if(!audio) {
+          const blob = await getFile(att.fileId);
+          if(blob) audio = new Audio(URL.createObjectURL(blob));
+        }
+        if(audio) {
+          if (audio.paused) audio.play();
+          else { audio.pause(); audio.currentTime = 0; }
+        }
+      };
+      
+      wrap.appendChild(playBtn);
+      wrap.appendChild(wave);
+    } else if (att.type === 'location') {
+      wrap.className = 'jw-attach-item jw-attach-loc';
+      wrap.innerHTML = `
+        <div class="jw-loc-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+        <div style="color:#fff; font-size:15px; font-weight:500;">${att.name}</div>
+      `;
+    }
+    
+    wrap.appendChild(delBtn);
+    grid.appendChild(wrap);
+  });
+}
+
 // --- openJournalWrite ---
 function openJournalWrite(entryId){
+  // Scoped Passcode Lock: if opening journal editor and lock is active, prompt first
+  if ((STATE.passcodeEnabled || STATE.facelockEnabled || STATE.fingerprintlockEnabled) && STATE.vaultLocked) {
+    STATE.lockTargetEditId = entryId || 'new';
+    triggerBiometricOrPasscodeLock();
+    return;
+  }
+
   const overlay=$('journal-write-overlay');if(!overlay)return;
   const ex=entryId?STATE.journalEntries.find(e=>e.id===entryId):null;
   STATE.journalEditId=entryId||null;
-  $('jw-date-display').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-  $('jw-title').value=ex?.title||'';$('jw-body').value=ex?.body||'';STATE.selectedMood=ex?.mood||'🙂';
-  document.querySelectorAll('.mood-chip').forEach(c=>c.classList.toggle('active',c.dataset.mood===STATE.selectedMood));
-  $('jw-prompt').textContent=PROMPTS[Math.floor(Math.random()*PROMPTS.length)];
+  STATE.journalEditAttachments=ex?.attachments ? [...ex.attachments] : [];
+
+  // Always do a clean reset of all fields
+  const dateEl = $('jw-date-display') || $('jw-date-header');
+  if (dateEl) dateEl.textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const titleEl = $('jw-title');
+  if (titleEl) titleEl.value = ex?.title || '';
+  const bodyEl = $('jw-body');
+  if (bodyEl) bodyEl.innerHTML = ex?.body || '';  // Always clear/reset
+
+  STATE.selectedMood = ex?.mood || '🙂';
+  document.querySelectorAll('.mood-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.mood === STATE.selectedMood);
+    c.onclick = () => {
+      STATE.selectedMood = c.dataset.mood;
+      document.querySelectorAll('.mood-chip').forEach(ch => ch.classList.toggle('active', ch.dataset.mood === STATE.selectedMood));
+    };
+  });
+  renderJournalAttachments();
+  const promptEl = $('jw-prompt');
+  if (promptEl) promptEl.textContent = PROMPTS[Math.floor(Math.random()*PROMPTS.length)];
+  // Make sure format toolbar starts hidden
+  $('jw-format-toolbar')?.classList.add('hidden');
+  $('jw-mention-dropdown')?.classList.add('hidden');
+  $('jw-tag-suggestions')?.classList.add('hidden');
+  $('jw-drop-zone')?.classList.add('hidden');
   overlay.classList.remove('hidden');
-  setTimeout(()=>$('jw-title').focus(),350);
+  setTimeout(()=>titleEl?.focus(), 350);
 }
 
 // --- startCascaraSession ---
@@ -2129,7 +2480,7 @@ function renderCountdown() {
         <div class="ig-countdown-title" style="margin-bottom:0">${STATE.countdown.title}</div>
         <div style="display:flex;gap:12px;z-index:5;">
           <button id="edit-countdown-btn" class="btn-ghost" style="padding:4px;font-size:14px;background:none;border:none;cursor:pointer;">✏️</button>
-          <button id="del-countdown-btn" class="btn-ghost" style="padding:4px;font-size:14px;background:none;border:none;cursor:pointer;color:var(--danger);">🗑</button>
+          <button id="del-countdown-btn" class="btn-ghost" style="padding:4px;display:flex;align-items:center;background:none;border:none;cursor:pointer;color:var(--danger);" title="Delete Countdown"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
         </div>
       </div>
       <div class="ig-countdown-grid">
@@ -2196,22 +2547,9 @@ function renderReminders(){
         <div class="rem-check${r.done?' done':''}" data-id="${r.id}" role="checkbox" aria-checked="${r.done}" tabindex="0"></div>
         <span class="rem-text${r.done?' done':''}" style="flex:1">${r.text}${r.time ? ` <span style="font-size:12px;color:inherit; opacity:0.7;">(${r.time})</span>` : ''}</span>
       </div>
-      <button class="rem-del-swipe" data-id="${r.id}" aria-label="Delete">Delete</button>
+      <button class="rem-del-swipe" data-id="${r.id}" aria-label="Delete"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
     `;
-    // Swipe logic
-    let startX = 0, currentX = 0;
-    const content = li.querySelector('.swipe-content');
-    content.addEventListener('touchstart', e => { startX = e.touches[0].clientX; content.style.transition = 'none'; });
-    content.addEventListener('touchmove', e => {
-      const delta = e.touches[0].clientX - startX;
-      if(delta < 0 && delta > -80) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
-    });
-    content.addEventListener('touchend', e => {
-      content.style.transition = 'transform 0.3s var(--spring)';
-      if(currentX < -40) { content.style.transform = 'translateX(-80px)'; }
-      else { content.style.transform = 'translateX(0)'; }
-      currentX = 0;
-    });
+    setupSwipeGesture(li, { direction: 'x', maxDistance: -80 });
     list.appendChild(li);
   });
 }
@@ -2247,43 +2585,30 @@ function renderCalEvents(dateStr){
           ${extraHTML}
         </div>
       </div>
-      <button class="rem-del-swipe" data-id="${ev.id}" data-type="calevent" aria-label="Delete">Delete</button>
+      <button class="rem-del-swipe" data-id="${ev.id}" data-type="calevent" aria-label="Delete"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
     `;
-    let startX = 0, currentX = 0;
-    const content = li.querySelector('.swipe-content');
-    content.addEventListener('touchstart', e => { startX = e.touches[0].clientX; content.style.transition = 'none'; });
-    content.addEventListener('touchmove', e => {
-      const delta = e.touches[0].clientX - startX;
-      if(delta < 0 && delta > -80) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
-    });
-    content.addEventListener('touchend', e => {
-      content.style.transition = 'transform 0.3s var(--spring)';
-      if(currentX < -40) { content.style.transform = 'translateX(-80px)'; }
-      else { content.style.transform = 'translateX(0)'; }
-      currentX = 0;
-    });
-    // Desktop swipe support
-    let mouseDragged = false;
-    content.addEventListener('mousedown', e => {
-      startX = e.clientX; currentX = 0; mouseDragged = false; content.style.transition = 'none';
-      const onMouseMove = (moveE) => {
-        const delta = moveE.clientX - startX;
-        if (Math.abs(delta) > 5) mouseDragged = true;
-        if(delta < 0 && delta > -80) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
-      };
-      const onMouseUp = () => {
-        window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('mouseup', onMouseUp);
-        if(!mouseDragged) return;
-        content.style.transition = 'transform 0.3s var(--spring)';
-        if(currentX < -40) { content.style.transform = 'translateX(-80px)'; }
-        else { content.style.transform = 'translateX(0)'; }
-      };
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-    });
+    setupSwipeGesture(li, { direction: 'x', maxDistance: -80 });
     list.appendChild(li);
   });
+}
+
+function applyManualTheme(theme) {
+  document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
+  if (theme === 'light') {
+    document.body.classList.add('theme-paper');
+  } else if (theme === 'dark') {
+    document.body.classList.add('theme-dark-vault');
+  }
+}
+
+function applyAutoTheme() {
+  const h = new Date().getHours();
+  document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
+  if (h >= 6 && h < 18) {
+    document.body.classList.add('theme-paper');
+  } else {
+    document.body.classList.add('theme-dark-vault');
+  }
 }
 
 // --- updateClock ---
@@ -2291,10 +2616,23 @@ function updateClock(){
   const now=new Date(),hm=now.toTimeString().slice(0,5);
   const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  
+  // Contextual Theming
+  const h=now.getHours();
+  // Don't override if user is in a forced mode (like crimson for venting)
+  if (!document.body.classList.contains('theme-crimson')) {
+    const savedTheme = localStorage.getItem('nv-theme') || 'auto';
+    if (savedTheme === 'auto') {
+      applyAutoTheme();
+    } else {
+      applyManualTheme(savedTheme);
+    }
+  }
+
   const el=$('home-time'),de=$('home-date');
   if(el)el.textContent=hm;
   if(de)de.textContent=`${DAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]}`;
-  const h=now.getHours(),greet=h<5?'Good night':h<12?'Good morning':h<17?'Good afternoon':h<21?'Good evening':'Good night';
+  const greet=h<5?'Good night':h<12?'Good morning':h<17?'Good afternoon':h<21?'Good evening':'Good night';
   const ge=$('home-greeting'); if(ge&&ge.textContent!==greet)ge.textContent=greet;
   const cd=$('cascara-date'); if(cd)cd.textContent=`${DAYS[now.getDay()].slice(0,3)}, ${now.getMonth()+1}/${now.getDate()}`;
   const cdB=$('cascara-dday-btn'); if(cdB)cdB.textContent=DAYS[now.getDay()];
@@ -2341,63 +2679,78 @@ function renderJournal(){
     const wrapper=document.createElement('div'); wrapper.className='journal-card-wrapper swipe-wrap';
     wrapper.style.animationDelay=`${i*.07}s`;
     
+    let attachHtml = '';
+    if (e.attachments && e.attachments.length > 0) {
+      attachHtml = '<div class="card-attachments">';
+      e.attachments.forEach(att => {
+        if (att.type === 'image') {
+          attachHtml += `<img class="card-attach-img" src="" data-fileid="${att.fileId}" />`;
+        } else if (att.type === 'audio') {
+          attachHtml += `
+            <div class="card-attach-audio">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <div style="flex:1; height:4px; background:rgba(255,255,255,0.2); border-radius:2px;"></div>
+            </div>`;
+        } else if (att.type === 'location') {
+          attachHtml += `
+            <div class="card-attach-loc">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              ${att.name}
+            </div>`;
+        }
+      });
+      attachHtml += '</div>';
+    }
+
+    const moodColors = {
+      '😆': '#E8652A',
+      '😊': '#30D158',
+      '🙂': '#0A84FF',
+      '😐': '#8E8E93',
+      '😔': '#FF453A',
+      '😢': '#FF453A'
+    };
+    const cardBorderColor = moodColors[e.mood] || '#E8652A';
+    const parsedDate = e.date ? new Date(e.date) : new Date();
+    const dateText = isNaN(parsedDate.getTime()) ? 'Today' : parsedDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+
     wrapper.innerHTML=`
-      <div class="journal-card swipe-content" style="background:${e.gradient||GRADIENTS[i%GRADIENTS.length]};transition:transform 0.3s var(--spring);padding:20px;cursor:pointer;position:relative;z-index:2;margin-bottom:0 !important;">
-        <div class="jc-top"><span class="jc-date">${new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span><span class="jc-mood">${e.mood||'🙂'}</span></div>
-        <div class="jc-title">${e.title||'Untitled'}</div>
-        <div class="jc-preview">${e.body||''}</div>
+      <div class="journal-card swipe-content" style="background:#FFFFFF; border:1px solid rgba(0,0,0,0.08); border-left:3.5px solid ${cardBorderColor} !important; border-radius:16px; box-shadow:0 4px 12px rgba(0,0,0,0.02); transition:transform 0.3s var(--spring); padding:20px; cursor:pointer; position:relative; z-index:2; margin-bottom:0 !important; color:#121214;">
+        <button class="jc-hover-del" style="display:none; position:absolute; right:16px; top:16px; width:32px; height:32px; border-radius:50%; background:rgba(255, 69, 58, 0.14); color:#ff453a; border:1px solid rgba(255,69,58,0.3); align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s ease; z-index:15;" title="Delete Entry"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+        <div class="jc-top"><span class="jc-date" style="color:rgba(18,18,20,0.55);">${dateText}</span><span class="jc-mood">${e.mood||'🙂'}</span></div>
+        <div class="jc-title" style="color:#121214; font-weight:700;">${e.title||'Untitled'}</div>
+        <div class="jc-preview" style="color:rgba(18,18,20,0.7);">${e.body||''}</div>
+        ${attachHtml}
       </div>
       <div class="journal-swipe-actions" style="position:absolute; right:0; top:0; bottom:0; display:flex; z-index:1; border-radius:20px; overflow:hidden;">
         <button class="journal-swipe-share" data-id="${e.id}" style="width:60px; background:#007AFF; color:#fff; border:none; display:flex; align-items:center; justify-content:center; font-size:18px; cursor:pointer;" title="Share">⎋</button>
-        <button class="journal-swipe-del" data-id="${e.id}" style="width:60px; background:#FF3B30; color:#fff; border:none; display:flex; align-items:center; justify-content:center; font-size:18px; cursor:pointer;" title="Delete">🗑</button>
+        <button class="journal-swipe-del" data-id="${e.id}" style="width:60px; background:#FF3B30; color:#fff; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Delete"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
       </div>
     `;
 
     const content = wrapper.querySelector('.journal-card');
     const shareBtn = wrapper.querySelector('.journal-swipe-share');
     const delBtn = wrapper.querySelector('.journal-swipe-del');
+    const hoverDelBtn = wrapper.querySelector('.jc-hover-del');
 
-    // Swipe logic (Touch + Leak-free Desktop Mouse Dragging)
-    let startX = 0, currentX = 0;
-    
-    content.addEventListener('touchstart', ev => { startX = ev.touches[0].clientX; content.style.transition = 'none'; });
-    content.addEventListener('touchmove', ev => {
-      const delta = ev.touches[0].clientX - startX;
-      if(delta < 0 && delta > -130) { currentX = delta; content.style.transform = `translateX(${delta}px)`; }
-    });
-    content.addEventListener('touchend', () => {
-      content.style.transition = 'transform 0.3s var(--spring)';
-      if(currentX < -60) content.style.transform = 'translateX(-120px)';
-      else content.style.transform = 'translateX(0)';
-      currentX = 0;
+    // Load images async
+    wrapper.querySelectorAll('img[data-fileid]').forEach(img => {
+      getFile(img.dataset.fileid).then(blob => {
+        if(blob) img.src = URL.createObjectURL(blob);
+      });
     });
 
-    content.addEventListener('mousedown', ev => {
-      startX = ev.clientX;
-      let isDragging = true;
-      content.style.transition = 'none';
-      
-      const handleMove = ev => {
-        if (!isDragging) return;
-        const delta = ev.clientX - startX;
-        if (delta < 0 && delta > -130) {
-          currentX = delta;
-          content.style.transform = `translateX(${delta}px)`;
-        }
-      };
-      
-      const handleUp = () => {
-        isDragging = false;
-        content.style.transition = 'transform 0.3s var(--spring)';
-        if (currentX < -60) content.style.transform = 'translateX(-120px)';
-        else content.style.transform = 'translateX(0)';
-        currentX = 0;
-        window.removeEventListener('mousemove', handleMove);
-        window.removeEventListener('mouseup', handleUp);
-      };
-      
-      window.addEventListener('mousemove', handleMove);
-      window.addEventListener('mouseup', handleUp);
+    // Swipe Gesture (Touch: raw physics, Mouse: scaled down friction)
+    setupSwipeGesture(wrapper, {
+      direction: 'x',
+      maxDistance: -120,
+      containerSelector: '.journal-card',
+      deleteLayerSelector: '.journal-swipe-actions',
+      isJournalCard: true,
+      onDeleteTrigger: () => {
+        STATE.journalEntries = STATE.journalEntries.filter(x => x.id !== e.id);
+        save(); renderJournal();
+      }
     });
 
     content.addEventListener('click', (ev) => {
@@ -2422,11 +2775,20 @@ function renderJournal(){
 
     delBtn.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      const idx = STATE.journalEntries.findIndex(x => x.id === e.id);
-      if(idx>-1) {
-        STATE.journalEntries.splice(idx, 1);
+      showConfirm('Delete Entry', 'Are you sure you want to delete this journal entry?', () => {
+        STATE.journalEntries = STATE.journalEntries.filter(x => x.id !== e.id);
         save(); renderJournal();
-      }
+      }, () => {
+        content.style.transform = 'translateX(0)';
+      });
+    });
+
+    hoverDelBtn?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      showConfirm('Delete Entry', 'Are you sure you want to delete this journal entry?', () => {
+        STATE.journalEntries = STATE.journalEntries.filter(x => x.id !== e.id);
+        save(); renderJournal();
+      });
     });
 
     grid.appendChild(wrapper);
@@ -2443,11 +2805,11 @@ async function fetchNorthStar(force = false){
   }
   qt.classList.add('skeleton'); qt.textContent='⠀'; qa.textContent='';
   try{
-    // Fetch from ZenQuotes as requested
-    const r=await fetch('https://zenquotes.io/api/random',{signal:AbortSignal.timeout(5000)});
+    // Fetch from DummyJSON as a reliable alternative
+    const r=await fetch('https://dummyjson.com/quotes/random',{signal:AbortSignal.timeout(5000)});
     if(!r.ok)throw new Error();
     const d=await r.json();
-    const data={q:d[0].q,a:d[0].a,ts:Date.now()};
+    const data={q:d.quote,a:d.author,ts:Date.now()};
     localStorage.setItem('nv-ns-cache',JSON.stringify(data));
     qt.classList.remove('skeleton'); qt.textContent=`"${data.q}"`; qa.textContent=`— ${data.a}`;
   }catch{
@@ -2535,101 +2897,12 @@ function renderBooks() {
     container.appendChild(card);
     grid.appendChild(container);
     
-    // Swipe Touch Gesture Handlers (Leak-free temporary binding pattern)
-    card.addEventListener('touchstart', (e) => {
-      if (e.target.closest('.book-dots-btn')) return;
-      const startY = e.touches[0].clientY;
-      let currentY = startY;
-      let hasDragged = false;
-      
-      card.style.transition = 'none';
-      deleteLayer.style.transition = 'none';
-      
-      const onTouchMove = (moveEvent) => {
-        currentY = moveEvent.touches[0].clientY;
-        let deltaY = currentY - startY;
-        if (Math.abs(deltaY) > 15) {
-          hasDragged = true;
-        }
-        if (hasDragged && deltaY < 0) {
-          let translateVal = Math.max(-60, deltaY);
-          card.style.transform = `translateY(${translateVal}px)`;
-          deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
-        }
-      };
-      
-      const onTouchEnd = () => {
-        card.removeEventListener('touchmove', onTouchMove);
-        card.removeEventListener('touchend', onTouchEnd);
-        
-        if (!hasDragged) return;
-        
-        card.style.transition = 'transform 0.2s ease';
-        deleteLayer.style.transition = 'opacity 0.2s ease';
-        let deltaY = currentY - startY;
-        if (deltaY < -25) {
-          card.style.transform = 'translateY(-60px)';
-          deleteLayer.style.opacity = '1';
-          deleteLayer.style.pointerEvents = 'auto';
-        } else {
-          card.style.transform = 'translateY(0px)';
-          deleteLayer.style.opacity = '0';
-          deleteLayer.style.pointerEvents = 'none';
-        }
-      };
-      
-      card.addEventListener('touchmove', onTouchMove, {passive: true});
-      card.addEventListener('touchend', onTouchEnd);
-    }, {passive: true});
-    
-    // Track drag state for distinguishing clicks from swipes
-    let _bookDragged = false;
-
-    // Swipe Mouse Fallback Gestures (Desktop Support - Leak-free temporary binding pattern)
-    card.addEventListener('mousedown', (e) => {
-      if (e.target.closest('.book-dots-btn')) return;
-      const startY = e.clientY;
-      let currentY = startY;
-      _bookDragged = false;
-      
-      card.style.transition = 'none';
-      deleteLayer.style.transition = 'none';
-      
-      const onMouseMove = (moveEvent) => {
-        currentY = moveEvent.clientY;
-        let deltaY = currentY - startY;
-        if (Math.abs(deltaY) > 15) {
-          _bookDragged = true;
-        }
-        if (_bookDragged && deltaY < 0) {
-          let translateVal = Math.max(-60, deltaY);
-          card.style.transform = `translateY(${translateVal}px)`;
-          deleteLayer.style.opacity = Math.min(1, Math.abs(translateVal) / 60);
-        }
-      };
-      
-      const onMouseUp = () => {
-        window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('mouseup', onMouseUp);
-        
-        if (!_bookDragged) return;
-        
-        card.style.transition = 'transform 0.2s ease';
-        deleteLayer.style.transition = 'opacity 0.2s ease';
-        let deltaY = currentY - startY;
-        if (deltaY < -25) {
-          card.style.transform = 'translateY(-60px)';
-          deleteLayer.style.opacity = '1';
-          deleteLayer.style.pointerEvents = 'auto';
-        } else {
-          card.style.transform = 'translateY(0px)';
-          deleteLayer.style.opacity = '0';
-          deleteLayer.style.pointerEvents = 'none';
-        }
-      };
-      
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
+    // Swipe Gesture (Touch, Mouse, Trackpad)
+    setupSwipeGesture(card, {
+      direction: 'y',
+      maxDistance: -60,
+      containerSelector: '.book-cover-card',
+      deleteLayerSelector: '.book-delete-layer'
     });
   
   // Wire dots button click
@@ -2697,18 +2970,1425 @@ function closeCalCreator() {
 }
 
 // ==========================================
+// PHASE 2: ALL JOURNAL FEATURE FUNCTIONS
+// ==========================================
+
+// --- save extended (ephemeral) ---
+function saveEphemeral() {
+  localStorage.setItem('nv-ephemeral', JSON.stringify(STATE.ephemeralEntries));
+}
+
+// --- BURN AFTER READING ---
+let burnTimerInterval = null;
+function openBurnOverlay() {
+  const overlay = $('journal-burn-overlay'); if (!overlay) return;
+  document.body.classList.add('theme-crimson');
+  document.body.classList.remove('theme-paper','theme-dark-vault');
+  $('burn-title').value = '';
+  $('burn-body').innerHTML = '';
+  overlay.classList.remove('hidden');
+  
+  checkEphemeralExpiry();
+
+  // Start fresh 24h timer for this new vent
+  clearInterval(burnTimerInterval);
+  const ventStartTime = Date.now();
+  const updateVentClock = () => {
+    const remaining = 24 * 3600 * 1000 - (Date.now() - ventStartTime);
+    if (remaining <= 0) {
+      clearInterval(burnTimerInterval);
+      return;
+    }
+    const h = Math.floor(remaining/3600000);
+    const m = Math.floor((remaining%3600000)/60000);
+    const s = Math.floor((remaining%60000)/1000);
+    const el = $('burn-countdown-display');
+    if (el) el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  };
+  updateVentClock();
+  burnTimerInterval = setInterval(updateVentClock, 1000);
+}
+function closeBurnOverlay() {
+  $('journal-burn-overlay')?.classList.add('hidden');
+  document.body.classList.remove('theme-crimson');
+  clearInterval(burnTimerInterval);
+}
+function burnNow() {
+  const body = $('burn-body');
+  if (!body) return;
+  body.classList.add('burning-text');
+  if (navigator.vibrate) navigator.vibrate([50, 30, 100]);
+  setTimeout(() => {
+    body.innerHTML = '';
+    body.classList.remove('burning-text');
+    $('burn-title').value = '';
+    closeBurnOverlay();
+  }, 1600);
+}
+function saveBurnEntry() {
+  const title = $('burn-title')?.value.trim() || '';
+  const body = $('burn-body')?.innerHTML.trim() || '';
+  if (!title && !body) return;
+  const expiry = Date.now() + 24 * 60 * 60 * 1000;
+  STATE.ephemeralEntries.push({ id: randomId(), title, body, expiry, createdAt: Date.now() });
+  saveEphemeral();
+  closeBurnOverlay();
+  triggerNotification('Ephemeral Entry Saved', 'It will self-destruct in 24 hours 🔥');
+}
+let storyInterval = null;
+let storySlideTimer = null;
+let currentStoryIndex = 0;
+let activeVents = [];
+
+function checkEphemeralExpiry() {
+  const now = Date.now();
+  const before = STATE.ephemeralEntries.length;
+  STATE.ephemeralEntries = STATE.ephemeralEntries.filter(e => e.expiry > now);
+  if (STATE.ephemeralEntries.length !== before) saveEphemeral();
+
+  // Active status stories sorted chronologically (oldest created first so they view them in order)
+  activeVents = [...STATE.ephemeralEntries].sort((a,b)=>a.createdAt-b.createdAt);
+  
+  const storiesBar = $('journal-stories-bar');
+  if (activeVents.length > 0) {
+    storiesBar?.classList.remove('hidden');
+    
+    // Wire active story click trigger
+    const storyItem = $('active-story-item');
+    if (storyItem) {
+      storyItem.onclick = () => {
+        openStoryViewer(0);
+      };
+    }
+
+    // We removed the global burnTimerInterval update here.
+    // The countdown in the vent creation modal will now tick fresh for 24h.
+  } else {
+    storiesBar?.classList.add('hidden');
+    closeStoryViewer();
+  }
+}
+
+function openStoryViewer(index) {
+  const overlay = $('story-viewer-overlay'); if (!overlay) return;
+  
+  if (activeVents.length === 0) {
+    closeStoryViewer();
+    return;
+  }
+  
+  // Wrap or bounds check
+  if (index < 0) index = 0;
+  if (index >= activeVents.length) {
+    closeStoryViewer();
+    return;
+  }
+  
+  currentStoryIndex = index;
+  const entry = activeVents[currentStoryIndex];
+  
+  const titleEl = $('story-viewer-title');
+  const bodyEl = $('story-viewer-body');
+  if (titleEl) titleEl.textContent = entry.title || 'My Ephemeral Vent';
+  if (bodyEl) bodyEl.innerHTML = entry.body || '';
+  
+  overlay.classList.remove('hidden');
+  
+  // Render WhatsApp-style progress bar indicators
+  const indicators = $('story-indicators-container');
+  if (indicators) {
+    indicators.innerHTML = activeVents.map((v, i) => `
+      <div class="story-indicator-track" style="flex:1; height:3px; background:rgba(255,255,255,0.25); border-radius:2px; overflow:hidden; position:relative;">
+        <div class="story-indicator-fill" id="story-fill-${i}" style="position:absolute; left:0; top:0; bottom:0; background:#ff453a; width:${i < currentStoryIndex ? '100%' : '0%'}; transition:none;"></div>
+      </div>
+    `).join('');
+  }
+
+  // Ticking specific entry countdown timer
+  clearInterval(storyInterval);
+  storyInterval = setInterval(() => {
+    const remaining = entry.expiry - Date.now();
+    if (remaining <= 0) {
+      nextStory();
+      return;
+    }
+    const h = Math.floor(remaining / 3600000);
+    const m = Math.floor((remaining % 3600000) / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    
+    const countEl = $('story-countdown-display');
+    if (countEl) countEl.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    
+    const timeEl = $('story-time-display');
+    if (timeEl) timeEl.textContent = `${h}h ${m}m remaining`;
+  }, 1000);
+  
+  const remaining = entry.expiry - Date.now();
+  if (remaining > 0) {
+    const h = Math.floor(remaining / 3600000);
+    const m = Math.floor((remaining % 3600000) / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    const countEl = $('story-countdown-display');
+    if (countEl) countEl.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    const timeEl = $('story-time-display');
+    if (timeEl) timeEl.textContent = `${h}h ${m}m remaining`;
+  }
+
+  // Animate status bar slide for 5 seconds
+  clearInterval(storySlideTimer);
+  let elapsed = 0;
+  const slideDuration = 5000;
+  storySlideTimer = setInterval(() => {
+    elapsed += 50;
+    const fillEl = $(`story-fill-${currentStoryIndex}`);
+    if (fillEl) {
+      fillEl.style.width = Math.min(100, (elapsed / slideDuration) * 100) + '%';
+    }
+    if (elapsed >= slideDuration) {
+      nextStory();
+    }
+  }, 50);
+}
+
+function nextStory() {
+  openStoryViewer(currentStoryIndex + 1);
+}
+
+function prevStory() {
+  openStoryViewer(currentStoryIndex - 1);
+}
+
+function closeStoryViewer() {
+  $('story-viewer-overlay')?.classList.add('hidden');
+  clearInterval(storyInterval);
+  clearInterval(storySlideTimer);
+}
+
+window.closeStoryViewer = closeStoryViewer;
+
+// Register story tapping navigation actions
+$('story-nav-left')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  prevStory();
+});
+$('story-nav-right')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  nextStory();
+});
+
+// Wire Story Viewer Close button
+$('story-viewer-close')?.addEventListener('click', closeStoryViewer);
+
+// --- COMMUTE THERAPY (Voice Mode) ---
+let commuteMediaRecorder = null;
+let commuteAudioCtx = null;
+let commuteAnimFrame = null;
+let commuteRecording = false;
+let commuteSpeechRec = null;
+let commuteTranscript = '';
+
+function openCommuteTherapy() {
+  const overlay = $('commute-therapy-overlay'); if (!overlay) return;
+  document.body.classList.add('theme-dark-vault');
+  overlay.classList.remove('hidden');
+  const q = COMMUTE_QUESTIONS[Math.floor(Math.random() * COMMUTE_QUESTIONS.length)];
+  const qEl = $('commute-question');
+  if (qEl) qEl.textContent = q;
+  // TTS - read the question aloud
+  if (window.speechSynthesis) {
+    const utt = new SpeechSynthesisUtterance(q);
+    utt.rate = 0.9;
+    window.speechSynthesis.speak(utt);
+  }
+  // Draw idle wave
+  drawIdleWave();
+  commuteTranscript = '';
+  const t = $('commute-transcript');
+  if (t) { t.style.display = 'none'; t.textContent = ''; }
+  $('commute-save-btn')?.classList.add('hidden');
+  $('commute-record-label').textContent = 'Tap to speak';
+}
+
+function closeCommuteTherapy() {
+  window.speechSynthesis?.cancel();
+  stopCommuteRecording();
+  cancelAnimationFrame(commuteAnimFrame);
+  commuteAudioCtx?.close();
+  commuteAudioCtx = null;
+  $('commute-therapy-overlay')?.classList.add('hidden');
+}
+
+function drawIdleWave() {
+  const canvas = $('commute-wave-canvas'); if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth * window.devicePixelRatio || 600;
+  canvas.height = canvas.offsetHeight * window.devicePixelRatio || 240;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  let t = 0;
+  function frame() {
+    if (!commuteRecording) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(168,85,247,0.5)';
+      ctx.lineWidth = 2;
+      for (let x = 0; x < canvas.offsetWidth; x++) {
+        const y = (canvas.offsetHeight / 2) + Math.sin((x * 0.02) + t) * 8;
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      t += 0.05;
+      commuteAnimFrame = requestAnimationFrame(frame);
+    }
+  }
+  frame();
+}
+
+function startCommuteRecording() {
+  commuteRecording = true;
+  $('commute-record-btn')?.classList.add('recording');
+  $('commute-record-label').textContent = 'Listening... (tap to stop)';
+  cancelAnimationFrame(commuteAnimFrame);
+
+  // Web Speech API transcription
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    commuteSpeechRec = new SpeechRecognition();
+    commuteSpeechRec.continuous = true;
+    commuteSpeechRec.interimResults = true;
+    commuteSpeechRec.onresult = (e) => {
+      commuteTranscript = Array.from(e.results).map(r => r[0].transcript).join(' ');
+      const t = $('commute-transcript');
+      if (t) { t.style.display = 'block'; t.textContent = commuteTranscript; }
+    };
+    commuteSpeechRec.start();
+  }
+
+  // Visualizer using Web Audio
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    commuteAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = commuteAudioCtx.createAnalyser();
+    commuteAudioCtx.createMediaStreamSource(stream).connect(analyser);
+    analyser.fftSize = 256;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const canvas = $('commute-wave-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth * window.devicePixelRatio || 600;
+    canvas.height = canvas.offsetHeight * window.devicePixelRatio || 240;
+    function drawFrame() {
+      if (!commuteRecording) return;
+      analyser.getByteFrequencyData(data);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const W = canvas.offsetWidth, H = canvas.offsetHeight;
+      const barW = W / data.length * 2.5;
+      let x = 0;
+      for (let i = 0; i < data.length; i++) {
+        const h = (data[i] / 255) * H;
+        const hue = 260 + (data[i] / 255) * 60;
+        ctx.fillStyle = `hsla(${hue}, 80%, 60%, 0.8)`;
+        ctx.fillRect(x, H - h, barW, h);
+        x += barW + 1;
+      }
+      commuteAnimFrame = requestAnimationFrame(drawFrame);
+    }
+    drawFrame();
+  }).catch(() => {
+    // No mic permission - just draw a fake animated wave
+    const canvas = $('commute-wave-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let t = 0;
+    function frame() {
+      if (!commuteRecording) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(255,68,68,0.7)';
+      ctx.lineWidth = 3;
+      for (let x = 0; x < canvas.offsetWidth; x++) {
+        const amp = 15 + Math.random() * 20;
+        const y = (canvas.offsetHeight / 2) + Math.sin((x * 0.03) + t) * amp;
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      t += 0.12;
+      commuteAnimFrame = requestAnimationFrame(frame);
+    }
+    frame();
+  });
+}
+
+function stopCommuteRecording() {
+  commuteRecording = false;
+  commuteSpeechRec?.stop();
+  commuteMediaRecorder?.stop();
+  $('commute-record-btn')?.classList.remove('recording');
+  $('commute-record-label').textContent = 'Tap to speak';
+  cancelAnimationFrame(commuteAnimFrame);
+  if (commuteTranscript.trim()) {
+    $('commute-save-btn')?.classList.remove('hidden');
+  }
+  drawIdleWave();
+}
+
+function saveCommuteEntry() {
+  if (!commuteTranscript.trim()) return;
+  const q = $('commute-question')?.textContent || 'Commute Reflection';
+  STATE.journalEntries.push({
+    id: randomId(),
+    date: new Date().toISOString(),
+    title: q,
+    body: `<p>${commuteTranscript}</p>`,
+    mood: '🎙️',
+    tags: ['#CommuteTherapy', '#AudioEntry'],
+    gradient: GRADIENTS[STATE.journalEntries.length % GRADIENTS.length],
+    attachments: [],
+    timestamp: Date.now(),
+  });
+  save();
+  renderJournal();
+  closeCommuteTherapy();
+  triggerNotification('Voice Entry Saved', 'Your commute therapy session is in your journal.');
+}
+
+// --- LIFE CONSTELLATIONS ---
+let constellationScale = 1, constellationOffsetX = 0, constellationOffsetY = 0;
+let constellationDragging = false, constellationDragStart = null;
+let constellationNodes = [];
+
+function openConstellation() {
+  const overlay = $('constellation-overlay'); if (!overlay) return;
+  document.body.classList.add('theme-dark-vault');
+  overlay.classList.remove('hidden');
+  setTimeout(drawConstellation, 100);
+}
+
+function drawConstellation() {
+  const canvas = $('constellation-canvas'); if (!canvas) return;
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // Build nodes from journal entries
+  constellationNodes = STATE.journalEntries.map((e, i) => {
+    const angle = (i / STATE.journalEntries.length) * Math.PI * 2;
+    const radius = 80 + Math.random() * (Math.min(W,H) * 0.3);
+    return {
+      x: W/2 + Math.cos(angle) * radius,
+      y: H/2 + Math.sin(angle) * radius,
+      entry: e,
+      radius: 6 + (e.body?.length || 0) * 0.01,
+    };
+  });
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(constellationOffsetX, constellationOffsetY);
+    ctx.scale(constellationScale, constellationScale);
+
+    // Draw starfield
+    for (let i = 0; i < 80; i++) {
+      ctx.beginPath();
+      ctx.arc(Math.sin(i*1.7)*W, Math.cos(i*2.3)*H, Math.random()*1.5, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,255,255,${0.1 + Math.random()*0.2})`;
+      ctx.fill();
+    }
+
+    // Draw connecting lines between linked entries
+    constellationNodes.forEach((n, i) => {
+      if (i < constellationNodes.length - 1) {
+        const n2 = constellationNodes[i+1];
+        ctx.beginPath();
+        ctx.moveTo(n.x, n.y);
+        ctx.lineTo(n2.x, n2.y);
+        ctx.strokeStyle = 'rgba(168,85,247,0.15)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    });
+
+    // Draw nodes
+    constellationNodes.forEach(n => {
+      const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.radius * 2);
+      grad.addColorStop(0, 'rgba(168,85,247,0.9)');
+      grad.addColorStop(1, 'rgba(59,130,246,0)');
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius * 2, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(200,150,255,0.95)';
+      ctx.fill();
+      // Label
+      if (constellationScale > 0.5 && n.entry.title) {
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = `${11 / constellationScale}px -apple-system, sans-serif`;
+        ctx.fillText(n.entry.title.slice(0, 20), n.x + n.radius + 4, n.y + 4);
+      }
+    });
+    ctx.restore();
+  }
+  render();
+
+  // Drag interaction
+  canvas.onmousedown = canvas.ontouchstart = (e) => {
+    constellationDragging = true;
+    const pt = e.touches ? e.touches[0] : e;
+    constellationDragStart = { x: pt.clientX - constellationOffsetX, y: pt.clientY - constellationOffsetY };
+  };
+  canvas.onmousemove = canvas.ontouchmove = (e) => {
+    if (!constellationDragging) return;
+    e.preventDefault();
+    const pt = e.touches ? e.touches[0] : e;
+    constellationOffsetX = pt.clientX - constellationDragStart.x;
+    constellationOffsetY = pt.clientY - constellationDragStart.y;
+    render();
+  };
+  canvas.onmouseup = canvas.ontouchend = () => { constellationDragging = false; };
+  canvas.onwheel = (e) => {
+    e.preventDefault();
+    constellationScale = Math.max(0.2, Math.min(3, constellationScale - e.deltaY * 0.001));
+    render();
+  };
+
+  // Tap to read entry
+  canvas.onclick = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left - constellationOffsetX) / constellationScale;
+    const my = (e.clientY - rect.top - constellationOffsetY) / constellationScale;
+    const hit = constellationNodes.find(n => Math.hypot(n.x - mx, n.y - my) < n.radius * 2 + 10);
+    if (hit) openJournalWrite(hit.entry.id);
+  };
+}
+
+// --- JOURNAL AI CHAT (Talk to Past Self) ---
+function openJournalAI() {
+  const overlay = $('journal-ai-overlay'); if (!overlay) return;
+  overlay.classList.remove('hidden');
+  document.body.classList.add('theme-dark-vault');
+  const feed = $('jai-feed');
+  if (feed && feed.children.length === 0) {
+    addJAIMessage('ai', "Hi! I can search through your journal history. Ask me anything — like \"When was the last time I felt burned out?\" or \"Summarize my entries about growth.\"");
+  }
+}
+
+function addJAIMessage(role, text, sourceEntry) {
+  const feed = $('jai-feed'); if (!feed) return;
+  const div = document.createElement('div');
+  div.className = `jai-msg ${role}`;
+  div.textContent = text;
+  if (sourceEntry && role === 'ai') {
+    const src = document.createElement('div');
+    src.className = 'jai-source';
+    src.textContent = `📖 From entry: "${sourceEntry.title || 'Untitled'}" — ${new Date(sourceEntry.date || sourceEntry.timestamp).toLocaleDateString()}`;
+    div.appendChild(src);
+  }
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function sendJournalAIQuery(query) {
+  if (!query.trim()) return;
+  addJAIMessage('user', query);
+  // Set shimmer thinking state
+  $('jai-shimmer-dot')?.classList.add('thinking');
+  // Search journal entries locally (on-device, privacy-first)
+  setTimeout(() => {
+    const lq = query.toLowerCase();
+    const keywords = lq.split(' ').filter(w => w.length > 3);
+    const scored = STATE.journalEntries.map(e => {
+      const text = ((e.title || '') + ' ' + (e.body || '').replace(/<[^>]*>/g,'') + ' ' + (e.tags||[]).join(' ')).toLowerCase();
+      let score = keywords.reduce((acc, kw) => acc + (text.includes(kw) ? 1 : 0), 0);
+      // Mood matching
+      if (lq.includes('burned out') || lq.includes('stress') || lq.includes('tired')) {
+        if (['😔','😫','🥱'].includes(e.mood)) score += 2;
+      }
+      if (lq.includes('happy') || lq.includes('great') || lq.includes('amazing')) {
+        if (['🤩','😊','😀'].includes(e.mood)) score += 2;
+      }
+      return { entry: e, score };
+    }).filter(x => x.score > 0).sort((a,b) => b.score - a.score);
+
+    $('jai-shimmer-dot')?.classList.remove('thinking');
+
+    if (scored.length === 0) {
+      addJAIMessage('ai', "I couldn't find matching entries in your journal for that query. Try writing more entries first, or use different keywords.");
+      return;
+    }
+
+    // Summarize based on query type
+    let response = '';
+    const top = scored[0].entry;
+    if (lq.includes('summarize') || lq.includes('all entries')) {
+      response = `I found ${scored.length} related entries. The most relevant: "${top.title || 'Untitled'}" from ${new Date(top.date||top.timestamp).toLocaleDateString()}. Common themes: ${scored.slice(0,3).map(s=>s.entry.title||'Untitled').join(', ')}.`;
+    } else if (lq.includes('last time') || lq.includes('when')) {
+      response = `The most recent matching entry is "${top.title || 'Untitled'}" from ${new Date(top.date||top.timestamp).toLocaleDateString()}. ${top.mood ? 'Mood: ' + top.mood : ''}.`;
+    } else {
+      response = `I found ${scored.length} related entries. The closest match: "${top.title || 'Untitled'}" from ${new Date(top.date||top.timestamp).toLocaleDateString()}.`;
+    }
+    addJAIMessage('ai', response, top);
+  }, 1200);
+}
+
+// --- ON THIS DAY ---
+function openOnThisDay() {
+  const overlay = $('on-this-day-overlay'); if (!overlay) return;
+  overlay.classList.remove('hidden');
+  const stack = $('otd-stack');
+  if (!stack) return;
+  stack.innerHTML = '';
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisDay = now.getDate();
+  const thisYear = now.getFullYear();
+  const throwbacks = STATE.journalEntries.filter(e => {
+    const d = new Date(e.date || e.timestamp);
+    return d.getMonth() === thisMonth && d.getDate() === thisDay && d.getFullYear() < thisYear;
+  }).sort((a,b) => new Date(b.date||b.timestamp) - new Date(a.date||a.timestamp));
+
+  if (throwbacks.length === 0) {
+    stack.innerHTML = '<p style="text-align:center;color:var(--txt3);padding:40px 20px;">No memories from this day in past years yet. Keep journaling!</p>';
+    return;
+  }
+  throwbacks.forEach((e, i) => {
+    const card = document.createElement('div');
+    card.className = 'otd-card';
+    card.style.animationDelay = `${i * 0.08}s`;
+    const d = new Date(e.date || e.timestamp);
+    const yearsAgo = thisYear - d.getFullYear();
+    const bodyText = (e.body || '').replace(/<[^>]*>/g,'').slice(0, 180);
+    card.innerHTML = `
+      <div class="otd-year-badge">${yearsAgo} year${yearsAgo !== 1 ? 's' : ''} ago — ${d.getFullYear()}</div>
+      <div class="otd-card-title">${e.title || 'Untitled Entry'}</div>
+      <div class="otd-card-body">${bodyText}${bodyText.length >= 180 ? '...' : ''}</div>
+      <div style="margin-top:12px;font-size:20px;">${e.mood || '📖'}</div>
+    `;
+    card.addEventListener('click', () => {
+      $('on-this-day-overlay')?.classList.add('hidden');
+      openJournalWrite(e.id);
+    });
+    stack.appendChild(card);
+  });
+}
+
+function checkOnThisDay() {
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisDay = now.getDate();
+  const thisYear = now.getFullYear();
+  const throwbacks = STATE.journalEntries.filter(e => {
+    const d = new Date(e.date || e.timestamp);
+    return d.getMonth() === thisMonth && d.getDate() === thisDay && d.getFullYear() < thisYear;
+  });
+  const banner = $('otd-banner');
+  if (banner && throwbacks.length > 0) {
+    banner.classList.remove('hidden');
+    const yearsBack = [...new Set(throwbacks.map(e => thisYear - new Date(e.date||e.timestamp).getFullYear()))];
+    $('otd-banner-text').textContent = `${throwbacks.length} memor${throwbacks.length > 1 ? 'ies' : 'y'} from ${yearsBack.join(', ')} year${yearsBack.length > 1 ? 's' : ''} ago`;
+  } else if (banner) {
+    banner.classList.add('hidden');
+  }
+}
+
+// --- MOOD HEATMAP ---
+function openMoodHeatmap() {
+  const overlay = $('mood-heatmap-overlay'); if (!overlay) return;
+  overlay.classList.remove('hidden');
+  renderMoodHeatmap();
+}
+
+function renderMoodHeatmap() {
+  const grid = $('mood-heatmap-grid'); if (!grid) return;
+  grid.innerHTML = '';
+  const now = new Date();
+  // Build last 84 days (12 weeks × 7 days)
+  for (let i = 83; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toLocaleDateString('sv').slice(0, 10);
+    const dayEntries = STATE.journalEntries.filter(e => {
+      const ed = new Date(e.date || e.timestamp);
+      return ed.toLocaleDateString('sv').slice(0, 10) === dateStr;
+    });
+    const cell = document.createElement('div');
+    cell.className = 'mh-cell';
+    if (dayEntries.length === 0) {
+      cell.classList.add('mh-cell-empty');
+    } else {
+      const mood = dayEntries[dayEntries.length-1].mood || '🙂';
+      const moodClass = { sad: 'mh-cell-sad', neutral: 'mh-cell-neutral', good: 'mh-cell-good', happy: 'mh-cell-happy', amazing: 'mh-cell-amazing' }[MOOD_MAP[mood] || 'good'];
+      cell.classList.add(moodClass || 'mh-cell-good');
+    }
+    cell.title = `${d.toLocaleDateString('en-US',{month:'short',day:'numeric'})} — ${dayEntries.length} entr${dayEntries.length !== 1 ? 'ies' : 'y'}`;
+    grid.appendChild(cell);
+  }
+
+  // Calculate and render mood breakdown percentages
+  const totals = { sad: 0, neutral: 0, good: 0, happy: 0, amazing: 0 };
+  let grandTotal = 0;
+  STATE.journalEntries.forEach(e => {
+    const moodLabel = MOOD_MAP[e.mood || '🙂'] || 'good';
+    if (totals[moodLabel] !== undefined) {
+      totals[moodLabel]++;
+      grandTotal++;
+    }
+  });
+
+  const listEl = $('mood-breakdown-list');
+  if (listEl) {
+    listEl.innerHTML = '';
+    const moodNames = { sad: '😔 Sad', neutral: '😐 Neutral', good: '🙂 Good', happy: '😊 Happy', amazing: '🤩 Amazing' };
+    const moodColors = { sad: '#5856D6', neutral: '#8E8E93', good: '#4CD964', happy: '#34C759', amazing: '#af52de' };
+    
+    Object.keys(totals).forEach(key => {
+      const count = totals[key];
+      const pct = grandTotal > 0 ? Math.round((count / grandTotal) * 100) : 0;
+      
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.alignItems = 'center';
+      row.style.justifyContent = 'space-between';
+      row.style.fontSize = '13px';
+      row.style.fontWeight = '500';
+      row.innerHTML = `
+        <span style="width:90px; text-align:left;">${moodNames[key]}</span>
+        <div style="flex:1; height:8px; background:rgba(255,255,255,0.06); border-radius:4px; margin:0 12px; overflow:hidden;">
+          <div style="width:${pct}%; height:100%; background:${moodColors[key]}; border-radius:4px; box-shadow:0 0 8px ${moodColors[key]}; transition:width 0.6s ease;"></div>
+        </div>
+        <span style="width:70px; text-align:right; color:var(--txt2);">${pct}% (${count})</span>
+      `;
+      listEl.appendChild(row);
+    });
+  }
+}
+
+// --- SMART TAGGING & @MENTIONS in Editor ---
+function initJournalEditorIntelligence() {
+  const body = $('jw-body');
+  const mentionDropdown = $('jw-mention-dropdown');
+  const tagDropdown = $('jw-tag-suggestions');
+  const slashMenu = $('jw-slash-menu');
+  const wikiDropdown = $('jw-wiki-dropdown');
+  const awarenessDrawer = $('jw-awareness-drawer');
+  const metaPillsContainer = $('jw-meta-pills-container');
+  
+  if (!body) return;
+
+  // Hidden by default, slides up from bottom ONLY when text inside jw-body is highlighted/selected
+  document.addEventListener('selectionchange', () => {
+    const selection = window.getSelection();
+    const toolbar = $('jw-format-toolbar');
+    if (!toolbar) return;
+    
+    if (selection && selection.toString().trim().length > 0) {
+      const anchor = selection.anchorNode;
+      if (anchor && body.contains(anchor)) {
+        toolbar.classList.remove('hidden');
+        void toolbar.offsetWidth;
+        toolbar.style.opacity = '1';
+        toolbar.style.pointerEvents = 'auto';
+        toolbar.style.transform = 'translateX(-50%) translateY(0) scale(1)';
+        return;
+      }
+    }
+    
+    toolbar.style.opacity = '0';
+    toolbar.style.pointerEvents = 'none';
+    toolbar.style.transform = 'translateX(-50%) translateY(15px) scale(0.95)';
+    setTimeout(() => {
+      if (window.getSelection().toString().trim().length === 0) {
+        toolbar.classList.add('hidden');
+      }
+    }, 250);
+  });
+  
+  const formatToggle = $('jw-tool-format-toggle');
+  if (formatToggle) {
+    formatToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      const toolbar = $('jw-format-toolbar');
+      if (!toolbar) return;
+      
+      const isVisible = toolbar.style.opacity === '1';
+      if (isVisible) {
+        toolbar.style.opacity = '0';
+        toolbar.style.pointerEvents = 'none';
+        toolbar.style.transform = 'translateX(-50%) translateY(15px) scale(0.95)';
+        setTimeout(() => {
+          toolbar.classList.add('hidden');
+        }, 250);
+      } else {
+        toolbar.classList.remove('hidden');
+        void toolbar.offsetWidth; // trigger reflow
+        toolbar.style.opacity = '1';
+        toolbar.style.pointerEvents = 'auto';
+        toolbar.style.transform = 'translateX(-50%) translateY(0) scale(1)';
+      }
+    });
+  }
+
+  // Render meta-pills container contents initially with user action prompts
+  let stepCount = parseInt(localStorage.getItem('nv-today-steps') || '0');
+  if (metaPillsContainer) {
+    metaPillsContainer.innerHTML = `
+      <span class="jw-meta-pill" draggable="true" data-type="location" style="cursor:pointer;">📍 Click to show Location</span>
+      <span class="jw-meta-pill" draggable="true" data-type="weather" style="cursor:pointer;">🌦 Click to show Weather</span>
+      <span class="jw-meta-pill" draggable="true" data-type="steps" style="cursor:pointer;">👣 Click to track Steps</span>
+      <span class="jw-meta-pill" draggable="true" data-type="music" style="cursor:pointer;">🎵 Click to scan Audio</span>
+    `;
+
+    // Step UI update helper
+    const updateStepsUI = () => {
+      const stepPill = metaPillsContainer.querySelector('[data-type="steps"]');
+      if (stepPill) stepPill.textContent = `👣 ${stepCount} steps`;
+      localStorage.setItem('nv-today-steps', stepCount);
+    };
+
+    // Helper to query Open-Meteo current forecast
+    const fetchWeather = async (lat, lon, cityName) => {
+      try {
+        const locPill = metaPillsContainer.querySelector('[data-type="location"]');
+        if (locPill) locPill.textContent = `📍 ${cityName}`;
+
+        const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=fahrenheit`);
+        const weatherData = await weatherRes.json();
+        const temp = Math.round(weatherData.current_weather?.temperature || 72);
+        const code = weatherData.current_weather?.weathercode || 0;
+        let cond = 'Sunny';
+        if (code >= 1 && code <= 3) cond = 'Partly Cloudy';
+        else if (code >= 45 && code <= 48) cond = 'Foggy';
+        else if (code >= 51 && code <= 67) cond = 'Rainy';
+        else if (code >= 71 && code <= 77) cond = 'Snowy';
+        else if (code >= 80 && code <= 82) cond = 'Showers';
+        else if (code >= 95 && code <= 99) cond = 'Stormy';
+
+        const wPill = metaPillsContainer.querySelector('[data-type="weather"]');
+        if (wPill) wPill.textContent = `🌦 ${temp}°F ${cond}`;
+      } catch (err) {
+        console.warn('Weather sensor query error', err);
+      }
+    };
+
+    // Location Pill handler: triggers Geolocation prompt
+    const triggerLocation = () => {
+      const locPill = metaPillsContainer.querySelector('[data-type="location"]');
+      if (locPill) locPill.textContent = `📍 Requesting GPS...`;
+
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+          const data = await res.json();
+          const city = data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || 'Local Area';
+          if (locPill) locPill.textContent = `📍 ${city}`;
+        } catch(err) {
+          if (locPill) locPill.textContent = `📍 Local Area`;
+        }
+      }, () => {
+        if (locPill) locPill.textContent = `📍 Access Denied`;
+      });
+    };
+
+    // Weather Pill handler: triggers Geolocation prompt and queries weather
+    const triggerWeather = () => {
+      const wPill = metaPillsContainer.querySelector('[data-type="weather"]');
+      if (wPill) wPill.textContent = `🌦 Requesting GPS...`;
+
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+          const data = await res.json();
+          const city = data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || 'Local Area';
+          fetchWeather(lat, lon, city);
+        } catch(err) {
+          fetchWeather(lat, lon, 'Local Area');
+        }
+      }, () => {
+        if (wPill) wPill.textContent = `🌦 Access Denied`;
+      });
+    };
+
+    // Steps Pill handler: triggers iOS motion permission or activates listener immediately
+    let motionActive = false;
+    const triggerSteps = async () => {
+      const stepPill = metaPillsContainer.querySelector('[data-type="steps"]');
+      if (motionActive) return;
+
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+          const state = await DeviceMotionEvent.requestPermission();
+          if (state === 'granted') {
+            activateMotionListener();
+          } else {
+            if (stepPill) stepPill.textContent = `👣 Access Denied`;
+          }
+        } catch(e) {
+          if (stepPill) stepPill.textContent = `👣 Access Denied`;
+        }
+      } else {
+        activateMotionListener();
+      }
+    };
+
+    const activateMotionListener = () => {
+      motionActive = true;
+      updateStepsUI();
+      window.addEventListener('devicemotion', (ev) => {
+        const acc = ev.accelerationIncludingGravity;
+        if (acc) {
+          const mag = Math.sqrt(acc.x*acc.x + acc.y*acc.y + acc.z*acc.z);
+          if (mag > 12.5) {
+            stepCount++;
+            updateStepsUI();
+          }
+        }
+      });
+    };
+
+    // Keystroke steps fallback (always active as backup)
+    let keystrokes = 0;
+    body.addEventListener('keydown', () => {
+      keystrokes++;
+      if (keystrokes % 20 === 0) {
+        stepCount++;
+        if (motionActive) updateStepsUI();
+      }
+    });
+
+    // Active music check handler (Media Session API + HTML5 Audio tag fallback)
+    const updateMusicPill = () => {
+      const musicPill = metaPillsContainer.querySelector('[data-type="music"]');
+      if (!musicPill) return;
+      if (navigator.mediaSession && navigator.mediaSession.metadata) {
+        musicPill.textContent = `🎵 ${navigator.mediaSession.metadata.title} - ${navigator.mediaSession.metadata.artist}`;
+      } else {
+        const audios = document.querySelectorAll('audio');
+        let playing = false;
+        for (let aud of audios) {
+          if (!aud.paused) {
+            musicPill.textContent = `🎵 Audio Recording Playback`;
+            playing = true;
+            break;
+          }
+        }
+        if (!playing) {
+          musicPill.textContent = `🎵 No Active Music`;
+        }
+      }
+    };
+
+    // Run music checks dynamically every 2.5 seconds
+    updateMusicPill();
+    setInterval(updateMusicPill, 2500);
+
+    // Wire clicks to activate permissions and query data
+    metaPillsContainer.querySelector('[data-type="location"]')?.addEventListener('click', triggerLocation);
+    metaPillsContainer.querySelector('[data-type="weather"]')?.addEventListener('click', triggerWeather);
+    metaPillsContainer.querySelector('[data-type="steps"]')?.addEventListener('click', triggerSteps);
+    metaPillsContainer.querySelector('[data-type="music"]')?.addEventListener('click', updateMusicPill);
+
+    // Setup drag event listeners
+    metaPillsContainer.querySelectorAll('.jw-meta-pill').forEach(pill => {
+      pill.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/html', pill.outerHTML);
+        e.dataTransfer.setData('text/plain', pill.textContent);
+      });
+    });
+  }
+
+  // --- Sticky notes / Scratchpad sidebar handlers ---
+  let quickNotes = JSON.parse(localStorage.getItem('nv-quick-notes') || '[]');
+  const renderQuickNotes = () => {
+    const listEl = $('jw-notes-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    
+    quickNotes.forEach(note => {
+      const card = document.createElement('div');
+      card.className = `sticky-note-card ${note.color}`;
+      card.dataset.id = note.id;
+      card.innerHTML = `
+        <textarea class="note-card-textarea" placeholder="Draft a quick thought...">${note.text}</textarea>
+        <div class="note-card-actions">
+          <div style="display:flex; gap:6px;">
+            <span class="color-dot orange" style="width:10px;height:10px;border-radius:50%;background:#e8652a;display:inline-block;cursor:pointer;"></span>
+            <span class="color-dot purple" style="width:10px;height:10px;border-radius:50%;background:#a855f7;display:inline-block;cursor:pointer;"></span>
+            <span class="color-dot green" style="width:10px;height:10px;border-radius:50%;background:#34c759;display:inline-block;cursor:pointer;"></span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="note-btn-action convert-btn">➕ Convert</button>
+            <button class="note-btn-action delete-btn" style="display:inline-flex; align-items:center; justify-content:center; padding:4px;" title="Delete Note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+          </div>
+        </div>
+      `;
+      
+      const tx = card.querySelector('.note-card-textarea');
+      tx.addEventListener('input', () => {
+        note.text = tx.value;
+        localStorage.setItem('nv-quick-notes', JSON.stringify(quickNotes));
+      });
+      
+      card.querySelectorAll('.color-dot').forEach(dot => {
+        dot.addEventListener('click', () => {
+          card.className = 'sticky-note-card';
+          if (dot.classList.contains('orange')) note.color = 'note-orange';
+          else if (dot.classList.contains('purple')) note.color = 'note-purple';
+          else note.color = 'note-green';
+          card.classList.add(note.color);
+          localStorage.setItem('nv-quick-notes', JSON.stringify(quickNotes));
+        });
+      });
+      
+      card.querySelector('.convert-btn').addEventListener('click', () => {
+        if (!note.text.trim()) {
+          showAlert('Convert Note', 'Cannot convert an empty note.');
+          return;
+        }
+        $('jw-title').value = 'Quick Scratchpad Note';
+        body.innerHTML = `<p>${note.text}</p>`;
+        body.focus();
+        $('jw-notes-panel')?.classList.add('hidden');
+        triggerNotification('Converted', 'Sticky note loaded into editor.');
+      });
+      
+      card.querySelector('.delete-btn').addEventListener('click', () => {
+        quickNotes = quickNotes.filter(n => n.id !== note.id);
+        localStorage.setItem('nv-quick-notes', JSON.stringify(quickNotes));
+        renderQuickNotes();
+      });
+      
+      listEl.appendChild(card);
+    });
+  };
+
+  $('jw-notes-add')?.addEventListener('click', () => {
+    quickNotes.push({ id: randomId(), text: '', color: 'note-orange', timestamp: Date.now() });
+    localStorage.setItem('nv-quick-notes', JSON.stringify(quickNotes));
+    renderQuickNotes();
+  });
+  
+  $('jw-notes-toggle')?.addEventListener('click', () => {
+    $('jw-notes-panel')?.classList.toggle('hidden');
+    renderQuickNotes();
+  });
+  
+  $('jw-notes-close')?.addEventListener('click', () => {
+    $('jw-notes-panel')?.classList.add('hidden');
+  });
+
+  // --- Highlights and Callout block toggles ---
+  $('jw-tool-highlight')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.execCommand('backColor', false, '#ffef7a');
+  });
+  $('jw-tool-callout')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const selected = sel.toString() || 'Callout insight...';
+      document.execCommand('insertHTML', false, `<div class="jw-callout" contenteditable="true">💡 ${selected}</div><p><br></p>`);
+    }
+  });
+
+  // --- HTML5 Drag & Drop inline snap placement ---
+  body.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+  body.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const htmlData = e.dataTransfer.getData('text/html');
+    const textData = e.dataTransfer.getData('text/plain');
+    
+    // Check if it is a meta pill or image file
+    if (htmlData && htmlData.includes('jw-meta-pill')) {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range) {
+        range.insertNode(document.createRange().createContextualFragment(htmlData + '&nbsp;'));
+        if (navigator.vibrate) navigator.vibrate(20); // haptic feedback snap
+      }
+    }
+  });
+
+  // --- Click handlers on collapsible heading chevrons ---
+  body.addEventListener('click', (e) => {
+    if (e.target.classList.contains('jw-collapse-chevron')) {
+      const chevron = e.target;
+      chevron.classList.toggle('collapsed');
+      const isCollapsed = chevron.classList.contains('collapsed');
+      
+      // Toggle display of siblings until next header
+      let next = chevron.closest('.jw-collapse-hdr')?.nextElementSibling;
+      while (next) {
+        if (next.classList.contains('jw-collapse-hdr') || next.tagName.match(/^H[1-3]$/)) {
+          break;
+        }
+        next.style.display = isCollapsed ? 'none' : '';
+        next = next.nextElementSibling;
+      }
+    }
+  });
+
+  // --- Event listener for keystrokes: Markdown, Slash Command, Wiki-links ---
+  let debouncedAwarenessTimeout = null;
+  body.addEventListener('keyup', (e) => {
+    const text = body.textContent || '';
+    const html = body.innerHTML;
+    const cursorPos = getCaretCharOffset(body);
+    const textBefore = text.slice(0, cursorPos);
+    
+    // 1. WYSIWYG Markdown Sync
+    if (e.key === ' ' || e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (sel && sel.anchorNode) {
+        let blockNode = sel.anchorNode;
+        while (blockNode && blockNode.parentNode !== body) {
+          blockNode = blockNode.parentNode;
+        }
+        if (blockNode) {
+          const txtVal = blockNode.textContent;
+          if (txtVal.startsWith('# ')) {
+            blockNode.innerHTML = `<span class="jw-collapse-chevron" contenteditable="false">▼</span>&nbsp;${txtVal.slice(2)}`;
+            blockNode.className = 'jw-collapse-hdr';
+            // Set tag type to H1 internally if we want, or keep it styled
+            document.execCommand('formatBlock', false, 'H1');
+          } else if (txtVal.startsWith('## ')) {
+            blockNode.innerHTML = `<span class="jw-collapse-chevron" contenteditable="false">▼</span>&nbsp;${txtVal.slice(3)}`;
+            blockNode.className = 'jw-collapse-hdr';
+            document.execCommand('formatBlock', false, 'H2');
+          } else if (txtVal.startsWith('### ')) {
+            blockNode.innerHTML = `<span class="jw-collapse-chevron" contenteditable="false">▼</span>&nbsp;${txtVal.slice(4)}`;
+            blockNode.className = 'jw-collapse-hdr';
+            document.execCommand('formatBlock', false, 'H3');
+          } else if (txtVal.startsWith('> ')) {
+            blockNode.innerHTML = `&nbsp;${txtVal.slice(2)}`;
+            document.execCommand('formatBlock', false, 'blockquote');
+          }
+        }
+      }
+    }
+
+    // 2. Slash command menu popup trigger
+    const slashMatch = textBefore.match(/\/(\w*)$/);
+    if (slashMatch && slashMenu) {
+      // Position menu near cursor
+      const rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
+      const parentRect = body.getBoundingClientRect();
+      slashMenu.style.left = `${rect.left - parentRect.left}px`;
+      slashMenu.style.top = `${rect.bottom - parentRect.top + body.scrollTop + 10}px`;
+      slashMenu.classList.remove('hidden');
+      
+      // Filter list based on type
+      const query = slashMatch[1].toLowerCase();
+      slashMenu.querySelectorAll('.jw-slash-item').forEach(item => {
+        const cmd = item.dataset.cmd;
+        item.style.display = cmd.includes(query) ? 'flex' : 'none';
+      });
+    } else {
+      slashMenu?.classList.add('hidden');
+    }
+
+    // 3. Wiki notes linking [[ query trigger
+    const wikiMatch = textBefore.match(/\[\[([^\]]*)$/);
+    if (wikiMatch && wikiDropdown) {
+      const query = wikiMatch[1].toLowerCase();
+      const matches = STATE.journalEntries.filter(entry => entry.title && entry.title.toLowerCase().includes(query)).slice(0, 5);
+      
+      const rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
+      const parentRect = body.getBoundingClientRect();
+      wikiDropdown.style.left = `${rect.left - parentRect.left}px`;
+      wikiDropdown.style.top = `${rect.bottom - parentRect.top + body.scrollTop + 10}px`;
+      
+      if (matches.length > 0) {
+        wikiDropdown.innerHTML = matches.map(entry =>
+          `<div class="jw-wiki-item" data-id="${entry.id}">
+            <span>🔗 [[${entry.title}]]</span>
+            <span style="font-size:11px;color:var(--txt3);">${new Date(entry.date||entry.timestamp).toLocaleDateString()}</span>
+          </div>`
+        ).join('');
+        wikiDropdown.classList.remove('hidden');
+        
+        wikiDropdown.querySelectorAll('.jw-wiki-item').forEach(item => {
+          item.addEventListener('mousedown', (ev) => {
+            ev.preventDefault();
+            const entry = STATE.journalEntries.find(x => x.id === item.dataset.id);
+            if (entry) {
+              const bodyVal = body.innerHTML;
+              // Replace [[ query with link
+              const replaced = bodyVal.replace(/\[\[([^\]]*)$/, `<a href="#" class="wiki-link" data-link-id="${entry.id}">[[${entry.title}]]</a>&nbsp;`);
+              body.innerHTML = replaced;
+            }
+            wikiDropdown.classList.add('hidden');
+          });
+        });
+      } else {
+        wikiDropdown.classList.add('hidden');
+      }
+    } else {
+      wikiDropdown?.classList.add('hidden');
+    }
+
+    // 4. Live Awareness prompts debounced check
+    clearTimeout(debouncedAwarenessTimeout);
+    debouncedAwarenessTimeout = setTimeout(() => {
+      const val = body.textContent.toLowerCase();
+      const triggers = ['stress', 'tired', 'burnout', 'exhausted', 'anxious', 'sad', 'angry', 'boundaries'];
+      const matched = triggers.find(t => val.includes(t));
+      if (matched && awarenessDrawer) {
+        const prompts = {
+          stress: "You wrote about stress. What is one small thing you can control right now to relieve it?",
+          tired: "Feeling tired? Is there a way you can clear 15 minutes of your schedule today to just rest?",
+          burnout: "Burnout is real. What boundary can you set with work or expectations today?",
+          exhausted: "When exhausted, even tiny steps matter. How can you treat yourself gently today?",
+          anxious: "Anxiety can feel heavy. Breathe deeply for 4 seconds and write down what you hear around you.",
+          sad: "It's okay to feel sad. Can you name one person or memory that brings a little comfort?",
+          boundaries: "Boundaries protect your peace. What is one thing you can say 'no' to today?"
+        };
+        const textPrompt = prompts[matched] || "Take a deep breath. Focus on your boundaries and peace.";
+        $('jw-awareness-content').innerHTML = `
+          <div>${textPrompt}</div>
+          <button class="editor-ai-insert-btn" id="jw-awareness-insert-btn">🌱 Insert reflection into note</button>
+        `;
+        awarenessDrawer.classList.remove('hidden');
+        $('jw-awareness-insert-btn')?.addEventListener('click', () => {
+          body.focus();
+          document.execCommand('insertText', false, `\n\n[Reflecting on ${matched}]: ${textPrompt}\n`);
+          awarenessDrawer.classList.add('hidden');
+        });
+      }
+    }, 1200);
+
+    // 5. Typewriter Mode line-centering logic
+    if (body.classList.contains('typewriter-mode')) {
+      const sel = window.getSelection();
+      if (sel && sel.anchorNode) {
+        let activeEl = sel.anchorNode;
+        while (activeEl && activeEl.parentNode !== body) {
+          activeEl = activeEl.parentNode;
+        }
+        if (activeEl && activeEl.nodeType === 1) {
+          body.querySelectorAll('.active-block').forEach(b => b.classList.remove('active-block'));
+          activeEl.classList.add('active-block');
+          
+          // Scroll container to center active item vertically
+          const containerHeight = body.clientHeight;
+          const elTop = activeEl.offsetTop;
+          const elHeight = activeEl.clientHeight;
+          body.scrollTop = elTop - (containerHeight / 2) + (elHeight / 2);
+        }
+      }
+    }
+  });
+
+  // --- Slash Command click handler ---
+  slashMenu?.querySelectorAll('.jw-slash-item')?.forEach(item => {
+    item.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      const cmd = item.dataset.cmd;
+      body.focus();
+      
+      // Erase the slash
+      const range = window.getSelection().getRangeAt(0);
+      range.setStart(range.startContainer, Math.max(0, range.startOffset - 1));
+      range.deleteContents();
+      
+      if (cmd === 'h1') {
+        document.execCommand('formatBlock', false, 'H1');
+        const sel = window.getSelection();
+        if (sel.anchorNode && sel.anchorNode.parentNode) {
+          const parent = sel.anchorNode.parentNode;
+          if (parent.tagName === 'H1' && !parent.querySelector('.jw-collapse-chevron')) {
+            parent.innerHTML = `<span class="jw-collapse-chevron" contenteditable="false">▼</span>&nbsp;` + parent.innerHTML;
+            parent.className = 'jw-collapse-hdr';
+          }
+        }
+      } else if (cmd === 'h2') {
+        document.execCommand('formatBlock', false, 'H2');
+      } else if (cmd === 'todo') {
+        document.execCommand('insertHTML', false, '<div><input type="checkbox" style="margin-right:8px;" /> &nbsp;</div>');
+      } else if (cmd === 'bullet') {
+        document.execCommand('insertUnorderedList', false, null);
+      } else if (cmd === 'table') {
+        document.execCommand('insertHTML', false, `
+          <table class="editor-table">
+            <tr><th>Header 1</th><th>Header 2</th></tr>
+            <tr><td contenteditable="true">Cell</td><td contenteditable="true">Cell</td></tr>
+            <tr><td contenteditable="true">Cell</td><td contenteditable="true">Cell</td></tr>
+          </table><p><br></p>
+        `);
+      } else if (cmd === 'pill') {
+        body.innerHTML += ` <span class="jw-meta-pill" contenteditable="false">📍 Location Tag</span>&nbsp;`;
+      }
+      slashMenu.classList.add('hidden');
+    });
+  });
+
+  // --- Close button on Awareness Prompts Drawer ---
+  $('jw-awareness-close')?.addEventListener('click', () => {
+    awarenessDrawer?.classList.add('hidden');
+  });
+
+  // Smart tagSuggestions/mentions click bindings from previous code
+  const dropZone = $('jw-drop-zone');
+  if (dropZone) {
+    body.addEventListener('dragenter', () => dropZone.classList.remove('hidden'));
+    body.addEventListener('dragleave', (e) => { if (!body.contains(e.relatedTarget)) dropZone.classList.add('hidden'); });
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      dropZone.classList.add('hidden');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      for (const file of files) {
+        const id = randomId();
+        await saveFile(id, file);
+        const att = { id: randomId(), type: 'image', fileId: id };
+        STATE.journalEditAttachments.push(att);
+        
+        // Snap layout alignment with haptic tick
+        const img = document.createElement('div');
+        img.className = 'attachment-snap';
+        $('jw-attachments-grid')?.appendChild(img);
+        if (navigator.vibrate) navigator.vibrate(30);
+      }
+      renderJournalAttachments();
+    });
+  }
+}
+
+function getCaretCharOffset(el) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return 0;
+  const range = sel.getRangeAt(0).cloneRange();
+  range.selectNodeContents(el);
+  range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+  return range.toString().length;
+}
+
+// --- EXPORT ---
+function openExport() {
+  $('export-backdrop')?.classList.remove('hidden');
+  $('journal-export-panel')?.classList.remove('hidden');
+}
+function closeExport() {
+  $('export-backdrop')?.classList.add('hidden');
+  $('journal-export-panel')?.classList.add('hidden');
+}
+function exportAsJSON() {
+  const blob = new Blob([JSON.stringify(STATE.journalEntries, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = `nyvron-journal-${today()}.json`; a.click();
+  URL.revokeObjectURL(url);
+  closeExport();
+}
+function exportAsMarkdown() {
+  const md = STATE.journalEntries.map(e => {
+    const body = (e.body || '').replace(/<[^>]*>/g, '');
+    return `# ${e.title || 'Untitled'}\n*${new Date(e.date||e.timestamp).toLocaleDateString()}* ${e.mood||''}\n\n${body}\n\n---`;
+  }).join('\n\n');
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = `nyvron-journal-${today()}.md`; a.click();
+  URL.revokeObjectURL(url);
+  closeExport();
+}
+
+// --- initSmartCapture ---
+function initSmartCapture() {
+  const smartContainer = $('journal-smart-capture');
+  if (smartContainer) {
+    const h = new Date().getHours();
+    let suggestionText = "Any thoughts on today?";
+    if (h < 10) suggestionText = "Morning brain dump?";
+    else if (h > 20) suggestionText = "Late night thoughts?";
+    
+    smartContainer.innerHTML = `
+      <div class="smart-suggestion-card" id="smart-suggestion-btn">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="font-size:24px;">✨</div>
+          <div>
+            <h3 style="font-size:16px; font-weight:600; margin-bottom:4px;">${suggestionText}</h3>
+            <p style="font-size:13px; color:var(--txt2);">Tap to write a frictionless entry</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    $('smart-suggestion-btn')?.addEventListener('click', (e) => {
+      const card = e.currentTarget;
+      const rect = card.getBoundingClientRect();
+      const bloom = document.createElement('div');
+      bloom.className = 'anim-bloom-reveal';
+      bloom.style.left = rect.left + 'px';
+      bloom.style.top = rect.top + 'px';
+      bloom.style.width = rect.width + 'px';
+      bloom.style.height = rect.height + 'px';
+      bloom.style.background = 'var(--surface)';
+      document.body.appendChild(bloom);
+      setTimeout(() => {
+        openJournalWrite();
+        bloom.remove();
+      }, 450);
+    });
+  }
+
+  // Micro Journal Zero-Typing logic
+  document.querySelectorAll('.micro-bubble').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const tag = e.currentTarget.dataset.tag;
+      const emoji = e.currentTarget.textContent;
+      
+      // Play Haptic Bubble animation
+      e.currentTarget.classList.remove('anim-haptic-pop');
+      void e.currentTarget.offsetWidth; // trigger reflow
+      e.currentTarget.classList.add('anim-haptic-pop');
+      if (navigator.vibrate) navigator.vibrate(40);
+      
+      // Create a zero-typing entry instantly
+      STATE.journalEntries.push({
+        id: randomId(),
+        title: "",
+        body: `<p>${emoji} ${tag}</p>`,
+        mood: emoji,
+        attachments: [],
+        timestamp: Date.now()
+      });
+      save();
+      renderJournal();
+    });
+  });
+}
+
+// ==========================================
 // INITIALIZATION & EVENT LISTENERS
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
+  initSmartCapture();
   BLOOM = $('nyvron-bloom-svg');
   // Theme selector
   const themeSel = $('settings-theme');
-  const savedTheme = localStorage.getItem('nv-theme') || 'light';
-  document.documentElement.dataset.theme = savedTheme;
+  const savedTheme = localStorage.getItem('nv-theme') || 'auto';
   if(themeSel) themeSel.value = savedTheme;
+  if (savedTheme === 'auto') {
+    applyAutoTheme();
+  } else {
+    applyManualTheme(savedTheme);
+  }
   themeSel?.addEventListener('change', () => {
-    document.documentElement.dataset.theme = themeSel.value;
-    localStorage.setItem('nv-theme', themeSel.value);
+    const val = themeSel.value;
+    localStorage.setItem('nv-theme', val);
+    if (val === 'auto') {
+      applyAutoTheme();
+    } else {
+      applyManualTheme(val);
+    }
   });
 
   // Motivation/North Star refresh click binding with spin loading animation
@@ -2776,37 +4456,68 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Journal Editor text formatting buttons
-  const formatTextarea = (fmt) => {
-    const txt = $('jw-body'); if(!txt) return;
-    const start = txt.selectionStart;
-    const end = txt.selectionEnd;
-    const val = txt.value;
-    const sel = val.substring(start, end);
-    
-    let replacement = '';
-    if (fmt === 'bold') {
-      replacement = `**${sel || 'bold text'}**`;
-    } else if (fmt === 'italic') {
-      replacement = `*${sel || 'italic text'}*`;
-    } else if (fmt === 'list') {
-      replacement = `\n- ${sel || 'item'}`;
-    } else if (fmt === 'todo') {
-      replacement = `\n- [ ] ${sel || 'task'}`;
-    }
-    
-    txt.value = val.substring(0, start) + replacement + val.substring(end);
-    txt.focus();
-    txt.setSelectionRange(start + 2, start + 2 + (sel || '').length);
-  };
-
   document.querySelectorAll('.jw-tool-btn[data-fmt]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      formatTextarea(btn.dataset.fmt);
+    btn.addEventListener('click', (e) => {
+      e.preventDefault(); // prevent loss of focus
+      const fmt = btn.dataset.fmt;
+      const editor = $('jw-body');
+      if (editor) editor.focus();
+      
+      if (fmt === 'list') {
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed) {
+          const range = selection.getRangeAt(0);
+          const container = document.createElement('div');
+          container.appendChild(range.cloneContents());
+          
+          const htmlContent = container.innerHTML;
+          const lines = htmlContent
+            .split(/<br\/?>|<\/?div>|<\/?p>|<li>/i)
+            .map(line => line.replace(/<\/?[^>]+(>|$)/g, "").trim())
+            .filter(line => line.length > 0);
+            
+          if (lines.length > 0) {
+            const listHTML = '<ul>' + lines.map(line => `<li>${line}</li>`).join('') + '</ul>';
+            document.execCommand('insertHTML', false, listHTML);
+          } else {
+            document.execCommand('insertUnorderedList', false, null);
+          }
+        } else {
+          document.execCommand('insertUnorderedList', false, null);
+        }
+      } else if (fmt.startsWith('h')) {
+        document.execCommand('formatBlock', false, `<${fmt}>`);
+      } else {
+        document.execCommand(fmt, false, null);
+      }
     });
   });
 
-  $('jw-tool-todo')?.addEventListener('click', () => {
-    formatTextarea('todo');
+  // Toggle highlight color picker display
+  $('jw-tool-highlight')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const picker = $('jw-highlight-colors');
+    if (picker) picker.classList.toggle('hidden');
+  });
+
+  // Wire highlight color dots selection
+  document.querySelectorAll('.hl-color-dot').forEach(dot => {
+    dot.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // keep text selection
+      const color = dot.dataset.color;
+      const editor = $('jw-body');
+      if (editor) editor.focus();
+      document.execCommand('backColor', false, color);
+      $('jw-highlight-colors')?.classList.add('hidden');
+    });
+  });
+
+  $('jw-tool-todo')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const txt = $('jw-body');
+    if (!txt) return;
+    txt.focus();
+    document.execCommand('insertHTML', false, '<div><input type="checkbox" style="margin-right:8px;" /> &nbsp;</div>');
   });
 
   // Main AI Tab Submit Buttons wiring
@@ -2952,6 +4663,681 @@ document.addEventListener('DOMContentLoaded', () => {
   $('jw-save')?.addEventListener('click', saveJournalEntry);
 
   // Delete journal entry button in jw modal
+  // Toggle format toolbar
+
+  // ==========================================
+  // PHASE 2: NEW FEATURE BUTTON WIRING
+  // ==========================================
+  $('jfb-burn')?.addEventListener('click', openBurnOverlay);
+  $('jfb-commute')?.addEventListener('click', openCommuteTherapy);
+  $('jfb-constellation')?.addEventListener('click', openConstellation);
+  $('jfb-ai')?.addEventListener('click', openJournalAI);
+  $('jfb-otd')?.addEventListener('click', openOnThisDay);
+  $('jfb-export')?.addEventListener('click', openExport);
+  $('jfb-heatmap')?.addEventListener('click', openMoodHeatmap);
+  $('otd-banner-btn')?.addEventListener('click', openOnThisDay);
+  $('burn-close-btn')?.addEventListener('click', closeBurnOverlay);
+  $('burn-save-btn')?.addEventListener('click', saveBurnEntry);
+  $('burn-now-btn')?.addEventListener('click', burnNow);
+  $('commute-close-btn')?.addEventListener('click', closeCommuteTherapy);
+  $('commute-record-btn')?.addEventListener('click', () => {
+    if (commuteRecording) stopCommuteRecording(); else startCommuteRecording();
+  });
+  $('commute-save-btn')?.addEventListener('click', saveCommuteEntry);
+  $('constellation-close')?.addEventListener('click', () => {
+    $('constellation-overlay')?.classList.add('hidden');
+  });
+  $('jai-close')?.addEventListener('click', () => {
+    $('journal-ai-overlay')?.classList.add('hidden');
+  });
+  $('jai-send')?.addEventListener('click', () => {
+    const inp = $('jai-input');
+    if (inp?.value.trim()) { sendJournalAIQuery(inp.value.trim()); inp.value = ''; }
+  });
+  $('jai-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const inp = $('jai-input');
+      if (inp?.value.trim()) { sendJournalAIQuery(inp.value.trim()); inp.value = ''; }
+    }
+  });
+  $('otd-close')?.addEventListener('click', () => $('on-this-day-overlay')?.classList.add('hidden'));
+  $('mh-close')?.addEventListener('click', () => $('mood-heatmap-overlay')?.classList.add('hidden'));
+  $('export-close')?.addEventListener('click', closeExport);
+  $('export-backdrop')?.addEventListener('click', closeExport);
+  $('export-json-btn')?.addEventListener('click', exportAsJSON);
+  $('export-markdown-btn')?.addEventListener('click', exportAsMarkdown);
+  
+  // --- PDF Export click wiring ---
+  $('export-pdf-btn')?.addEventListener('click', () => {
+    exportAsPDF();
+    closeExport();
+  });
+
+  function exportAsPDF() {
+    const printWindow = window.open('', '_blank');
+    const entriesHtml = STATE.journalEntries.map(e => `
+      <div style="page-break-after:always; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; padding:40px; color:#2c3e50;">
+        <div style="font-size:14px;color:#7f8c8d;margin-bottom:10px;">${new Date(e.date||e.timestamp).toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
+        <h1 style="font-size:28px;color:#2c3e50;margin-top:0;margin-bottom:20px;">${e.title || 'Untitled Entry'}</h1>
+        <div style="font-size:16px;line-height:1.6;color:#34495e;">${e.body || ''}</div>
+      </div>
+    `).join('');
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>NYVRON Journal Export</title>
+        </head>
+        <body onload="window.print();window.close();">
+          ${entriesHtml || '<h3>No journal entries found.</h3>'}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
+
+  // --- ZK Passcode & Decoy logic ---
+  let inputPasscode = '';
+  const dialBtns = document.querySelectorAll('.dial-btn[data-val]');
+  const dots = document.querySelectorAll('#passcode-dots .dot');
+  
+  dialBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (inputPasscode.length < 4) {
+        inputPasscode += btn.dataset.val;
+        updatePasscodeDots();
+        
+        if (inputPasscode.length === 4) {
+          setTimeout(verifyPasscode, 300);
+        }
+      }
+    });
+  });
+  
+  $('lock-clear-btn')?.addEventListener('click', () => {
+    if (inputPasscode.length > 0) {
+      inputPasscode = inputPasscode.slice(0, -1);
+      updatePasscodeDots();
+    }
+  });
+
+  function updatePasscodeDots() {
+    dots.forEach((dot, idx) => {
+      dot.classList.toggle('filled', idx < inputPasscode.length);
+    });
+  }
+
+  // Sync passcode and Face Lock checkbox states on load
+  const pToggle = $('settings-passcode-toggle');
+  const fToggle = $('settings-facelock-toggle');
+  const fingerToggle = $('settings-fingerprint-toggle');
+  
+  if (pToggle) pToggle.checked = STATE.passcodeEnabled;
+  if (fToggle) fToggle.checked = STATE.facelockEnabled;
+  if (fingerToggle) fingerToggle.checked = STATE.fingerprintlockEnabled;
+
+  // General Privacy Settings wiring
+  const remChatsToggle = $('settings-remember-chats');
+  const storeHistToggle = $('settings-store-history');
+  const notifToggle = $('settings-notifications');
+
+  if (remChatsToggle) remChatsToggle.checked = localStorage.getItem('nv-remember-chats') !== 'false';
+  if (storeHistToggle) storeHistToggle.checked = localStorage.getItem('nv-store-history') !== 'false';
+  if (notifToggle) notifToggle.checked = localStorage.getItem('nv-notifications') !== 'false';
+
+  remChatsToggle?.addEventListener('change', () => {
+    localStorage.setItem('nv-remember-chats', remChatsToggle.checked);
+    triggerNotification('Settings Saved', `Remember Chats preference is now ${remChatsToggle.checked ? 'Enabled' : 'Disabled'}`);
+  });
+  storeHistToggle?.addEventListener('change', () => {
+    localStorage.setItem('nv-store-history', storeHistToggle.checked);
+    triggerNotification('Settings Saved', `Store History preference is now ${storeHistToggle.checked ? 'Enabled' : 'Disabled'}`);
+  });
+  notifToggle?.addEventListener('change', () => {
+    localStorage.setItem('nv-notifications', notifToggle.checked);
+    triggerNotification('Settings Saved', `Notifications preference is now ${notifToggle.checked ? 'Enabled' : 'Disabled'}`);
+  });
+
+  pToggle?.addEventListener('change', () => {
+    STATE.passcodeEnabled = pToggle.checked;
+    localStorage.setItem('nv-passcode-enabled', STATE.passcodeEnabled);
+    triggerNotification('Settings Saved', `Passcode Protection is now ${STATE.passcodeEnabled ? 'Enabled' : 'Disabled'}`);
+  });
+  
+  fToggle?.addEventListener('change', () => {
+    STATE.facelockEnabled = fToggle.checked;
+    localStorage.setItem('nv-facelock-enabled', STATE.facelockEnabled);
+    if (STATE.facelockEnabled && fingerToggle) {
+      fingerToggle.checked = false;
+      STATE.fingerprintlockEnabled = false;
+      localStorage.setItem('nv-fingerprintlock-enabled', false);
+    }
+    triggerNotification('Settings Saved', `Face Lock is now ${STATE.facelockEnabled ? 'Enabled' : 'Disabled'}`);
+  });
+
+  fingerToggle?.addEventListener('change', () => {
+    STATE.fingerprintlockEnabled = fingerToggle.checked;
+    localStorage.setItem('nv-fingerprintlock-enabled', STATE.fingerprintlockEnabled);
+    if (STATE.fingerprintlockEnabled && fToggle) {
+      fToggle.checked = false;
+      STATE.facelockEnabled = false;
+      localStorage.setItem('nv-facelock-enabled', false);
+    }
+    triggerNotification('Settings Saved', `Fingerprint Lock is now ${STATE.fingerprintlockEnabled ? 'Enabled' : 'Disabled'}`);
+  });
+
+  // Cancel biometrics scanner overlay
+  $('bio-cancel-btn')?.addEventListener('click', () => {
+    $('biometric-scan-overlay')?.classList.add('hidden');
+    STATE.lockTargetTab = null;
+    STATE.lockTargetEditId = null;
+  });
+
+  // Simulated Biometric Scanner execution routing
+  triggerBiometricOrPasscodeLock = function() {
+    const overlay = $('biometric-scan-overlay');
+    const fSvg = $('fingerprint-scan-svg');
+    const fSquare = $('faceid-scan-square');
+    
+    if (STATE.facelockEnabled && overlay) {
+      overlay.classList.remove('hidden');
+      fSquare.classList.remove('hidden');
+      fSvg.classList.add('hidden');
+      $('bio-scan-title').textContent = 'FaceID Identity Verification';
+      $('bio-scan-status').textContent = 'Scanning face...';
+      
+      setTimeout(() => {
+        if (!overlay.classList.contains('hidden')) {
+          unlockVault(STATE.passcode, false);
+          overlay.classList.add('hidden');
+          triggerNotification('Unlocked', 'Identity verified via FaceID');
+        }
+      }, 1500);
+    } else if (STATE.fingerprintlockEnabled && overlay) {
+      overlay.classList.remove('hidden');
+      fSvg.classList.remove('hidden');
+      fSquare.classList.add('hidden');
+      $('bio-scan-title').textContent = 'TouchID Verification';
+      $('bio-scan-status').textContent = 'Hold finger on scanner to verify';
+      
+      let holdTimeout = null;
+      const frame = $('bio-scanner-frame');
+      
+      const startHold = (e) => {
+        e.preventDefault();
+        fSvg.classList.add('scanning');
+        $('bio-scan-status').textContent = 'Verifying fingerprint...';
+        if (navigator.vibrate) navigator.vibrate(35);
+        
+        holdTimeout = setTimeout(() => {
+          if (!overlay.classList.contains('hidden')) {
+            unlockVault(STATE.passcode, false);
+            overlay.classList.add('hidden');
+            triggerNotification('Unlocked', 'Identity verified via TouchID');
+          }
+        }, 1200);
+      };
+      
+      const endHold = () => {
+        fSvg.classList.remove('scanning');
+        $('bio-scan-status').textContent = 'Hold finger on scanner to verify';
+        clearTimeout(holdTimeout);
+      };
+      
+      frame.onmousedown = startHold;
+      frame.onmouseup = endHold;
+      frame.onmouseleave = endHold;
+      frame.ontouchstart = startHold;
+      frame.ontouchend = endHold;
+    } else {
+      $('vault-lock-screen')?.classList.remove('hidden');
+    }
+  }
+
+  // Change Passcode handler
+  $('settings-change-passcode')?.addEventListener('click', () => {
+    openModal('Change Passcode', `
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;opacity:0.7;display:block;margin-bottom:4px;">CURRENT 4-DIGIT PASSCODE</label>
+        <input id="old-passcode-inp" type="password" maxlength="4" class="modal-input" placeholder="••••" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff; text-align:center; letter-spacing:8px;" />
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;opacity:0.7;display:block;margin-bottom:4px;">NEW 4-DIGIT PASSCODE</label>
+        <input id="new-passcode-inp" type="password" maxlength="4" class="modal-input" placeholder="••••" style="width:100%; padding:10px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:#fff; text-align:center; letter-spacing:8px;" />
+      </div>
+      <button id="save-passcode-btn" class="btn-primary" style="width:100%; padding:10px; border-radius:8px; background:var(--cascara); color:#000; font-weight:bold; border:none; cursor:pointer;">Update Passcode</button>
+    `);
+    
+    setTimeout(() => {
+      $('old-passcode-inp')?.focus();
+      $('save-passcode-btn')?.addEventListener('click', () => {
+        const oldVal = $('old-passcode-inp').value;
+        const newVal = $('new-passcode-inp').value;
+        if (oldVal !== STATE.passcode) {
+          showAlert('Error', 'Current passcode is incorrect.');
+          return;
+        }
+        if (!newVal || newVal.length !== 4 || isNaN(newVal)) {
+          showAlert('Error', 'New passcode must be a 4-digit number.');
+          return;
+        }
+        STATE.passcode = newVal;
+        localStorage.setItem('nv-passcode', newVal);
+        closeModal();
+        triggerNotification('Success', 'Passcode updated successfully!');
+      });
+    }, 50);
+  });
+
+  function verifyPasscode() {
+    if (inputPasscode === STATE.passcode) {
+      unlockVault(STATE.passcode, false);
+    } else if (inputPasscode === '9999') {
+      unlockVault('9999', true);
+    } else {
+      const dotsContainer = $('passcode-dots');
+      dotsContainer?.classList.add('error');
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      setTimeout(() => {
+        dotsContainer?.classList.remove('error');
+        inputPasscode = '';
+        updatePasscodeDots();
+      }, 500);
+    }
+  }
+
+  function unlockVault(passcode, isDecoy) {
+    const shutter = $('vault-shutter');
+    if (shutter) {
+      shutter.classList.remove('hidden');
+      shutter.classList.add('shutter-closed');
+    }
+    
+    if (navigator.vibrate) navigator.vibrate(80);
+    
+    setTimeout(() => {
+      if (isDecoy) {
+        STATE.journalEntries = [...DECOY_ENTRIES];
+        STATE.priorities = [
+          { id: 'dp1', text: 'Clean up desk workspace', done: false },
+          { id: 'dp2', text: 'Plan weekend grocery run', done: true }
+        ];
+        STATE.reminders = [
+          { id: 'dr1', text: 'Drink water (8 glasses)', done: false },
+          { id: 'dr2', text: 'Stretch legs every 2 hours', done: false }
+        ];
+        STATE.activeTab = 'tab-home';
+      } else {
+        const encJournal = localStorage.getItem('nv-journal-enc');
+        if (encJournal) {
+          try {
+            const raw = decryptData(encJournal, passcode);
+            STATE.journalEntries = JSON.parse(raw || '[]');
+          } catch(e) {
+            STATE.journalEntries = [];
+          }
+        } else {
+          const legacy = localStorage.getItem('nv-journal') || '[]';
+          STATE.journalEntries = JSON.parse(legacy);
+          localStorage.setItem('nv-journal-enc', encryptData(legacy, passcode));
+        }
+      }
+      
+      STATE.vaultLocked = false;
+      renderJournal();
+      renderPriorities();
+      renderSchedule();
+      renderReminders();
+      
+      $('vault-lock-screen')?.classList.add('hidden');
+      
+      if (shutter) {
+        shutter.classList.remove('shutter-closed');
+        setTimeout(() => shutter.classList.add('hidden'), 500);
+      }
+
+      // Execute lock target action if defined
+      if (STATE.lockTargetTab) {
+        switchTab(STATE.lockTargetTab);
+        STATE.lockTargetTab = null;
+      } else if (STATE.lockTargetEditId) {
+        openJournalWrite(STATE.lockTargetEditId === 'new' ? null : STATE.lockTargetEditId);
+        STATE.lockTargetEditId = null;
+      }
+      
+      inputPasscode = '';
+      updatePasscodeDots();
+    }, 600);
+  }
+
+  function lockVault() {
+    const shutter = $('vault-shutter');
+    if (shutter) {
+      shutter.classList.remove('hidden');
+      shutter.classList.add('shutter-closed');
+    }
+    
+    if (navigator.vibrate) navigator.vibrate(100);
+    
+    setTimeout(() => {
+      STATE.journalEntries = [];
+      STATE.priorities = [];
+      STATE.reminders = [];
+      STATE.vaultLocked = true;
+      renderJournal();
+      renderPriorities();
+      renderSchedule();
+      renderReminders();
+      
+      // If currently on Journal tab, push to Home tab to hide empty list
+      if (STATE.activeTab === 'tab-journal') {
+        switchTab('tab-home');
+      }
+      
+      $('vault-lock-screen')?.classList.remove('hidden');
+      inputPasscode = '';
+      updatePasscodeDots();
+      
+      if (shutter) {
+        shutter.classList.remove('shutter-closed');
+        setTimeout(() => shutter.classList.add('hidden'), 500);
+      }
+    }, 600);
+  }
+
+  // --- Lock App Now listener ---
+  $('settings-lock-now')?.addEventListener('click', () => {
+    lockVault();
+  });
+
+  // --- Scrub Metadata toolbar click listener ---
+  $('jw-tool-scrub')?.addEventListener('click', () => {
+    if (STATE.journalEditAttachments.length > 0) {
+      STATE.journalEditAttachments = STATE.journalEditAttachments.map(att => {
+        if (att.type === 'location') return null;
+        if (att.type === 'image') {
+          delete att.lat;
+          delete att.lng;
+        }
+        return att;
+      }).filter(Boolean);
+      renderJournalAttachments();
+      triggerNotification('Scrubbed', 'EXIF metadata and Location tags removed.');
+    } else {
+      showAlert('Scrub Metadata', 'No attachments found to scrub.');
+    }
+  });
+
+  initJournalEditorIntelligence();
+  checkOnThisDay();
+  checkEphemeralExpiry();
+
+
+
+  // Typewriter Mode Line-Centering and Opacity fading
+  $('jw-tool-typewriter')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const btn = $('jw-tool-typewriter');
+    const body = $('jw-body');
+    if (body) {
+      body.classList.toggle('typewriter-mode');
+      btn.classList.toggle('active');
+      if (!body.classList.contains('typewriter-mode')) {
+        body.querySelectorAll('.active-block').forEach(b => b.classList.remove('active-block'));
+      }
+    }
+  });
+
+
+
+  // Shoulder-Surfing Privacy Mask hold interaction
+  const triggerMaskRelease = (e) => {
+    e.preventDefault();
+    if ($('jw-tool-mask')?.classList.contains('active-mask-toggled')) {
+      $('jw-body')?.classList.add('privacy-masked');
+      $('jw-tool-mask')?.classList.add('active');
+    }
+  };
+  const triggerMaskPress = (e) => {
+    e.preventDefault();
+    if ($('jw-tool-mask')?.classList.contains('active-mask-toggled')) {
+      $('jw-body')?.classList.remove('privacy-masked');
+      $('jw-tool-mask')?.classList.remove('active');
+    }
+  };
+  $('jw-tool-mask')?.addEventListener('mousedown', triggerMaskPress);
+  $('jw-tool-mask')?.addEventListener('mouseup', triggerMaskRelease);
+  $('jw-tool-mask')?.addEventListener('touchstart', triggerMaskPress);
+  $('jw-tool-mask')?.addEventListener('touchend', triggerMaskRelease);
+
+  $('jw-tool-mask')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const btn = $('jw-tool-mask');
+    btn.classList.toggle('active-mask-toggled');
+    const isActive = btn.classList.contains('active-mask-toggled');
+    if (isActive) {
+      $('jw-body')?.classList.add('privacy-masked');
+      $('jw-header-blur-status')?.classList.remove('hidden');
+    } else {
+      $('jw-body')?.classList.remove('privacy-masked');
+      $('jw-header-blur-status')?.classList.add('hidden');
+    }
+  });
+
+  // Wire header status pill click resets
+  $('jw-header-blur-status')?.addEventListener('click', () => {
+    $('jw-tool-mask')?.click();
+  });
+  $('jw-header-burn-status')?.addEventListener('click', () => {
+    $('jw-tool-burn-toggle')?.click();
+  });
+
+  // Photos
+  $('jw-tool-photo')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    $('jw-photo-input')?.click();
+  });
+  $('jw-photo-input')?.addEventListener('change', async (e) => {
+    for (const file of e.target.files) {
+      const id = randomId();
+      await saveFile(id, file);
+      STATE.journalEditAttachments.push({ id: randomId(), type: 'image', fileId: id });
+    }
+    renderJournalAttachments();
+    e.target.value = ''; // reset
+  });
+
+  // Location
+  $('jw-tool-location')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const btn = $('jw-tool-location');
+    btn.style.opacity = '0.5';
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+        const data = await res.json();
+        const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || 'Current Location';
+        STATE.journalEditAttachments.push({ id: randomId(), type: 'location', name: city, lat: pos.coords.latitude, lng: pos.coords.longitude });
+        renderJournalAttachments();
+      } catch(err) {
+        showAlert('Location Error', 'Could not get location name.');
+      }
+      btn.style.opacity = '1';
+    }, () => {
+      btn.style.opacity = '1';
+      showAlert('Location Error', 'Permission denied or unavailable.');
+    });
+  });
+
+  // Audio Recording + Real-time Speech-to-Text Auto-Transcription
+  let mediaRecorder;
+  let audioChunks = [];
+  let speechRecInstance = null;
+
+  $('jw-tool-audio')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const btn = $('jw-tool-audio');
+    
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      speechRecInstance?.stop();
+      btn.style.color = '';
+      btn.classList.remove('active');
+      return;
+    }
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+      mediaRecorder.ondataavailable = ev => audioChunks.push(ev.data);
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+        const id = randomId();
+        await saveFile(id, blob);
+        STATE.journalEditAttachments.push({ id: randomId(), type: 'audio', fileId: id });
+        renderJournalAttachments();
+        stream.getTracks().forEach(t => t.stop()); // close mic
+      };
+      
+      // Speech recognition for auto-transcription
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        speechRecInstance = new SpeechRecognition();
+        speechRecInstance.continuous = true;
+        speechRecInstance.interimResults = false;
+        speechRecInstance.onresult = (ev) => {
+          let finalTranscript = '';
+          for (let i = ev.resultIndex; i < ev.results.length; ++i) {
+            if (ev.results[i].isFinal) {
+              finalTranscript += ev.results[i][0].transcript;
+            }
+          }
+          if (finalTranscript.trim()) {
+            const bodyEl = $('jw-body');
+            if (bodyEl) {
+              bodyEl.focus();
+              document.execCommand('insertText', false, ' ' + finalTranscript.trim());
+            }
+          }
+        };
+        speechRecInstance.start();
+      }
+
+      mediaRecorder.start();
+      btn.style.color = 'var(--danger)'; // red when recording
+      btn.classList.add('active');
+    } catch(err) {
+      showAlert('Microphone Error', 'Could not access microphone.');
+    }
+  });
+
+  // Vent Mode Toggle inside Editor
+  $('jw-tool-burn-toggle')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const toggle = e.currentTarget;
+    toggle.classList.toggle('active');
+    const isCrimson = toggle.classList.contains('active');
+    if (isCrimson) {
+      document.body.classList.add('theme-crimson');
+      document.body.classList.remove('theme-paper', 'theme-dark-vault');
+      $('jw-header-burn-status')?.classList.remove('hidden');
+    } else {
+      document.body.classList.remove('theme-crimson');
+      const h = new Date().getHours();
+      if (h >= 6 && h < 18) {
+        document.body.classList.add('theme-paper');
+      } else {
+        document.body.classList.add('theme-dark-vault');
+      }
+      $('jw-header-burn-status')?.classList.add('hidden');
+    }
+  });
+
+  // AI Chat Panel inside Editor
+  $('jw-tool-ai')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const panel = $('jw-editor-ai-panel');
+    if (panel) {
+      panel.classList.toggle('hidden');
+      const feed = $('jw-editor-ai-feed');
+      if (feed && feed.children.length === 0) {
+        feed.innerHTML = `
+          <div class="editor-ai-msg ai">
+            Hi! I am your past self retrieval assistant. Ask me anything about your journal history, e.g. "When did I last feel burned out?"
+          </div>
+        `;
+      }
+    }
+  });
+
+  $('jw-editor-ai-close')?.addEventListener('click', () => {
+    $('jw-editor-ai-panel')?.classList.add('hidden');
+  });
+
+  const queryEditorAI = () => {
+    const inputEl = $('jw-editor-ai-input');
+    const feed = $('jw-editor-ai-feed');
+    const query = inputEl?.value.trim();
+    if (!query || !feed) return;
+
+    // Append user message
+    const uMsg = document.createElement('div');
+    uMsg.className = 'editor-ai-msg user';
+    uMsg.textContent = query;
+    feed.appendChild(uMsg);
+    inputEl.value = '';
+    feed.scrollTop = feed.scrollHeight;
+
+    // Simulate search past self locally
+    setTimeout(() => {
+      const lq = query.toLowerCase();
+      const keywords = lq.split(' ').filter(w => w.length > 3);
+      const scored = STATE.journalEntries.map(entry => {
+        const text = ((entry.title || '') + ' ' + (entry.body || '').replace(/<[^>]*>/g,'') + ' ' + (entry.tags||[]).join(' ')).toLowerCase();
+        let score = keywords.reduce((acc, kw) => acc + (text.includes(kw) ? 1 : 0), 0);
+        return { entry, score };
+      }).filter(x => x.score > 0).sort((a,b) => b.score - a.score);
+
+      const aiMsg = document.createElement('div');
+      aiMsg.className = 'editor-ai-msg ai';
+
+      if (scored.length === 0) {
+        aiMsg.textContent = "I couldn't find matching entries in your journal history. Write more entries or adjust your keywords!";
+      } else {
+        const top = scored[0].entry;
+        const topText = (top.body || '').replace(/<[^>]*>/g, '');
+        aiMsg.innerHTML = `
+          <div>From your entry: "${top.title || 'Untitled'}" (${new Date(top.date || top.timestamp).toLocaleDateString()})</div>
+          <div style="font-style:italic; margin-top:6px; color:var(--txt2);">"${topText.slice(0, 120)}${topText.length > 120 ? '...' : ''}"</div>
+          <button class="editor-ai-insert-btn" data-text="${encodeURIComponent(topText)}">📋 Insert Into Note</button>
+        `;
+        setTimeout(() => {
+          aiMsg.querySelector('.editor-ai-insert-btn')?.addEventListener('click', (ev) => {
+            const txt = decodeURIComponent(ev.currentTarget.dataset.text);
+            const bodyEl = $('jw-body');
+            if (bodyEl) {
+              bodyEl.focus();
+              document.execCommand('insertText', false, `\n\n"${txt}"\n\n`);
+              triggerNotification('Inserted', 'Quote inserted into note!');
+            }
+          });
+        }, 10);
+      }
+      feed.appendChild(aiMsg);
+      feed.scrollTop = feed.scrollHeight;
+    }, 1000);
+  };
+
+  $('jw-editor-ai-send')?.addEventListener('click', queryEditorAI);
+  $('jw-editor-ai-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      queryEditorAI();
+    }
+  });
+
   $('jw-tool-del')?.addEventListener('click', () => {
     if(STATE.journalEditId) {
       showConfirm('Delete Entry', 'Are you sure you want to delete this journal entry?', () => {
@@ -2966,7 +5352,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Share journal entry button (just copies to clipboard)
   $('jw-tool-share')?.addEventListener('click', () => {
     const title = $('jw-title').value;
-    const body = $('jw-body').value;
+    const body = $('jw-body').innerHTML;
     if(navigator.clipboard) {
       navigator.clipboard.writeText(`${title}\n\n${body}`).then(() => showAlert('Copied', 'Copied to clipboard!'));
     }
@@ -3072,24 +5458,63 @@ document.addEventListener('DOMContentLoaded', () => {
       if(!file) return;
       const id = randomId();
       const fileType = file.name.endsWith('.pdf') ? 'pdf' : 'txt';
-      const title = file.name.replace(/\.[^/.]+$/, "");
+      const defaultTitle = file.name.replace(/\.[^/.]+$/, "");
+      
+      const meta = await new Promise((resolve) => {
+        const modal = $('cr-book-meta-modal');
+        const titleInp = $('cr-book-meta-title');
+        const authorInp = $('cr-book-meta-author');
+        const saveBtn = $('cr-book-meta-save');
+        const cancelBtn = $('cr-book-meta-cancel');
+        
+        titleInp.value = defaultTitle;
+        authorInp.value = '';
+        modal.classList.remove('hidden');
+        modal.style.opacity = '1';
+        
+        const cleanup = () => {
+          modal.style.opacity = '0';
+          setTimeout(() => modal.classList.add('hidden'), 250);
+          saveBtn.removeEventListener('click', onSave);
+          cancelBtn.removeEventListener('click', onCancel);
+        };
+        
+        const onSave = () => {
+          cleanup();
+          resolve({ title: titleInp.value.trim() || defaultTitle, author: authorInp.value.trim() || 'Unknown' });
+        };
+        const onCancel = () => {
+          cleanup();
+          resolve(null);
+        };
+        
+        saveBtn.addEventListener('click', onSave);
+        cancelBtn.addEventListener('click', onCancel);
+      });
+      
+      if (!meta) return; // cancelled
+      const { title, author } = meta;
       
       if (fileType === 'pdf') {
         await saveFile(id, file);
         STATE.books.push({
           id,
           title,
+          author,
           fileType,
           progress: 0,
           currentPage: 1,
           totalPages: 1
         });
+        save();
+        renderBooks();
       } else {
         const reader = new FileReader();
         reader.onload = function() {
           STATE.books.push({
             id,
             title,
+            author,
             fileType,
             fileContent: this.result,
             progress: 0,
@@ -3100,10 +5525,7 @@ document.addEventListener('DOMContentLoaded', () => {
           renderBooks();
         };
         reader.readAsText(file);
-        return;
       }
-      save();
-      renderBooks();
     });
   });
 
@@ -3265,6 +5687,108 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }, 100);
   });
+
+  // Inline Image click-to-delete context handler
+  const jwBodyEl = $('jw-body');
+  let activeFloatingDelBtn = null;
+  
+  jwBodyEl?.addEventListener('click', (e) => {
+    if (activeFloatingDelBtn) {
+      activeFloatingDelBtn.remove();
+      activeFloatingDelBtn = null;
+    }
+    
+    if (e.target.tagName === 'IMG') {
+      const img = e.target;
+      const delBtn = document.createElement('button');
+      delBtn.innerHTML = '<span style="display:inline-flex; align-items:center; gap:5px; font-weight:600; font-size:12px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>Delete</span>';
+      delBtn.style.position = 'absolute';
+      delBtn.style.zIndex = '99999';
+      delBtn.style.background = '#ff3b30';
+      delBtn.style.color = '#fff';
+      delBtn.style.border = 'none';
+      delBtn.style.padding = '4px 10px';
+      delBtn.style.borderRadius = '12px';
+      delBtn.style.fontSize = '12px';
+      delBtn.style.fontWeight = 'bold';
+      delBtn.style.cursor = 'pointer';
+      delBtn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+      
+      // Position floating button on top of the image
+      delBtn.style.top = `${img.offsetTop + 6}px`;
+      delBtn.style.left = `${img.offsetLeft + img.offsetWidth - 75}px`;
+      
+      delBtn.onclick = () => {
+        img.remove();
+        delBtn.remove();
+        activeFloatingDelBtn = null;
+      };
+      
+      img.parentNode.insertBefore(delBtn, img.nextSibling);
+      activeFloatingDelBtn = delBtn;
+      
+      img.setAttribute('tabindex', '0');
+      img.focus();
+    }
+  });
+  
+  jwBodyEl?.addEventListener('keydown', (e) => {
+    if ((e.key === 'Backspace' || e.key === 'Delete') && document.activeElement && document.activeElement.tagName === 'IMG') {
+      e.preventDefault();
+      const img = document.activeElement;
+      if (activeFloatingDelBtn) {
+        activeFloatingDelBtn.remove();
+        activeFloatingDelBtn = null;
+      }
+      img.remove();
+    }
+  });
+
+  // Device Permissions Request System
+  async function requestDevicePermissions() {
+    let locationGranted = false;
+    let micGranted = false;
+    let motionGranted = false;
+
+    // 1. Location permission
+    try {
+      await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
+      });
+      locationGranted = true;
+    } catch(e) {
+      console.warn("Location permission rejected", e);
+    }
+
+    // 2. Microphone permission
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      micGranted = true;
+    } catch(e) {
+      console.warn("Microphone permission rejected", e);
+    }
+
+    // 3. Motion permission (iOS)
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      try {
+        const state = await DeviceMotionEvent.requestPermission();
+        if (state === 'granted') motionGranted = true;
+      } catch(e) {
+        console.warn("iOS DeviceMotion permission rejected", e);
+      }
+    } else {
+      motionGranted = true;
+    }
+
+    triggerNotification(
+      'Permissions Status',
+      `Location: ${locationGranted ? '✅' : '❌'} | Mic: ${micGranted ? '✅' : '❌'} | Motion: ${motionGranted ? '✅' : '❌'}`
+    );
+  }
+
+  // Wire permissions request triggers
+  $('settings-request-permissions')?.addEventListener('click', requestDevicePermissions);
 
   // Initial renders
   renderPriorities();

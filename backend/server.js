@@ -3,6 +3,9 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import fetch from "node-fetch";
+import { exec, spawn } from "child_process";
+import { promisify } from "util";
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +38,54 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.static(frontendPath, { etag: false, lastModified: false }));
+
+
+// --- macOS Native TTS API ---
+app.get("/api/tts/voices", async (req, res) => {
+  try {
+    const { stdout } = await execAsync('say -v "?"');
+    const lines = stdout.split('\n');
+    const voices = [];
+    lines.forEach(line => {
+      const match = line.match(/^([^\s]+(?:\s+[^\s]+)*?)\s+([a-z]{2}_[A-Z]{2})\s+#\s*(.*)$/);
+      if (match) {
+        voices.push({
+          name: match[1].trim(),
+          lang: match[2],
+          demo: match[3]
+        });
+      }
+    });
+    res.json(voices);
+  } catch (e) {
+    console.error("Failed to get voices", e);
+    res.status(500).json({ error: "Failed to load voices" });
+  }
+});
+
+app.post("/api/tts/speak", async (req, res) => {
+  try {
+    const { text, voice } = req.body;
+    if (!text) return res.status(400).json({ error: "No text provided" });
+    
+    const v = voice || "Samantha";
+    const tempFile = path.join(__dirname, `tts_${Date.now()}.m4a`);
+    
+    const sayProcess = spawn('say', ['-v', v, text, '-o', tempFile]);
+    sayProcess.on('close', (code) => {
+      if (code !== 0) {
+        return res.status(500).json({ error: "TTS generation failed" });
+      }
+      res.sendFile(tempFile, (err) => {
+        // Clean up temp file after sending
+        fs.unlink(tempFile, () => {});
+      });
+    });
+  } catch (e) {
+    console.error("TTS failed", e);
+    res.status(500).json({ error: "TTS generation failed" });
+  }
+});
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(frontendPath, "index.html"));
@@ -202,7 +253,7 @@ app.post("/api/chat", async (req, res) => {
     : "No custom knowledge base file uploaded.";
 
   // Dynamic system prompt incorporating the workspace context
-  const systemPrompt = systemPromptOverride || `You are NYVRON, a calm, precise, Apple-inspired personal command center assistant.
+  const systemPrompt = systemPromptOverride || `You are NYVRON, an AI of Cascara, a calm, precise, Apple-inspired personal command center assistant.
 You help the user plan their day, organize task priorities, review schedules, log reflection journals, and answer queries.
 
 Here is the user's active context from their local dashboard:
@@ -451,7 +502,7 @@ app.post("/api/insights", async (req, res) => {
     scheduleText = context.schedule.map((s) => `- ${s.text || s}`).join("\n");
   }
 
-  const prompt = `You are NYVRON, a personal productivity AI.
+  const prompt = `You are NYVRON, an AI of Cascara, a personal productivity AI.
 Based on the user's dashboard context below, write a short, sharp daily briefing (3-4 sentences max).
 Focus on what matters most right now. Be encouraging but precise.
 
@@ -548,6 +599,11 @@ Write the briefing now:`;
 
 const server = app.listen(PORT, () => {
   console.log(`NYVRON backend running on http://localhost:${PORT}`);
+  try {
+    exec(`open http://localhost:${PORT}`);
+  } catch(e) {
+    console.error('Failed to open browser:', e);
+  }
 });
 
 server.on('error', (err) => {

@@ -20,7 +20,60 @@
     }
   </style>
 </head>
-<body>
+<body class="theme-paper">
+
+  <!-- Vault Shutter (Iris Lock Animation) -->
+  <div id="vault-shutter" class="vault-shutter hidden">
+    <div class="shutter-blade blade-top"></div>
+    <div class="shutter-blade blade-bottom"></div>
+  </div>
+
+  <!-- Vault Passcode Lock Screen -->
+  <div id="vault-lock-screen" class="vault-lock-screen hidden">
+    <div class="lock-container">
+      <div class="lock-header">
+        <div class="lock-shield">🔒</div>
+        <h2>NYVRON VAULT</h2>
+        <p id="lock-screen-prompt">Enter Passcode to decrypt your data</p>
+      </div>
+      <div class="passcode-dots" id="passcode-dots">
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
+      <div class="dial-pad">
+        <button class="dial-btn" data-val="1">1</button>
+        <button class="dial-btn" data-val="2">2</button>
+        <button class="dial-btn" data-val="3">3</button>
+        <button class="dial-btn" data-val="4">4</button>
+        <button class="dial-btn" data-val="5">5</button>
+        <button class="dial-btn" data-val="6">6</button>
+        <button class="dial-btn" data-val="7">7</button>
+        <button class="dial-btn" data-val="8">8</button>
+        <button class="dial-btn" data-val="9">9</button>
+        <button class="dial-btn dummy-btn"></button>
+        <button class="dial-btn" data-val="0">0</button>
+        <button class="dial-btn clear-btn" id="lock-clear-btn">⌫</button>
+      </div>
+      <p style="font-size:12px; color:rgba(255,255,255,0.4); margin-top:20px; font-style:italic;">Hint: Default real is 1234. Decoy is 9999.</p>
+    </div>
+  </div>
+
+  <!-- Simulated Biometric Scan Overlay -->
+  <div id="biometric-scan-overlay" class="biometric-overlay hidden">
+    <div class="bio-container">
+      <div class="bio-scanner-frame" id="bio-scanner-frame">
+        <svg class="fingerprint-svg hidden" id="fingerprint-scan-svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="1.5"><path d="M12 2a10 10 0 0 0-10 10M12 22a10 10 0 0 0 10-10M12 6a6 6 0 0 0-6 6M12 18a6 6 0 0 0 6-6M12 10a2 2 0 1 0 0 4M9.5 16.5a7 7 0 0 0 5 0M4.5 19.5a11 11 0 0 0 15 0"/></svg>
+        <div class="face-id-square hidden" id="faceid-scan-square"></div>
+      </div>
+      <h3 id="bio-scan-title">Verifying Identity</h3>
+      <p id="bio-scan-status">Please hold finger on the sensor</p>
+      <button id="bio-cancel-btn" class="bio-cancel-btn">Cancel</button>
+    </div>
+  </div>
+  
+  <!-- BACKGROUND MESH -->
 <div id="app">
 
 
@@ -344,6 +397,49 @@
         <h1 class="tab-page-title">Journal</h1>
         <button id="new-entry-btn" class="journal-new-btn" aria-label="New entry">+</button>
       </div>
+      
+      <!-- Ambient Smart Capture & Micro Journal -->
+      <div id="journal-smart-capture" class="smart-capture-container"></div>
+      <div class="micro-journal-container">
+        <p style="font-size:12px; color:var(--txt1); margin-left:16px; margin-bottom:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Quick Log</p>
+        <div class="micro-journal-grid" id="micro-journal-grid">
+          <button class="micro-bubble" data-tag="#Happy">😀</button>
+          <button class="micro-bubble" data-tag="#Tired">🥱</button>
+          <button class="micro-bubble" data-tag="#Gym">🏋️</button>
+          <button class="micro-bubble" data-tag="#Read">📚</button>
+          <button class="micro-bubble" data-tag="#WorkedLate">🌙</button>
+          <button class="micro-bubble" data-tag="#Stressed">😫</button>
+          <button class="micro-bubble" data-tag="#Creative">🎨</button>
+        </div>
+      </div>
+
+      <!-- Journal Feature Toolbar -->
+      <div class="journal-feature-bar" id="journal-feature-bar">
+        <button class="jfb-btn" id="jfb-commute" title="Commute Therapy">🎙 Voice</button>
+        <button class="jfb-btn" id="jfb-burn" title="Burn After Reading">🔥 Vent</button>
+        <button class="jfb-btn" id="jfb-otd" title="On This Day">⏳ Throwback</button>
+        <button class="jfb-btn" id="jfb-constellation" title="Life Constellations">✦ Map</button>
+        <button class="jfb-btn" id="jfb-ai" title="Talk to Past Self">🤖 AI Chat</button>
+        <button class="jfb-btn" id="jfb-export" title="Export Journal">📤 Export</button>
+        <button class="jfb-btn" id="jfb-heatmap" title="Mood Heatmap">🗓 Moods</button>
+      </div>
+      <!-- On This Day Banner -->
+      <div id="otd-banner" class="otd-banner hidden">
+        <span>⏳</span>
+        <div><strong>On This Day</strong><br><span id="otd-banner-text">You had memories from past years</span></div>
+        <button id="otd-banner-btn" class="otd-banner-btn">View</button>
+      </div>
+      <!-- Ephemeral Status Bar (WhatsApp/Instagram style) -->
+      <div id="journal-stories-bar" class="hidden" style="display:flex; gap:16px; align-items:center; padding:12px 24px; margin-bottom:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:16px; overflow-x:auto;">
+        <!-- Story item -->
+        <div id="active-story-item" style="display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; position:relative;">
+          <div class="story-ring" style="width:56px; height:56px; border-radius:50%; border:1px solid var(--border); background:var(--bg2); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.05); transition:transform 0.1s var(--spring);">
+            <div style="font-size:24px;">🔥</div>
+          </div>
+          <span style="font-size:11px; font-weight:600; color:var(--txt2);">My Vents</span>
+        </div>
+      </div>
+
       <div id="journal-entries" class="journal-grid"></div>
       <div class="" id="journal-empty" style="text-align:center;padding:40px 20px;color:var(--txt3)">
         <div style="font-size:40px;margin-bottom:12px">📓</div>
@@ -381,37 +477,89 @@
             <span class="ios-row-label">Appearance</span>
             <div class="ios-row-right">
               <select id="settings-theme" class="ios-select">
-                <option value="dark">Dark</option>
+                <option value="auto">Auto</option>
                 <option value="light">Light</option>
+                <option value="dark">Dark</option>
               </select>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Privacy Group -->
-      <div class="ios-group" style="margin-bottom:24px;">
+      <!-- General Privacy Settings -->
+      <div class="settings-section-title" style="font-size: 13px; font-weight: 600; text-transform: uppercase; color: var(--txt3); margin: 20px 16px 8px;">General Privacy</div>
+      <div class="ios-group" style="margin-bottom:20px;">
         <div class="ios-group-body">
           <div class="ios-row">
             <div class="ios-row-icon" style="background:linear-gradient(135deg,#30B0C7,#32ADE6);color:#fff;">💬</div>
             <span class="ios-row-label">Remember Chats</span>
             <div class="ios-row-right">
-              <label class="ios-toggle"><input type="checkbox" checked=""><span class="ios-toggle-slider"></span></label>
+              <label class="ios-toggle"><input type="checkbox" id="settings-remember-chats" checked=""><span class="ios-toggle-slider"></span></label>
             </div>
           </div>
           <div class="ios-row">
             <div class="ios-row-icon" style="background:linear-gradient(135deg,#34C759,#2ECC71);color:#fff;">💾</div>
             <span class="ios-row-label">Store History</span>
             <div class="ios-row-right">
-              <label class="ios-toggle"><input type="checkbox" checked=""><span class="ios-toggle-slider"></span></label>
+              <label class="ios-toggle"><input type="checkbox" id="settings-store-history" checked=""><span class="ios-toggle-slider"></span></label>
             </div>
           </div>
           <div class="ios-row">
             <div class="ios-row-icon" style="background:linear-gradient(135deg,#FF3B30,#FF2D55);color:#fff;">🔔</div>
             <span class="ios-row-label">Notifications</span>
             <div class="ios-row-right">
-              <label class="ios-toggle"><input type="checkbox" checked=""><span class="ios-toggle-slider"></span></label>
+              <label class="ios-toggle"><input type="checkbox" id="settings-notifications" checked=""><span class="ios-toggle-slider"></span></label>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Journal Privacy Section -->
+      <div class="settings-section-title" style="font-size: 13px; font-weight: 600; text-transform: uppercase; color: var(--txt3); margin: 20px 16px 8px;">Journal Privacy</div>
+      <div class="ios-group" style="margin-bottom:24px;">
+        <div class="ios-group-body">
+          <div class="ios-row">
+            <div class="ios-row-icon" style="background:#5856D6;color:#fff;">🔒</div>
+            <span class="ios-row-label">Local-Only Mode</span>
+            <div class="ios-row-right">
+              <label class="ios-toggle"><input type="checkbox" id="settings-local-only" checked=""><span class="ios-toggle-slider"></span></label>
+            </div>
+          </div>
+          <div class="ios-row">
+            <div class="ios-row-icon" style="background:#4CD964;color:#fff;">🔑</div>
+            <span class="ios-row-label">Passcode Protection</span>
+            <div class="ios-row-right">
+              <label class="ios-toggle"><input type="checkbox" id="settings-passcode-toggle"><span class="ios-toggle-slider"></span></label>
+            </div>
+          </div>
+          <div class="ios-row">
+            <div class="ios-row-icon" style="background:#007AFF;color:#fff;">👤</div>
+            <span class="ios-row-label">Face Lock</span>
+            <div class="ios-row-right">
+              <label class="ios-toggle"><input type="checkbox" id="settings-facelock-toggle"><span class="ios-toggle-slider"></span></label>
+            </div>
+          </div>
+          <div class="ios-row">
+            <div class="ios-row-icon" style="background:#E8652A;color:#fff;">✋</div>
+            <span class="ios-row-label">Fingerprint Lock</span>
+            <div class="ios-row-right">
+              <label class="ios-toggle"><input type="checkbox" id="settings-fingerprint-toggle"><span class="ios-toggle-slider"></span></label>
+            </div>
+          </div>
+          <div class="ios-row" id="settings-request-permissions" style="cursor:pointer;">
+            <div class="ios-row-icon" style="background:#5ac8fa;color:#fff;">🎙️</div>
+            <span class="ios-row-label">Grant Device Permissions</span>
+            <span class="ios-row-chevron">›</span>
+          </div>
+          <div class="ios-row" id="settings-change-passcode" style="cursor:pointer;">
+            <div class="ios-row-icon" style="background:#FF9500;color:#fff;">⚙️</div>
+            <span class="ios-row-label">Change Passcode</span>
+            <span class="ios-row-chevron">›</span>
+          </div>
+          <div class="ios-row" id="settings-lock-now" style="cursor:pointer;">
+            <div class="ios-row-icon" style="background:#8E8E93;color:#fff;">🔒</div>
+            <span class="ios-row-label">Lock App Now</span>
+            <span class="ios-row-chevron">›</span>
           </div>
         </div>
       </div>
@@ -454,30 +602,180 @@
 
   <!-- Journal Write Mode -->
   <div id="journal-write-overlay" class="journal-write-overlay hidden">
-    <div class="jw-topbar">
-      <button id="jw-close" class="jw-close-btn">‹ Done</button>
-      <button id="jw-save" class="jw-save-btn">Save</button>
+    <!-- Hidden File Input for Image Attachments -->
+    <input type="file" id="jw-photo-input" accept="image/*" multiple style="display:none;" />
+    
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding: 16px 24px 0;">
+      <button class="overlay-close-btn" id="jw-close">✕</button>
+      <div id="jw-date-header" style="font-size:14px; font-weight:700; color:var(--txt1);"></div>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <!-- Blur Mode Status Button -->
+        <button id="jw-header-blur-status" class="hidden" style="background:rgba(255,149,0,0.12); border:1px solid rgba(255,149,0,0.4); color:#ff9500; padding:6px 12px; border-radius:20px; font-size:11px; font-weight:bold; cursor:pointer;">🔒 Blur Mode On</button>
+        <!-- Vent Mode Status Button -->
+        <button id="jw-header-burn-status" class="hidden" style="background:rgba(255,69,58,0.12); border:1px solid rgba(255,69,58,0.4); color:#ff453a; padding:6px 12px; border-radius:20px; font-size:11px; font-weight:bold; cursor:pointer;">🔥 Vent Mode On</button>
+        <!-- Quick Notes Toggle -->
+        <button id="jw-notes-toggle" style="background:none; border:1px solid var(--border); color:var(--txt1); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">📝 Notes</button>
+        <button id="jw-save" class="btn-primary" style="background:var(--cascara); color:#000; font-weight:bold; border:none; padding:8px 16px; border-radius:20px; cursor:pointer;">Done</button>
+      </div>
     </div>
-    <div class="jw-body">
-      <div id="jw-date-display" class="jw-date">Friday, July 3</div>
-      <div class="mood-picker" id="mood-picker">
+    
+    <div class="jw-body" style="padding:0 20px; overflow-y:auto; flex:1;">
+      <div class="mood-picker" id="mood-picker" style="margin-bottom:16px;">
         <button class="mood-chip" data-mood="😔">😔</button>
         <button class="mood-chip" data-mood="😐">😐</button>
         <button class="mood-chip active" data-mood="🙂">🙂</button>
         <button class="mood-chip" data-mood="😊">😊</button>
         <button class="mood-chip" data-mood="🤩">🤩</button>
       </div>
-      <div id="jw-prompt" class="jw-prompt">What gave you energy?</div>
+      
+      <!-- Rich Media Attachments Grid with Drag/Drop -->
+      <div id="jw-attachments-grid" class="jw-attachments-grid" style="display:grid; gap:8px; margin-bottom:8px;"></div>
+      <div id="jw-drop-zone" class="jw-drop-zone hidden">
+        <span>📎 Drop photos or files here</span>
+      </div>
+      
+
+
       <input id="jw-title" class="jw-title-input" type="text" placeholder="Title…">
-      <textarea id="jw-body" class="jw-body-input" placeholder="What's on your mind…"></textarea>
+      <div id="jw-prompt" style="font-size:13.5px; color:var(--txt1); opacity:0.8; font-weight:600; margin-bottom:8px; font-style:italic;"></div>
+      
+      <!-- Meta-Pills Container -->
+      <div id="jw-meta-pills-container" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
+
+      <div id="jw-body" class="jw-body-input" contenteditable="true" placeholder="What's on your mind… Type / for commands, [[ to link notes, # for tags, @ for entries"></div>
+      
+      <div id="jw-mention-dropdown" class="jw-mention-dropdown hidden"></div>
+      <div id="jw-tag-suggestions" class="jw-tag-suggestions hidden"></div>
+      
+      <!-- Slash Command Popup Menu -->
+      <div id="jw-slash-menu" class="jw-slash-menu hidden">
+        <div class="jw-slash-item" data-cmd="h1"> Heading 1</div>
+        <div class="jw-slash-item" data-cmd="h2"> Heading 2</div>
+        <div class="jw-slash-item" data-cmd="table"> Simple Table</div>
+        <div class="jw-slash-item" data-cmd="todo"> Todo Checklist</div>
+        <div class="jw-slash-item" data-cmd="bullet"> Bullet List</div>
+        <div class="jw-slash-item" data-cmd="pill"> Insert Meta-Pills</div>
+      </div>
+
+      <!-- Wiki notes link dropdown -->
+      <div id="jw-wiki-dropdown" class="jw-wiki-dropdown hidden"></div>
     </div>
-    <div class="jw-toolbar">
-      <button class="jw-tool-btn" data-fmt="bold" title="Bold"><b>B</b></button>
-      <button class="jw-tool-btn" data-fmt="italic" title="Italic"><i>I</i></button>
-      <button class="jw-tool-btn" data-fmt="list" title="List">☰</button>
-      <button class="jw-tool-btn" id="jw-tool-todo" title="To-Do Checklist">☑</button>
-      <button class="jw-tool-btn" id="jw-tool-share" title="Share Note">⎋</button>
-      <button class="jw-tool-btn" id="jw-tool-del" style="color:var(--danger);" title="Delete Note">🗑</button>
+    
+    <!-- Bottom Accessory Toolbars -->
+    <div id="jw-accessory-toolbar" class="jw-accessory-toolbar" style="display:flex; justify-content:flex-end; padding:12px 20px;">
+      <div style="display:flex; gap:12px; align-items:center;">
+        <!-- Format Text -->
+        <button class="jw-acc-btn btn-format" id="jw-tool-format-toggle" title="Format Text">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+        </button>
+
+        <!-- Typewriter Mode (green glow) -->
+        <button class="jw-acc-btn btn-typewriter" id="jw-tool-typewriter" title="Typewriter Mode">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H7M17 19H7"/></svg>
+        </button>
+
+        <!-- Privacy Mask (orange glow) -->
+        <button class="jw-acc-btn btn-mask" id="jw-tool-mask" title="Privacy Mask (Hold to view)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a9 9 0 0 0-9 9 9 9 0 0 0 9 9 9 9 0 0 0 9-9 9 9 0 0 0-9-9zm0 12a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>
+        </button>
+        <!-- AI Assistant (cyan glow) with Bloom SVG -->
+        <button class="jw-acc-btn btn-ai" id="jw-tool-ai" title="Ask Past Self">
+          <svg width="24" height="24" viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg">
+            <g>
+              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path>
+              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path>
+              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path>
+              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path>
+              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path>
+              <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path>
+            </g>
+          </svg>
+        </button>
+        <!-- Add Photo (magenta glow) -->
+        <button class="jw-acc-btn btn-photo" id="jw-tool-photo" title="Add Photo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </button>
+        <!-- Voice Memo (red glow) -->
+        <button class="jw-acc-btn btn-audio" id="jw-tool-audio" title="Voice Memo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+        </button>
+        <!-- Location Tag (gold glow) -->
+        <button class="jw-acc-btn btn-location" id="jw-tool-location" title="Location Tag">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </button>
+        <!-- Vent Mode (crimson glow) -->
+        <button class="jw-acc-btn btn-burn" id="jw-tool-burn-toggle" title="Vent Mode (Burn Note)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Formatting Toolbar (Hidden by default) -->
+    <div id="jw-format-toolbar" class="hidden" style="display:flex; gap:8px; padding:10px 20px; background:rgba(30, 30, 35, 0.98); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); justify-content:center; flex-wrap:wrap; position:absolute; bottom:85px; left:50%; transform:translateX(-50%) translateY(15px) scale(0.95); transition:all 0.25s cubic-bezier(0.16, 1, 0.3, 1); z-index:1000; border-radius:20px; border:1px solid rgba(255,255,255,0.08); opacity:0; pointer-events:none; box-shadow:0 10px 30px rgba(0,0,0,0.35);">
+      <button type="button" class="jw-tool-btn" data-fmt="bold" title="Bold" onmousedown="event.preventDefault()"><b>B</b></button>
+      <button type="button" class="jw-tool-btn" data-fmt="italic" title="Italic" onmousedown="event.preventDefault()"><i>I</i></button>
+      <button type="button" class="jw-tool-btn" data-fmt="underline" title="Underline" onmousedown="event.preventDefault()"><u>U</u></button>
+      <button type="button" class="jw-tool-btn" data-fmt="strikeThrough" title="Strikethrough" onmousedown="event.preventDefault()"><s>S</s></button>
+      <button type="button" class="jw-tool-btn" data-fmt="h1" title="Heading 1" onmousedown="event.preventDefault()">H1</button>
+      <button type="button" class="jw-tool-btn" data-fmt="h2" title="Heading 2" onmousedown="event.preventDefault()">H2</button>
+      <button type="button" class="jw-tool-btn" data-fmt="h3" title="Heading 3" onmousedown="event.preventDefault()">H3</button>
+      <button type="button" class="jw-tool-btn" data-fmt="h4" title="Heading 4" onmousedown="event.preventDefault()">H4</button>
+      <button type="button" class="jw-tool-btn" data-fmt="h5" title="Heading 5" onmousedown="event.preventDefault()">H5</button>
+      <button type="button" class="jw-tool-btn" data-fmt="list" title="Bullet List" onmousedown="event.preventDefault()">List</button>
+      <button type="button" class="jw-tool-btn" id="jw-tool-todo" title="To-Do Checklist" onmousedown="event.preventDefault()">Todo</button>
+      
+      <!-- Highlight with custom colors color dot selector -->
+      <div style="position:relative; display:inline-block;">
+        <button type="button" class="jw-tool-btn" id="jw-tool-highlight" title="Highlight Text" onmousedown="event.preventDefault()">Highlight</button>
+        <div id="jw-highlight-colors" class="hidden" style="position:absolute; bottom:42px; left:50%; transform:translateX(-50%); background:#2a2a30; border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:6px; display:flex; gap:8px; z-index:100; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+          <span class="hl-color-dot" data-color="#ffd60a" style="width:18px;height:18px;border-radius:50%;background:#ffd60a;display:inline-block;cursor:pointer;"></span>
+          <span class="hl-color-dot" data-color="#30d158" style="width:18px;height:18px;border-radius:50%;background:#30d158;display:inline-block;cursor:pointer;"></span>
+          <span class="hl-color-dot" data-color="#ff375f" style="width:18px;height:18px;border-radius:50%;background:#ff375f;display:inline-block;cursor:pointer;"></span>
+          <span class="hl-color-dot" data-color="#0a84ff" style="width:18px;height:18px;border-radius:50%;background:#0a84ff;display:inline-block;cursor:pointer;"></span>
+          <span class="hl-color-dot" data-color="#bf5af2" style="width:18px;height:18px;border-radius:50%;background:#bf5af2;display:inline-block;cursor:pointer;"></span>
+        </div>
+      </div>
+
+      <button type="button" class="jw-tool-btn" id="jw-tool-callout" title="Callout Box" onmousedown="event.preventDefault()">Callout</button>
+      <button type="button" class="jw-tool-btn" id="jw-tool-scrub" style="color:var(--cascara);" title="Scrub Location & EXIF" onmousedown="event.preventDefault()">Scrub</button>
+      <button type="button" class="jw-tool-btn" id="jw-tool-del" style="color:var(--danger);" title="Delete Note" onmousedown="event.preventDefault()">Delete</button>
+    </div>
+    
+    <!-- AI Past Self Panel inside Editor -->
+    <div id="jw-editor-ai-panel" class="editor-ai-panel hidden">
+      <div class="editor-ai-hdr">
+        <span>🤖 Ask Past Self</span>
+        <button id="jw-editor-ai-close" style="background:none; border:none; color:var(--txt3); font-size:16px; cursor:pointer;">✕</button>
+      </div>
+      <div id="jw-editor-ai-feed" class="editor-ai-feed"></div>
+      <div class="editor-ai-input-row">
+        <input id="jw-editor-ai-input" class="editor-ai-input" type="text" placeholder="Search your history..." />
+        <button id="jw-editor-ai-send" class="editor-ai-send">➤</button>
+      </div>
+    </div>
+
+    <!-- Live Awareness Prompts Drawer inside Editor -->
+    <div id="jw-awareness-drawer" class="awareness-drawer hidden">
+      <div class="awareness-hdr">
+        <span>🌱 Real-time Mindful Suggestions</span>
+        <button id="jw-awareness-close" style="background:none; border:none; color:var(--txt3); font-size:15px; cursor:pointer;">✕</button>
+      </div>
+      <div id="jw-awareness-content" class="awareness-content">
+        Listening to your thoughts... Write something to get mindful suggestions.
+      </div>
+    </div>
+
+    <!-- Quick Notes & Scratchpad Slide-out Sidebar Panel -->
+    <div id="jw-notes-panel" class="editor-notes-panel hidden">
+      <div class="notes-panel-hdr">
+        <span>📝 Scratchpad Notes</span>
+        <button id="jw-notes-close" style="background:none; border:none; color:var(--txt3); font-size:16px; cursor:pointer;">✕</button>
+      </div>
+      <div class="notes-panel-body">
+        <button id="jw-notes-add" class="add-note-btn">+ Add Sticky Note</button>
+        <div id="jw-notes-list" class="notes-list-feed"></div>
+      </div>
     </div>
   </div>
 
@@ -715,14 +1013,18 @@
 
       <!-- Main page workspace -->
       <div id="cr-page-view" class="cr-page-view theme-dark">
+      <div id="cr-page-container" style="display: flex; gap: 20px; justify-content: center; align-items: center; transform-origin: center center; transition: transform 0.2s var(--spring);">
         <div id="cr-page-wrapper" class="cr-page-wrapper">
-          <!-- Real PDF page canvas layer -->
           <canvas id="cr-pdf-canvas" class="cr-pdf-canvas" width="600" height="780" style="position:absolute; left:0; top:0; z-index:1;"></canvas>
-          <!-- Page text container -->
           <div id="cr-page-content" class="cr-page-content" style="position: absolute; inset: 0px; z-index: 2; background: none; padding: 0px; overflow: hidden;"></div>
-          <!-- Drawing Canvas -->
           <canvas id="cr-markup-canvas" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute; left:0; top:0; z-index:5;"></canvas>
         </div>
+        <div id="cr-page-wrapper-right" class="cr-page-wrapper hidden">
+          <canvas id="cr-pdf-canvas-right" class="cr-pdf-canvas" width="600" height="780" style="position:absolute; left:0; top:0; z-index:1;"></canvas>
+          <div id="cr-page-content-right" class="cr-page-content" style="position: absolute; inset: 0px; z-index: 2; background: none; padding: 0px; overflow: hidden;"></div>
+          <canvas id="cr-markup-canvas-right" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute; left:0; top:0; z-index:5;"></canvas>
+        </div>
+      </div>
       
         <!-- iOS-Style Selection Menu -->
         <div id="cr-selection-menu" class="cr-selection-menu">
@@ -821,12 +1123,12 @@
     </div>
 
     <!-- Floating AI Study Buddy Chat FAB -->
-    <button id="cr-chat-fab" style="position:absolute; right:24px; bottom:80px; width:56px; height:56px; border-radius:50%; background:var(--cascara); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,0.3); z-index:1050; transition:all 0.2s var(--spring);">
+    <button id="cr-chat-fab" class="ai-buddy-animated" style="position:absolute; left:24px; bottom:80px; width:56px; height:56px; border-radius:50%; background:var(--cascara); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,0.3); z-index:1050; transition:all 0.2s var(--spring);">
       <img src="cascara_logo.jpg" style="width:40px; height:40px; border-radius:50%; object-fit:cover;" />
     </button>
 
     <!-- AI Study Buddy Chat Widget -->
-    <div id="cr-chat-widget" class="cr-floating-panel hidden" style="position:absolute; right:24px; bottom:150px; width:320px; height:420px; display:flex; flex-direction:column; background:rgba(28,28,30,0.95); border:1px solid var(--border); border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.4); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); z-index:1060; overflow:hidden;">
+    <div id="cr-chat-widget" class="cr-floating-panel hidden" style="position:absolute; left:24px; bottom:150px; width:320px; height:420px; display:flex; flex-direction:column; background:rgba(28,28,30,0.95); border:1px solid var(--border); border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.4); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); z-index:1060; overflow:hidden;">
       <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); background:rgba(0,0,0,0.2);">
         <div style="display:flex; align-items:center; gap:8px;">
           <img src="cascara_logo.jpg" style="width:24px; height:24px; border-radius:50%; object-fit:cover;" />
@@ -963,6 +1265,172 @@
       </div>
     </div>
   </div>
-  <script src="app.js"></script>
+  <!-- Book Meta Modal -->
+  <div id="cr-book-meta-modal" class="apple-dialog-overlay hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(10px); z-index:9999; display:flex; align-items:center; justify-content:center; opacity:0; transition:all 0.25s ease-in-out;">
+    <div class="apple-dialog-box" style="background:#1c1c1e; border:1px solid rgba(255,255,255,0.15); border-radius:14px; width:320px; max-width:90%; padding:24px 20px; text-align:center; box-shadow:0 12px 36px rgba(0,0,0,0.6); transform:scale(0.85); transition:all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);">
+      <div style="font-size:18px; font-weight:600; color:#fff; margin-bottom:8px; line-height:1.3; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Book Details</div>
+      <div style="font-size:13px; color:rgba(255,255,255,0.7); margin-bottom:24px; line-height:1.4; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Please provide the book's details.</div>
+      
+      <div style="margin-bottom:16px; text-align:left;">
+        <label style="display:block; font-size:12px; color:rgba(255,255,255,0.6); margin-bottom:6px; font-family:-apple-system, sans-serif; padding-left:4px;">Title</label>
+        <input type="text" id="cr-book-meta-title" style="width:100%; box-sizing:border-box; padding:10px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:#2c2c2e; color:#fff; font-size:15px; outline:none; transition: border-color 0.2s;" placeholder="Book Title" />
+      </div>
+      
+      <div style="margin-bottom:24px; text-align:left;">
+        <label style="display:block; font-size:12px; color:rgba(255,255,255,0.6); margin-bottom:6px; font-family:-apple-system, sans-serif; padding-left:4px;">Author</label>
+        <input type="text" id="cr-book-meta-author" style="width:100%; box-sizing:border-box; padding:10px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:#2c2c2e; color:#fff; font-size:15px; outline:none; transition: border-color 0.2s;" placeholder="Unknown Author" />
+      </div>
 
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button id="cr-book-meta-save" style="width:100%; border:none; background:var(--cascara, #ff9500); color:#000; padding:12px; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer;">Add Book</button>
+        <button id="cr-book-meta-cancel" style="width:100%; border:none; background:rgba(255,255,255,0.1); color:#fff; padding:12px; border-radius:10px; font-size:15px; font-weight:500; cursor:pointer;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+<!-- BURN AFTER READING -->
+<div id="journal-burn-overlay" class="journal-burn-overlay hidden">
+  <div class="burn-header">
+    <div class="burn-badge">🔥 EPHEMERAL MODE</div>
+    <div id="burn-countdown-display" class="burn-timer">24:00:00</div>
+    <button id="burn-close-btn" class="overlay-close-btn" style="display:flex; align-items:center; justify-content:center;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+  </div>
+  <input id="burn-title" class="burn-title-input" type="text" placeholder="Vent it out... (disappears in 24h)" />
+  <div id="burn-body" class="burn-body-input" contenteditable="true" placeholder="This space is yours. Write anything. It will burn."></div>
+  <div class="burn-footer">
+    <button id="burn-save-btn" class="burn-save-btn">Save Ephemerally</button>
+    <button id="burn-now-btn" class="burn-now-btn">🔥 Burn Now</button>
+  </div>
+</div>
+<!-- COMMUTE THERAPY -->
+<div id="commute-therapy-overlay" class="commute-overlay hidden">
+  <div class="commute-header">
+    <button id="commute-close-btn" class="overlay-close-btn" style="display:flex; align-items:center; justify-content:center;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+    <h2 style="color:white;font-size:18px;font-weight:700;">Commute Therapy</h2>
+    <div style="width:32px;"></div>
+  </div>
+  <div class="commute-prompt-card">
+    <p class="commute-label">Today's Question</p>
+    <p id="commute-question" class="commute-question-text">Loading...</p>
+  </div>
+  <div class="commute-wave-container">
+    <canvas id="commute-wave-canvas" class="commute-wave"></canvas>
+  </div>
+  <div id="commute-transcript" class="commute-transcript" style="display:none;"></div>
+  <div class="commute-controls">
+    <button id="commute-record-btn" class="commute-record-btn">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="white" fill="none" stroke-width="2"/><line x1="12" y1="19" x2="12" y2="23" stroke="white" stroke-width="2"/><line x1="8" y1="23" x2="16" y2="23" stroke="white" stroke-width="2"/></svg>
+    </button>
+    <p id="commute-record-label" style="font-size:13px;color:rgba(255,255,255,0.5);margin-top:8px;">Tap to speak</p>
+  </div>
+  <button id="commute-save-btn" class="commute-save-btn hidden">Save as Journal Entry</button>
+</div>
+<!-- CONSTELLATION VIEW -->
+<div id="constellation-overlay" class="constellation-overlay hidden">
+  <div class="constellation-header">
+    <button id="constellation-close" class="overlay-close-btn">✕</button>
+    <h2 style="color:white;font-size:18px;font-weight:700;">Life Constellations</h2>
+    <div style="width:32px;"></div>
+  </div>
+  <canvas id="constellation-canvas" style="width:100%;flex:1;touch-action:none;"></canvas>
+  <p style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.3);font-size:12px;pointer-events:none;">Drag to explore · Scroll to zoom</p>
+</div>
+<!-- JOURNAL AI CHAT -->
+<div id="journal-ai-overlay" class="journal-ai-overlay hidden">
+  <div class="jai-header">
+    <button id="jai-close" class="overlay-close-btn">✕</button>
+    <div style="text-align:center;">
+      <h2 style="font-size:17px;font-weight:700;">Talk to Your Past Self</h2>
+      <p style="font-size:12px;color:var(--txt2);">AI searches your journal history</p>
+    </div>
+    <div id="jai-shimmer-dot" class="jai-shimmer-dot"></div>
+  </div>
+  <div id="jai-feed" class="jai-feed"></div>
+  <div class="jai-input-row">
+    <input id="jai-input" class="jai-input" type="text" placeholder="Ask about your past..." />
+    <button id="jai-send" class="jai-send-btn">➤</button>
+  </div>
+</div>
+<!-- ON THIS DAY -->
+<div id="on-this-day-overlay" class="otd-overlay hidden">
+  <div class="otd-header">
+    <button id="otd-close" class="overlay-close-btn">✕</button>
+    <h2 style="font-size:18px;font-weight:700;">⏳ On This Day</h2>
+    <div style="width:32px;"></div>
+  </div>
+  <div id="otd-stack" class="otd-card-stack"></div>
+</div>
+<!-- EXPORT PANEL -->
+<div id="export-backdrop" class="export-backdrop hidden"></div>
+<div id="journal-export-panel" class="export-panel hidden">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <h3 style="font-size:18px;font-weight:700;">Export Journal</h3>
+    <button id="export-close" class="overlay-close-btn">✕</button>
+  </div>
+  <p style="color:var(--txt2);font-size:14px;margin-bottom:24px;">Export all your entries in an open format. Your data, your freedom.</p>
+  <button class="export-btn" id="export-json-btn">📄 Export as JSON</button>
+  <button class="export-btn" id="export-markdown-btn" style="margin-top:12px;">✍️ Export as Markdown</button>
+  <button class="export-btn" id="export-pdf-btn" style="margin-top:12px; background:linear-gradient(135deg,#FF453A,#FF2D55); color:#fff;">📑 Export as PDF</button>
+</div>
+<!-- MOOD HEATMAP -->
+<div id="mood-heatmap-overlay" class="mood-heatmap-overlay hidden">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 20px 0;">
+    <h2 style="font-size:20px;font-weight:700;">🗓 Mood Heatmap</h2>
+    <button id="mh-close" class="overlay-close-btn">✕</button>
+  </div>
+  <div id="mood-heatmap-grid" class="mood-heatmap-grid"></div>
+  <div class="mood-legend">
+    <span>😔 Sad</span><span>😐 Neutral</span><span>🙂 Good</span><span>😊 Happy</span><span>🤩 Amazing</span>
+  </div>
+  
+  <!-- Mood Analysis Distribution -->
+  <div id="mood-breakdown-container" style="margin:20px 24px; padding:16px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); border-radius:16px;">
+    <h3 style="font-size:12px; font-weight:600; text-transform:uppercase; color:var(--txt3); margin-bottom:12px; letter-spacing:0.05em;">Mood Distribution</h3>
+    <div id="mood-breakdown-list" style="display:flex; flex-direction:column; gap:10px;">
+      <!-- breakdown rows will be rendered here dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- WHATSAPP / INSTAGRAM STATUS VIEWER OVERLAY -->
+<div id="story-viewer-overlay" class="story-viewer-overlay hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.96); z-index:1100; display:flex; flex-direction:column; padding:24px; box-sizing:border-box; color:white; justify-content:space-between; backdrop-filter:blur(30px);">
+  <!-- Left/Right Navigation Tap Overlay -->
+  <div style="position:absolute; inset:80px 0 100px 0; display:flex; z-index:1005;">
+    <div id="story-nav-left" style="flex:1; cursor:pointer;" title="Previous Status"></div>
+    <div id="story-nav-right" style="flex:1; cursor:pointer;" title="Next Status"></div>
+  </div>
+  <!-- Top Progress Indicators & Header -->
+  <div style="position:relative; z-index:1020;">
+    <div id="story-indicators-container" style="display:flex; gap:6px; width:100%; height:3px; margin-bottom:20px;"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:22px;">🔥</span>
+        <div>
+          <div style="font-size:15px; font-weight:600;">My Ephemeral Vent</div>
+          <div id="story-time-display" style="font-size:12px; color:rgba(255,255,255,0.5);">24 hours left</div>
+        </div>
+      </div>
+      <button id="story-viewer-close" onclick="closeStoryViewer()" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:50%; color:white; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s ease;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Center Content -->
+  <div style="flex:1; display:flex; flex-direction:column; justify-content:center; text-align:center; max-width:600px; margin:0 auto; padding:40px 0;">
+    <h1 id="story-viewer-title" style="font-size:28px; font-weight:700; margin-bottom:20px; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,0.5);"></h1>
+    <div id="story-viewer-body" style="font-size:18px; line-height:1.6; color:rgba(255,255,255,0.9); font-weight:400; max-height:60vh; overflow-y:auto; text-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>
+  </div>
+
+  <!-- Footer Countdown -->
+  <div style="text-align:center; padding-bottom:16px;">
+    <div id="story-countdown-display" style="font-size:24px; font-weight:700; letter-spacing:0.05em; font-variant-numeric:tabular-nums; color:#ff453a; text-shadow:0 0 10px rgba(255,69,58,0.5);">24:00:00</div>
+    <p style="font-size:11px; text-transform:uppercase; color:rgba(255,255,255,0.4); margin-top:6px; letter-spacing:0.1em;">disappears forever on expiry</p>
+  </div>
+</div>
+<script src="app.js"></script>
 </body></html>

@@ -6,7 +6,7 @@
   "author": "Antigravity",
   "license": "MIT",
   "scripts": {
-    "start": "electron .",
+    "start": "cd backend && node server.js",
     "dist": "electron-builder"
   },
   "dependencies": {
