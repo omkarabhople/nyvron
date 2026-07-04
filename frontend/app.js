@@ -5602,7 +5602,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if(themeSel) themeSel.value = savedTheme;
 
     // Avoid triggering view transitions or recalculations if the theme didn't change
-    const newAutoTheme = (h >= 18 || h < 6) ? 'dark' : 'light';
+    const h2 = new Date().getHours();
+    const newAutoTheme = (h2 >= 18 || h2 < 6) ? 'dark' : 'light';
     const currentTheme = document.documentElement.getAttribute('data-theme');
 
     if (savedTheme === 'auto') {
