@@ -3596,11 +3596,17 @@ function updateClock(){
   // Don't override if user is in a forced mode (like crimson for venting)
   if (!document.body.classList.contains('theme-crimson')) {
     const savedTheme = localStorage.getItem('nv-theme') || 'auto';
+
+    // Avoid triggering view transitions or recalculations if the theme didn't change
+    const newAutoTheme = (h >= 18 || h < 6) ? 'dark' : 'light';
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+
     if (savedTheme === 'auto') {
-      applyAutoTheme();
+      if (currentTheme !== newAutoTheme) applyAutoTheme();
     } else {
-      applyManualTheme(savedTheme);
+      if (currentTheme !== savedTheme) applyManualTheme(savedTheme);
     }
+
   }
 
   const el=$('home-time'),de=$('home-date');
@@ -5568,17 +5574,43 @@ function initSmartCapture() {
 // INITIALIZATION & EVENT LISTENERS
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
+
+  // 15. iOS Control Center Sliders (Polish)
+  document.querySelectorAll('input[type="range"]').forEach(slider => {
+    slider.addEventListener('mousedown', () => {
+      slider.style.transform = 'scaleY(1.5) scaleX(1.02)';
+    });
+    slider.addEventListener('mouseup', () => {
+      slider.style.transform = 'scaleY(1) scaleX(1)';
+    });
+    slider.addEventListener('mouseleave', () => {
+      slider.style.transform = 'scaleY(1) scaleX(1)';
+    });
+    slider.addEventListener('touchstart', () => {
+      slider.style.transform = 'scaleY(1.5) scaleX(1.02)';
+    });
+    slider.addEventListener('touchend', () => {
+      slider.style.transform = 'scaleY(1) scaleX(1)';
+    });
+  });
+
   initSmartCapture();
   BLOOM = $('nyvron-bloom-svg');
   // Theme selector
   const themeSel = $('settings-theme');
   const savedTheme = localStorage.getItem('nv-theme') || 'auto';
   if(themeSel) themeSel.value = savedTheme;
-  if (savedTheme === 'auto') {
-    applyAutoTheme();
-  } else {
-    applyManualTheme(savedTheme);
-  }
+
+    // Avoid triggering view transitions or recalculations if the theme didn't change
+    const newAutoTheme = (h >= 18 || h < 6) ? 'dark' : 'light';
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+
+    if (savedTheme === 'auto') {
+      if (currentTheme !== newAutoTheme) applyAutoTheme();
+    } else {
+      if (currentTheme !== savedTheme) applyManualTheme(savedTheme);
+    }
+
   themeSel?.addEventListener('change', () => {
     const val = themeSel.value;
     localStorage.setItem('nv-theme', val);
@@ -7287,11 +7319,11 @@ function initEReaderAdvancedFeatures() {
     micBtn.addEventListener('click', () => {
       const isRecording = micBtn.classList.toggle('active');
       if (isRecording) {
-        micBtn.style.color = '#ffffff';
+        micBtn.classList.add('recording-active');
         triggerNotification('Smart Capture Active', 'Listening to ambient audio logs... 🎙');
         showRecordingModal();
       } else {
-        micBtn.style.color = '';
+        micBtn.classList.remove('recording-active');
       }
     });
   }
@@ -7328,7 +7360,7 @@ function initEReaderAdvancedFeatures() {
       recOverlay.remove();
       style.remove();
       micBtn.classList.remove('active');
-      micBtn.style.color = '';
+      micBtn.classList.remove('recording-active');
 
       const docTitle = currentReaderBook ? currentReaderBook.title : 'Comprehensive Conservation Report';
       const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 16;
@@ -7679,6 +7711,82 @@ function initEReaderAdvancedFeatures() {
     };
   }
 
+
+  // 14. Inline AI Context Panel (Reader Assistant)
+  const aiPanel = $('cr-ai-context-panel');
+  const aiContent = $('cr-ai-context-content');
+  const aiClose = $('cr-ai-context-close');
+  const aiPopover = $('cr-ai-popover');
+  const aiAnalyzeBtn = $('cr-btn-analyze');
+  const pageView = $('cr-page-view');
+
+  if (pageView) {
+    pageView.addEventListener('mouseup', (e) => {
+      const selection = window.getSelection();
+      const text = selection.toString().trim();
+      if (text.length > 0 && !window.reflowModeActive) {
+        // Show popover
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+
+        // Position relative to pageView
+        const pvRect = pageView.getBoundingClientRect();
+
+        aiPopover.style.left = (rect.left - pvRect.left + rect.width / 2) + 'px';
+        aiPopover.style.top = (rect.top - pvRect.top) + 'px';
+        aiPopover.classList.remove('hidden');
+      } else {
+        aiPopover.classList.add('hidden');
+      }
+    });
+  }
+
+  if (aiAnalyzeBtn) {
+    aiAnalyzeBtn.onclick = async () => {
+      aiPopover.classList.add('hidden');
+      const text = window.getSelection().toString().trim();
+      if (!text) return;
+
+      aiPanel.classList.remove('hidden');
+      // small delay to allow display block to apply before transform transition
+      setTimeout(() => {
+        aiPanel.style.transform = 'translateX(0)';
+      }, 10);
+
+      aiContent.innerHTML = `<div style="text-align: center; color: #2ECC71; margin-top: 40px; animation: pulse 1.5s infinite;">Analyzing...</div>`;
+
+      // Simulate AI response
+      setTimeout(() => {
+        aiContent.innerHTML = `
+          <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #2ECC71; margin-bottom: 4px; font-weight: bold;">Summary</div>
+            <p style="margin: 0;">${text.substring(0, 50)}... deals primarily with foundational concepts described earlier in the chapter.</p>
+          </div>
+          <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #3498DB; margin-bottom: 4px; font-weight: bold;">Cross-Document Connections</div>
+            <ul style="margin: 0; padding-left: 16px;">
+              <li>Linked to <b>"Q3 Project Strategy"</b> (Page 4)</li>
+              <li>Matches concept in <b>"Wildlife Zones"</b> margin notes</li>
+            </ul>
+          </div>
+          <div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <span style="background: rgba(46, 204, 113, 0.2); color: #2ECC71; padding: 4px 8px; border-radius: 12px; font-size: 11px;">#Concept</span>
+            <span style="background: rgba(46, 204, 113, 0.2); color: #2ECC71; padding: 4px 8px; border-radius: 12px; font-size: 11px;">#Important</span>
+          </div>
+        `;
+      }, 1000);
+    };
+  }
+
+  if (aiClose) {
+    aiClose.onclick = () => {
+      aiPanel.style.transform = 'translateX(100%)';
+      setTimeout(() => {
+        aiPanel.classList.add('hidden');
+      }, 300);
+    };
+  }
+
   // 5. Multi-Doc splitscreen & synthesis (Feature 5)
   const spreadBtn = $('cr-tool-spread');
   let spreadMode = 'single';
@@ -7820,57 +7928,35 @@ function initEReaderAdvancedFeatures() {
   const summaryBtn = $('cr-btn-summary');
   const summaryPanel = $('cr-summarization-panel');
   const summaryDepthSlider = $('cr-summary-depth');
+  const summaryContent = $('cr-summary-content');
+  const summaryCloseBtn = $('cr-summarization-close');
 
-  if (summaryBtn && summaryPanel) {
+  if (summaryBtn && summaryPanel && summaryCloseBtn) {
     summaryBtn.onclick = () => {
       const isVisible = summaryPanel.classList.toggle('hidden');
       summaryBtn.classList.toggle('active', !isVisible);
-      if (!isVisible && currentReaderBook) {
-        updatePageSummaryDisplay(currentReaderBook.currentPage || 1);
+      if (!isVisible) {
+        if (typeof updatePageSummaryDisplay === 'function') {
+           updatePageSummaryDisplay(currentReaderBook ? currentReaderBook.currentPage || 1 : 1);
+        } else {
+           summaryContent.innerHTML = "Progressive Summarization enabled for this page block.";
+        }
       }
     };
-    $('cr-summarization-close').onclick = () => {
+    summaryCloseBtn.onclick = () => {
       summaryPanel.classList.add('hidden');
       summaryBtn.classList.remove('active');
     };
   }
 
-  if (summaryDepthSlider) {
-    summaryDepthSlider.oninput = () => {
-      if (currentReaderBook) {
-        updatePageSummaryDisplay(currentReaderBook.currentPage || 1);
-      }
+  if (summaryDepthSlider && summaryContent) {
+    summaryDepthSlider.oninput = (e) => {
+      const depth = e.target.value;
+      if (depth === '1') summaryContent.innerHTML = "<b>Brief:</b> This page discusses main topic features.";
+      else if (depth === '2') summaryContent.innerHTML = "<b>Detailed:</b> The page outlines multiple strategies for the project and discusses environmental policies in detail. Concepts include Zonal mapping.";
+      else summaryContent.innerHTML = "<b>Complete:</b> The Comprehensive Conservation Report on this page goes into full analytical depth regarding western India policies, mapping specific zones like Ranibennur, and establishing Q3 strategies for the future.";
     };
   }
-
-  window.updatePageSummaryDisplay = (pageNum) => {
-    const content = $('cr-summary-content');
-    if (!content) return;
-
-    const depth = summaryDepthSlider ? parseInt(summaryDepthSlider.value) : 1;
-    const docTitle = currentReaderBook ? currentReaderBook.title : 'Comprehensive Conservation Report';
-
-    const summaries = {
-      1: [
-        `• Critical conservation milestones established for Q3.`,
-        `• Zonal demarcation mapping outlines 4 sensitive buffer zones.`,
-        `• Key stakeholder engagement parameters mapped under page ${pageNum}.`
-      ],
-      2: [
-        `<h3>Page ${pageNum} Key Insights</h3>
-         <p>Demarcates active buffer wildlife boundaries spanning western India regions. Outlines migration corridors and ecological conservation policy guidelines.</p>
-         <p><strong>Zonal Coordinates:</strong> Demarcations map directly to Project Strategy milestones.</p>`
-      ],
-      3: [
-        `<h3>Complete Page ${pageNum} Analysis</h3>
-         <p>Detailed analysis of regional wildlife populations and corridor blockages. Highlights regional conflict areas under the Western Ghats framework.</p>
-         <p>Recommends structural changes to local reserve allocations, with emphasis on buffer zones and tiger reserve migration routes.</p>
-         <p><strong>Milestone Impact:</strong> Connects to previous strategies and Q3 review parameters.</p>`
-      ]
-    };
-
-    content.innerHTML = (summaries[depth] || summaries[1]).join('<br><br>');
-  };
 
   // 9. PDF/ePUB Reflow and sentence editor (Feature 9)
   const reflowBtn = $('cr-btn-reflow');

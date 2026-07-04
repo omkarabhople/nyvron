@@ -2922,7 +2922,10 @@ input[type="range"]:active::-webkit-slider-thumb {
 
 /* Siri-Style Multi-Color Audio Waves */
 @keyframes siri-wave {
-  0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4), 0 0 0 0 rgba(0, 255, 255, 0.4); }
+  0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.6), 0 0 0 0 rgba(0, 255, 255, 0.6); transform: scale(1); }
+  50% { box-shadow: 0 0 20px 10px rgba(46, 204, 113, 0.8), 0 0 40px 20px rgba(0, 255, 255, 0.6); transform: scale(1.1); }
+  100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0), 0 0 0 0 rgba(0, 255, 255, 0); transform: scale(1); }
+}
   50% { box-shadow: 0 0 20px 10px rgba(46, 204, 113, 0.6), 0 0 40px 20px rgba(0, 255, 255, 0.4); }
   100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0), 0 0 0 0 rgba(0, 255, 255, 0); }
 }
@@ -2938,4 +2941,34 @@ input[type="range"]:active::-webkit-slider-thumb {
 ::view-transition-new(active-book-card) {
   animation-duration: 0.6s;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ios-swipe-actions { position: absolute; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: flex-end; padding-right: 16px; opacity: 0; pointer-events: none; }
+.ios-swipe-btn { border: none; background: #ff3b30; color: white; border-radius: 12px; width: 60px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.ios-swipe-btn-icon { pointer-events: none; }
+.book-swipe-container { position: relative; }
+.book-delete-layer { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; z-index: 1; border-radius: 12px; background: rgba(255, 59, 48, 0.2); backdrop-filter: blur(8px); }
+.book-swipe-delete-btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: #ff3b30; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(255, 59, 48, 0.4); }
+
+
+input[type="range"] {
+  -webkit-appearance: none;
+  background: rgba(120, 120, 128, 0.4);
+  border-radius: 8px;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), height 0.2s;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: transform 0.2s;
+}
+input[type="range"]:active {
+  transform: scaleY(1.5) scaleX(1.02);
+}
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(0.6);
 }
