@@ -2278,13 +2278,16 @@ function openBookReader(book) {
   }, {passive: false});
   canvas.addEventListener('touchend', endDraw);
 
+  // Centralized toolbar controller: clones to clean listeners, then registers single, clean clicks
   document.querySelectorAll('.cr-tool-btn').forEach(btn => {
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
 
     newBtn.addEventListener('click', () => {
       const toolId = newBtn.id;
-      
+      let toolName = toolId.replace('cr-tool-', '').replace('cr-btn-', '').replace('cr-mic-capture-btn', 'mic');
+
+      // 1. Finder Sidebar tool
       if (toolId === 'cr-tool-find') {
         const sidebar = $('cr-sidebar');
         if (sidebar) {
@@ -2294,18 +2297,128 @@ function openBookReader(book) {
         }
         return;
       }
-      
-      activeTool = toolId.replace('cr-tool-', '');
-      overlay.dataset.activeTool = activeTool;
-      
-      if (activeTool === 'hl-yellow') { highlightSelection('rgba(255, 213, 79, 0.45)'); return; }
-      if (activeTool === 'hl-green') { highlightSelection('rgba(129, 199, 132, 0.45)'); return; }
-      if (activeTool === 'hl-blue') { highlightSelection('rgba(100, 181, 246, 0.45)'); return; }
-      if (activeTool === 'zoom-in') { if (currentZoom < 2.0) { currentZoom += 0.15; updateZoom(); } return; }
-      if (activeTool === 'zoom-out') { if (currentZoom > 0.5) { currentZoom -= 0.15; updateZoom(); } return; }
 
-      document.querySelectorAll('.cr-tool-btn').forEach(b => b.classList.remove('active'));
+      // 2. Highlighting tools
+      if (toolName === 'hl-yellow') { highlightSelection('rgba(255, 213, 79, 0.45)'); return; }
+      if (toolName === 'hl-green') { highlightSelection('rgba(129, 199, 132, 0.45)'); return; }
+      if (toolName === 'hl-blue') { highlightSelection('rgba(100, 181, 246, 0.45)'); return; }
+
+      // 3. Zooming actions (desktop scale adjust)
+      if (toolName === 'zoom-in') { if (currentZoom < 2.0) { currentZoom += 0.15; updateZoom(); } return; }
+      if (toolName === 'zoom-out') { if (currentZoom > 0.5) { currentZoom -= 0.15; updateZoom(); } return; }
+
+      // 4. Settings popover toggles (Font, Speech, Pen)
+      if (['speech', 'font', 'pen'].includes(toolName)) {
+        const targetPopoverId = `cr-${toolName}-settings`;
+        const popover = $(targetPopoverId);
+        const wasHidden = popover?.classList.contains('hidden');
+        hideAllPopovers();
+        if (wasHidden && popover) popover.classList.remove('hidden');
+      } else {
+        hideAllPopovers();
+      }
+
+      // 5. Two-Page Spread toggle
+      if (toolName === 'spread') {
+        const spreadBtn = $('cr-tool-spread');
+        if (window.spreadMode === 'single') {
+          window.spreadMode = 'spread';
+          spreadBtn.classList.add('active');
+          triggerNotification('Two-Page Spread', 'Showing consecutive pages of the book');
+          $('cr-page-wrapper-right')?.classList.remove('hidden');
+          $('cr-synthesis-gutter')?.classList.add('hidden');
+          $('cr-page-view-right-doc')?.classList.add('hidden');
+          renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
+        } else if (window.spreadMode === 'spread') {
+          window.spreadMode = 'split';
+          spreadBtn.classList.add('active');
+          triggerNotification('Multi-Doc Split View', 'Cross-book synthesis notes gutter active');
+          $('cr-page-wrapper-right')?.classList.add('hidden');
+          $('cr-synthesis-gutter')?.classList.remove('hidden');
+          $('cr-page-view-right-doc')?.classList.remove('hidden');
+          initSplitscreenRightDoc();
+        } else {
+          window.spreadMode = 'single';
+          spreadBtn.classList.remove('active');
+          triggerNotification('Single Page view', 'Restored default reader viewport');
+          $('cr-page-wrapper-right')?.classList.add('hidden');
+          $('cr-synthesis-gutter')?.classList.add('hidden');
+          $('cr-page-view-right-doc')?.classList.add('hidden');
+          renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
+        }
+        adjustReaderResponsiveScale();
+        return;
+      }
+
+      // 6. MCQ Sidebar toggle
+      if (toolName === 'mcq') {
+        const side = $('cr-mcq-sidebar');
+        if (side) {
+          const isHidden = side.classList.toggle('hidden');
+          newBtn.classList.toggle('active', !isHidden);
+          if (!isHidden) generateMCQs();
+        }
+        return;
+      }
+
+      // 7. Reflow Mode toggle
+      if (toolName === 'reflow') {
+        window.reflowModeActive = !window.reflowModeActive;
+        newBtn.classList.toggle('active', window.reflowModeActive);
+        const reflowContainer = $('cr-reflow-container');
+        const mainPageView = $('cr-page-view');
+        if (window.reflowModeActive) {
+          reflowContainer?.classList.remove('hidden');
+          mainPageView?.classList.add('hidden');
+          renderReflowContent();
+        } else {
+          reflowContainer?.classList.add('hidden');
+          mainPageView?.classList.remove('hidden');
+        }
+        return;
+      }
+
+      // 8. Progressive Summarization toggle
+      if (toolName === 'summary') {
+        const summaryPanel = $('cr-summarization-panel');
+        const isHidden = summaryPanel?.classList.toggle('hidden');
+        newBtn.classList.toggle('active', !isHidden);
+        if (!isHidden) {
+          if (typeof updatePageSummaryDisplay === 'function') {
+            updatePageSummaryDisplay(currentReaderBook ? currentReaderBook.currentPage || 1 : 1);
+          } else {
+            const summaryContent = $('cr-summary-content');
+            if (summaryContent) summaryContent.innerHTML = "Progressive Summarization enabled for this page block.";
+          }
+        }
+        return;
+      }
+
+      // 9. Ambient Smart Capture toggle
+      if (toolName === 'mic') {
+        const isRecording = newBtn.classList.toggle('active');
+        if (isRecording) {
+          newBtn.classList.add('recording-active');
+          triggerNotification('Smart Capture Active', 'Listening to ambient audio logs... 🎙');
+          showRecordingModal();
+        } else {
+          newBtn.classList.remove('recording-active');
+        }
+        return;
+      }
+
+      // 10. Default selection / drawing modes active classes
+      activeTool = toolName;
+      overlay.dataset.activeTool = activeTool;
+
+      document.querySelectorAll('.cr-tool-btn').forEach(b => {
+        const mode = b.id.replace('cr-tool-', '');
+        if (['text', 'pen', 'eraser'].includes(mode)) {
+          b.classList.remove('active');
+        }
+      });
       newBtn.classList.add('active');
+
       if (activeTool === 'pen' || activeTool === 'eraser') {
         canvas.classList.add('active');
       } else {
@@ -2385,33 +2498,6 @@ function openBookReader(book) {
     });
   }
 
-  // Active Tool bindings
-  document.querySelectorAll('.cr-tool-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const toolId = btn.id;
-      if (['cr-tool-speech', 'cr-tool-font', 'cr-tool-pen'].includes(toolId)) {
-        const targetPopoverId = toolId.replace('cr-tool-', 'cr-') + '-settings';
-        const popover = $(targetPopoverId);
-        const wasHidden = popover?.classList.contains('hidden');
-        hideAllPopovers();
-        if (wasHidden && popover) popover.classList.remove('hidden');
-      } else {
-        hideAllPopovers();
-      }
-    });
-  });
-
-  // Two-page Spread layout mode
-  let isTwoPage = false;
-  $('cr-tool-spread')?.addEventListener('click', () => {
-    isTwoPage = !isTwoPage;
-    $('cr-tool-spread').classList.toggle('active', isTwoPage);
-    const viewport = $('cr-page-view');
-    if (viewport) {
-      viewport.classList.toggle('cr-spread-view', isTwoPage);
-    }
-    adjustReaderResponsiveScale();
-  });
 
   // Pen settings (color and brush width)
   document.querySelectorAll('.cr-pen-color').forEach(dot => {
@@ -2640,20 +2726,6 @@ function openBookReader(book) {
 
   $('cr-mcq-refresh-btn')&&( $('cr-mcq-refresh-btn').onclick = generateMCQs );
 
-  // Toggle MCQ sidebar
-  $('cr-tool-mcq')?.addEventListener('click', () => {
-    const side = $('cr-mcq-sidebar');
-    if (!side) return;
-    const isOpen = !side.classList.contains('hidden');
-    if (isOpen) {
-      side.classList.add('hidden');
-      $('cr-tool-mcq').classList.remove('active');
-    } else {
-      side.classList.remove('hidden');
-      $('cr-tool-mcq').classList.add('active');
-      generateMCQs();
-    }
-  });
 
   // AI Study Buddy Chatbot Widget
   const chatFab = $('cr-chat-fab');
@@ -7789,44 +7861,7 @@ function initEReaderAdvancedFeatures() {
   }
 
   // 5. Multi-Doc splitscreen & synthesis (Feature 5)
-  const spreadBtn = $('cr-tool-spread');
-  let spreadMode = 'single';
-
-  if (spreadBtn) {
-    spreadBtn.onclick = () => {
-      if (spreadMode === 'single') {
-        spreadMode = 'spread';
-        spreadBtn.classList.add('active');
-        triggerNotification('Two-Page Spread', 'Showing consecutive pages of the book');
-        
-        $('cr-page-wrapper-right')?.classList.remove('hidden');
-        $('cr-synthesis-gutter')?.classList.add('hidden');
-        $('cr-page-view-right-doc')?.classList.add('hidden');
-        
-        renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
-      } else if (spreadMode === 'spread') {
-        spreadMode = 'split';
-        spreadBtn.classList.add('active');
-        triggerNotification('Multi-Doc Split View', 'Cross-book synthesis notes gutter active');
-        
-        $('cr-page-wrapper-right')?.classList.add('hidden');
-        $('cr-synthesis-gutter')?.classList.remove('hidden');
-        $('cr-page-view-right-doc')?.classList.remove('hidden');
-        
-        initSplitscreenRightDoc();
-      } else {
-        spreadMode = 'single';
-        spreadBtn.classList.remove('active');
-        triggerNotification('Single Page view', 'Restored default reader viewport');
-        
-        $('cr-page-wrapper-right')?.classList.add('hidden');
-        $('cr-synthesis-gutter')?.classList.add('hidden');
-        $('cr-page-view-right-doc')?.classList.add('hidden');
-        
-        renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
-      }
-    };
-  }
+  window.spreadMode = 'single';
 
   function initSplitscreenRightDoc() {
     const select = $('cr-right-book-select');
@@ -7933,17 +7968,6 @@ function initEReaderAdvancedFeatures() {
   const summaryCloseBtn = $('cr-summarization-close');
 
   if (summaryBtn && summaryPanel && summaryCloseBtn) {
-    summaryBtn.onclick = () => {
-      const isVisible = summaryPanel.classList.toggle('hidden');
-      summaryBtn.classList.toggle('active', !isVisible);
-      if (!isVisible) {
-        if (typeof updatePageSummaryDisplay === 'function') {
-           updatePageSummaryDisplay(currentReaderBook ? currentReaderBook.currentPage || 1 : 1);
-        } else {
-           summaryContent.innerHTML = "Progressive Summarization enabled for this page block.";
-        }
-      }
-    };
     summaryCloseBtn.onclick = () => {
       summaryPanel.classList.add('hidden');
       summaryBtn.classList.remove('active');
@@ -7965,20 +7989,6 @@ function initEReaderAdvancedFeatures() {
   const mainPageView = $('cr-page-view');
 
   if (reflowBtn && reflowContainer) {
-    reflowBtn.onclick = () => {
-      window.reflowModeActive = !window.reflowModeActive;
-      reflowBtn.classList.toggle('active', window.reflowModeActive);
-      
-      if (window.reflowModeActive) {
-        reflowContainer.classList.remove('hidden');
-        mainPageView.classList.add('hidden');
-        renderReflowContent();
-      } else {
-        reflowContainer.classList.add('hidden');
-        mainPageView.classList.remove('hidden');
-      }
-    };
-
     $('cr-reflow-close-btn').onclick = () => {
       window.reflowModeActive = false;
       reflowBtn.classList.remove('active');
