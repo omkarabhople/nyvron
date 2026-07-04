@@ -345,12 +345,12 @@ ul { list-style: none; }
 .cal-cell { aspect-ratio: 1 / 1; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; transition: .25s var(--spring); animation: hmIn .3s var(--spring) both; }
 .cal-cell:active { transform: scale(0.86); }
 .cal-num { font-size: 16px; font-weight: 400; color: var(--txt1); }
-.cal-cell.today .cal-num { color: var(--green); font-weight: 700; }
-.cal-cell.selected { background: var(--green); border-radius: 50%; }
+.cal-cell.today .cal-num { color: var(--cascara); font-weight: 700; }
+.cal-cell.selected { background: var(--cascara); border-radius: 50%; }
 .cal-cell.selected .cal-num { color: rgb(255, 255, 255); font-weight: 700; }
 .cal-cell.other-month .cal-num { color: var(--txt3); }
 .cal-dot-row { display: flex; gap: 2px; }
-.cal-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--green); }
+.cal-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--cascara); }
 .cal-cell.selected .cal-dot { background: rgb(255, 255, 255); }
 .cal-day-panel { position: absolute; bottom: 0px; left: 0px; right: 0px; background: var(--surface); border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding-top: 24px; padding-right: 20px; padding-left: 20px; padding-bottom: calc(max(24px, env(safe-area-inset-bottom)) + 80px); transform: translateY(100%); transition: transform .4s var(--spring); z-index: 950; box-shadow: rgba(0, 0, 0, 0.4) 0px -10px 40px; backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); }
 .cal-day-panel.open { transform: translateY(0px); }
@@ -363,7 +363,7 @@ ul { list-style: none; }
 .cal-events-list { display: flex; flex-direction: column; padding-bottom: 120px; width: 100%; box-sizing: border-box; overflow-x: hidden; }
 .cal-event-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--separator); animation: listIn .3s var(--spring); }
 .cal-event-item:last-child { border-bottom: medium; }
-.cal-event-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.cal-event-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cascara); flex-shrink: 0; }
 .cal-event-time { font-size: 13px; color: var(--txt3); width: 52px; font-variant-numeric: tabular-nums; }
 .cal-event-title { flex: 1 1 0%; font-size: 16px; font-weight: 400; color: var(--txt1); }
 .cal-event-del { color: rgba(255, 59, 48, 0.4); font-size: 16px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: 0.2s; }
@@ -568,7 +568,7 @@ ul { list-style: none; }
 .cr-doc-author { font-size: 11px; color: var(--txt3); margin-top: 2px; }
 .cr-tools-panel { display: flex; gap: 4px; background: rgba(255, 255, 255, 0.06); padding: 3px; border-radius: 8px; overflow-x: auto; max-width: 100%; scrollbar-width: none; flex-wrap: nowrap; }
 .cr-tools-panel::-webkit-scrollbar { display: none; }
-.cr-tool-btn { background: none; border: medium; font-size: 15px; padding: 6px; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; transition: all 0.2s var(--spring); color: var(--txt2); display: flex; align-items: center; justify-content: center; }
+.cr-tool-btn { background: none; border: medium; font-size: 15px; padding: 6px; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; transition: background 0.2s var(--spring), color 0.2s var(--spring), transform 0.2s var(--spring); color: var(--txt2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .cr-tool-btn:hover { color: rgb(255, 255, 255); background: rgba(255, 255, 255, 0.06); }
 .cr-tool-btn.active { background: rgba(255, 255, 255, 0.15); transform: scale(1.05); color: var(--cascara) !important; }
 .cr-settings-group { display: flex; gap: 12px; align-items: center; }
@@ -1980,7 +1980,7 @@ ul { list-style: none; }
   background: var(--bg2);
   border-left: 1px solid var(--border);
   box-shadow: -8px 0 24px rgba(0,0,0,0.15);
-  z-index: 800;
+  z-index: 1200;
   display: flex;
   flex-direction: column;
   animation: slideInRight 0.3s var(--smooth) both;
@@ -2390,6 +2390,7 @@ ul { list-style: none; }
   .journal-card:hover .glassy-del-btn,
   .book-card:hover .glassy-del-btn,
   .book-cover-card:hover .glassy-del-btn,
+  .cal-timeline-card:hover .glassy-del-btn,
   .rem-item:hover .glassy-del-btn {
     opacity: 1;
     pointer-events: auto;
@@ -2637,6 +2638,27 @@ ul { list-style: none; }
 .cr-reflow-container {
   background: var(--bg);
 }
+.cascara-reader-overlay.theme-light .cr-reflow-container {
+  background: rgb(255, 255, 255) !important;
+  color: rgb(28, 28, 30) !important;
+}
+.cascara-reader-overlay.theme-light #cr-reflow-body {
+  color: rgb(28, 28, 30) !important;
+}
+.cascara-reader-overlay.theme-sepia .cr-reflow-container {
+  background: rgb(253, 246, 227) !important;
+  color: rgb(88, 110, 117) !important;
+}
+.cascara-reader-overlay.theme-sepia #cr-reflow-body {
+  color: rgb(88, 110, 117) !important;
+}
+.cascara-reader-overlay.theme-dark .cr-reflow-container {
+  background: rgb(28, 28, 30) !important;
+  color: rgb(245, 245, 247) !important;
+}
+.cascara-reader-overlay.theme-dark #cr-reflow-body {
+  color: rgb(245, 245, 247) !important;
+}
 
 .reflow-para {
   padding: 8px;
@@ -2793,6 +2815,7 @@ ul { list-style: none; }
 }
 .cal-timeline-card {
   flex: 1;
+  position: relative;
   background: rgba(28, 28, 30, 0.4);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -2969,3 +2992,128 @@ input[type="range"]:active {
 input[type="range"]:active::-webkit-slider-thumb {
   transform: scale(0.6);
 }
+
+/* Theme adjustments for Floating Panels and their internal children */
+
+/* Light Theme overrides */
+.cascara-reader-overlay.theme-light .cr-floating-panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
+  color: rgb(28, 28, 30) !important;
+}
+.cascara-reader-overlay.theme-light .cr-floating-panel * {
+  color: rgb(28, 28, 30) !important;
+}
+.cascara-reader-overlay.theme-light .cr-floating-panel input[type="range"]::-webkit-slider-runnable-track {
+  background: rgba(0, 0, 0, 0.1) !important;
+}
+.cascara-reader-overlay.theme-light .cr-floating-panel .cr-panel-divider {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+.cascara-reader-overlay.theme-light #cr-notes-textarea {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: rgb(28, 28, 30) !important;
+}
+.cascara-reader-overlay.theme-light #cr-notes-mic-btn {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: rgb(28, 28, 30) !important;
+}
+.cascara-reader-overlay.theme-light #cr-notes-save-btn {
+  background: var(--cascara) !important;
+  color: #000 !important;
+}
+.cascara-reader-overlay.theme-light #cr-speech-play-btn {
+  background: var(--cascara) !important;
+  color: #fff !important;
+}
+.cascara-reader-overlay.theme-light #cr-speech-voice-select {
+  background: #f4f4f6 !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  color: rgb(28, 28, 30) !important;
+}
+.cascara-reader-overlay.theme-light .cr-font-options button {
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+.cascara-reader-overlay.theme-light .cr-font-options button.active {
+  background: rgba(0, 0, 0, 0.08) !important;
+  font-weight: bold;
+}
+
+/* Sepia Theme overrides */
+.cascara-reader-overlay.theme-sepia .cr-floating-panel {
+  background: rgba(253, 246, 227, 0.97) !important;
+  border: 1px solid rgba(88, 110, 117, 0.2) !important;
+  box-shadow: 0 10px 40px rgba(88, 110, 117, 0.15) !important;
+  color: rgb(88, 110, 117) !important;
+}
+.cascara-reader-overlay.theme-sepia .cr-floating-panel * {
+  color: rgb(88, 110, 117) !important;
+}
+.cascara-reader-overlay.theme-sepia .cr-floating-panel input[type="range"]::-webkit-slider-runnable-track {
+  background: rgba(88, 110, 117, 0.15) !important;
+}
+.cascara-reader-overlay.theme-sepia .cr-floating-panel .cr-panel-divider {
+  background: rgba(88, 110, 117, 0.1) !important;
+}
+.cascara-reader-overlay.theme-sepia #cr-notes-textarea {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(88, 110, 117, 0.15) !important;
+  color: rgb(88, 110, 117) !important;
+}
+.cascara-reader-overlay.theme-sepia #cr-notes-mic-btn {
+  background: rgba(88, 110, 117, 0.05) !important;
+  border-color: rgba(88, 110, 117, 0.15) !important;
+  color: rgb(88, 110, 117) !important;
+}
+.cascara-reader-overlay.theme-sepia #cr-notes-save-btn {
+  background: rgb(232, 101, 42) !important;
+  color: #fff !important;
+}
+.cascara-reader-overlay.theme-sepia #cr-speech-play-btn {
+  background: rgb(232, 101, 42) !important;
+  color: #fff !important;
+}
+.cascara-reader-overlay.theme-sepia #cr-speech-voice-select {
+  background: #fdf6e3 !important;
+  border-color: rgba(88, 110, 117, 0.2) !important;
+  color: rgb(88, 110, 117) !important;
+}
+.cascara-reader-overlay.theme-sepia .cr-font-options button {
+  border-color: rgba(88, 110, 117, 0.2) !important;
+}
+.cascara-reader-overlay.theme-sepia .cr-font-options button.active {
+  background: rgba(88, 110, 117, 0.12) !important;
+  font-weight: bold;
+}
+
+/* Dark Theme overrides (to ensure consistency even with inline styles) */
+.cascara-reader-overlay.theme-dark .cr-floating-panel {
+  background: rgba(28, 28, 30, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: rgb(245, 245, 247) !important;
+}
+.cascara-reader-overlay.theme-dark .cr-floating-panel * {
+  color: rgb(245, 245, 247) !important;
+}
+.cascara-reader-overlay.theme-dark #cr-notes-textarea {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+.cascara-reader-overlay.theme-dark #cr-notes-mic-btn {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+}
+.cascara-reader-overlay.theme-dark #cr-speech-voice-select {
+  background: #1e1e20 !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #fff !important;
+}
+.cascara-reader-overlay.theme-dark .cr-font-options button.active {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+

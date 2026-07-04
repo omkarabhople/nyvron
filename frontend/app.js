@@ -38,6 +38,7 @@ const STATE = {
   selectedMood: '🙂',
   journalEditId: null,
   journalEditAttachments: [],
+  activeJournalTagFilter: 'All',
   direction: localStorage.getItem('nv-direction')||'Stability, consistency, and confidence.',
   profile: JSON.parse(localStorage.getItem('nv-profile')||'{"name":"User"}'),
   
@@ -463,6 +464,8 @@ function openCalCreator() {
   
   $('cc-repeat').value = 'never';
   $('cc-calendar-type').value = 'personal';
+  const dot = document.querySelector('#cc-calendar-group .dot-indicator');
+  if (dot) dot.style.background = '#30d158';
   $('cc-alert').value = 'none';
   $('cc-url').value = '';
   $('cc-notes').value = '';
@@ -659,6 +662,74 @@ function showAlert(title, message) {
   _openAppleDialog({ title, message, hasInput: false, okLabel: 'OK' });
 }
 
+function showGlassyToast(title, message) {
+  let container = $('glassy-toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'glassy-toast-container';
+    container.style.cssText = `
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 9999;
+      pointer-events: none;
+    `;
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    min-width: 260px;
+    max-width: 360px;
+    background: rgba(28, 28, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transform: translateX(120%);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s;
+    opacity: 0;
+    pointer-events: auto;
+  `;
+
+  toast.innerHTML = `
+    <div style="font-size: 13px; font-weight: 700; color: var(--cascara, #ff9500); display: flex; align-items: center; gap: 6px;">
+      <span style="font-size:14px;">✓</span>
+      <span>${title}</span>
+    </div>
+    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.85); line-height: 1.4;">${message}</div>
+  `;
+
+  container.appendChild(toast);
+
+  // Trigger entrance
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      toast.style.transform = 'translateX(0)';
+      toast.style.opacity = '1';
+    }, 10);
+  });
+
+  // Auto remove
+  setTimeout(() => {
+    toast.style.transform = 'translateX(120%)';
+    toast.style.opacity = '0';
+    setTimeout(() => {
+      toast.remove();
+    }, 450);
+  }, 3000);
+}
+
 function showConfirm(title, message, onOk, onCancel) {
   _openAppleDialog({ title, message, hasInput: false, okLabel: 'Confirm', cancelLabel: 'Cancel', onOk, onCancel: onCancel || (() => {}) });
 }
@@ -811,6 +882,63 @@ function renderPlanner() {
 // --- hideBloomTyping ---
 function hideBloomTyping(){BLOOM?.classList.remove('typing');$('ai-typing')?.classList.add('hidden');}
 
+// --- getEventsForDate ---
+function getEventsForDate(dateStr) {
+  const dateStrMatch = dateStr;
+  const list = [];
+  
+  // Manual events
+  const manualEvs = STATE.events[dateStr] || [];
+  manualEvs.forEach(ev => {
+    let color = ev.color;
+    if (!color) {
+      if (ev.type === 'personal') color = '#30d158';
+      else if (ev.type === 'work') color = '#0a84ff';
+      else if (ev.type === 'important') color = '#ff453a';
+      else if (ev.type === 'project') color = '#a855f7';
+      else color = '#30d158';
+    }
+    list.push({
+      type: 'manual',
+      color,
+      ...ev
+    });
+  });
+  
+  // Journal entries
+  STATE.journalEntries.forEach(entry => {
+    const entryDateStr = new Date(entry.timestamp || entry.date).toISOString().split('T')[0];
+    if (entryDateStr === dateStrMatch) {
+      list.push({
+        type: 'journal',
+        color: '#0a84ff',
+        title: entry.title || 'Journal Entry',
+        timestamp: entry.timestamp || entry.date
+      });
+    }
+  });
+  
+  // Interaction Log
+  (STATE.interactionLog || []).forEach(log => {
+    const logDate = new Date(log.timestamp);
+    if (logDate.toISOString().split('T')[0] === dateStrMatch) {
+      list.push({
+        type: log.action || 'interaction',
+        color: log.action === 'highlight' ? '#ffcc00' :
+               log.action === 'dictation' ? '#30d158' : '#ff9500',
+        title: log.action === 'highlight' ? 'Highlight Created' :
+               log.action === 'dictation' ? 'Voice Capture' :
+               log.action === 'margin' ? 'Margin Drawing' : log.action,
+        timestamp: log.timestamp
+      });
+    }
+  });
+  
+  // Sort by timestamp
+  list.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
+  return list;
+}
+
 // --- renderCalendar ---
 function renderCalendar(){
   const year=STATE.calendarYear,month=STATE.calendarMonth;
@@ -820,11 +948,19 @@ function renderCalendar(){
   for(let i=0;i<firstDay;i++){const d=document.createElement('div');d.className='cal-cell other-month';grid.appendChild(d);}
   for(let d=1;d<=daysInMonth;d++){
     const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const hasEv=(STATE.events[dateStr]||[]).length>0;
+    const dayEvents = getEventsForDate(dateStr);
+    const hasEv = dayEvents.length > 0;
     const cell=document.createElement('div');
     cell.className=`cal-cell${dateStr===todayStr?' today':''}${STATE.selectedDate===dateStr?' selected':''}`;
     cell.style.animationDelay=`${d*.012}s`;
-    cell.innerHTML=`<span class="cal-num">${d}</span>${hasEv?'<div class="cal-dot-row"><div class="cal-dot"></div></div>':''}`;
+    
+    let dotsHtml = '';
+    if (hasEv) {
+      const colors = [...new Set(dayEvents.map(e => e.color))].slice(0, 4);
+      dotsHtml = `<div class="cal-dot-row">${colors.map(color => `<div class="cal-dot" style="background: ${color} !important;"></div>`).join('')}</div>`;
+    }
+    
+    cell.innerHTML=`<span class="cal-num">${d}</span>${dotsHtml}`;
     cell.addEventListener('click',()=>selectCalDate(dateStr));
     grid.appendChild(cell);
   }
@@ -983,6 +1119,9 @@ function openBookReader(book) {
 
   currentReaderBook = book;
   
+  const notesTextarea = $('cr-notes-textarea');
+  if (notesTextarea) notesTextarea.value = book.notes || "";
+  
   $('cr-doc-title').textContent = book.title;
   $('cr-doc-author').textContent = 'by ' + (book.author || 'Unknown');
   
@@ -1068,10 +1207,18 @@ function openBookReader(book) {
     const mSpacer = container.querySelector('#cr-mobile-scroll-spacer');
     if (mSpacer) mSpacer.remove();
 
+    const rightWrapper = $('cr-page-wrapper-right');
+    const isSpread = rightWrapper && !rightWrapper.classList.contains('hidden');
+
     // ── STEP 1: Size the wrapper to perfectly fill the available space ──
     // This is the FIXED book rectangle — it never changes size when zooming.
-    const padH = 32, padV = 24;
-    const availW = Math.max(100, container.clientWidth - padH);
+    const padH = 80;
+    const padV = 96;
+    const gap = isSpread ? 58 : 0;
+
+    const availW = isSpread 
+      ? Math.max(100, (container.clientWidth - padH - gap) / 2)
+      : Math.max(100, container.clientWidth - padH);
     const availH = Math.max(100, container.clientHeight - padV);
 
     // PDF native dimensions (600×780). Fit by aspect ratio.
@@ -1114,7 +1261,6 @@ function openBookReader(book) {
     }
 
     // ── STEP 3: Handle spread (right page) identically ──
-    const rightWrapper = $('cr-page-wrapper-right');
     if (rightWrapper && !rightWrapper.classList.contains('hidden')) {
       rightWrapper.style.width  = `${wrapperW}px`;
       rightWrapper.style.height = `${wrapperH}px`;
@@ -1149,7 +1295,7 @@ function openBookReader(book) {
       containerDiv.style.position = 'relative';
       containerDiv.style.left = 'auto';
     }
-    container.style.overflow = 'hidden';
+    container.style.overflow = 'auto';
     container.style.paddingBottom = '';
   }
 
@@ -1549,6 +1695,13 @@ function openBookReader(book) {
                 book.pdfTextCache = book.pdfTextCache || {};
                 book.pdfTextCache[pageNum] = nativeText;
                 
+                if (window.reflowModeActive && typeof window.renderReflowContent === 'function') {
+                  window.renderReflowContent();
+                }
+                if (typeof window.updatePageSummaryDisplay === 'function') {
+                  window.updatePageSummaryDisplay(pageNum);
+                }
+                
                 if (nativeText.length > 10) {
                   contentDiv.innerHTML = '';
                   let charCounter = 0;
@@ -1793,15 +1946,20 @@ function openBookReader(book) {
   }
 
   function renderReaderPage(pageNum) {
+    window.renderReaderPage = renderReaderPage;
     if (pageNum < 1) pageNum = 1;
     if (pageNum > book.totalPages) pageNum = book.totalPages;
+    
+    // Ensure we start on an odd page when entering dual page (e.g. 1-2, 3-4)
+    if (window.spreadMode === 'spread' && pageNum % 2 === 0) {
+      pageNum = Math.max(1, pageNum - 1);
+    }
     
     const isMobile = window.innerWidth <= 768;
     if (isMobile) {
       const pw = $('cr-page-container')?.querySelector(`.cr-page-wrapper[data-page="${pageNum}"]`);
       if (pw) {
         pw.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        
         book.currentPage = pageNum;
         book.progress = Math.round((book.currentPage / book.totalPages) * 100);
         save();
@@ -1832,11 +1990,61 @@ function openBookReader(book) {
       slider.value = pageNum;
     }
     const label = $('cr-page-label');
-    if (label) label.textContent = `Page ${pageNum} of ${book.totalPages} (${book.progress}%)`;
+    if (label) {
+      if (window.spreadMode === 'spread' && pageNum < book.totalPages) {
+        label.textContent = `Pages ${pageNum}-${pageNum+1} of ${book.totalPages} (${book.progress}%)`;
+      } else {
+        label.textContent = `Page ${pageNum} of ${book.totalPages} (${book.progress}%)`;
+      }
+    }
 
-    const contentDiv = $('cr-page-content');
-    const canvasPdf = $('cr-pdf-canvas');
+    // Render Left Side
+    renderReaderPageSide(pageNum, false);
+
+    // Render Right Side / Spread Mode
+    if (window.spreadMode === 'spread') {
+      const rightWrapper = $('cr-page-wrapper-right');
+      if (rightWrapper) {
+        if (pageNum + 1 <= book.totalPages) {
+          rightWrapper.classList.remove('hidden');
+          renderReaderPageSide(pageNum + 1, true);
+        } else {
+          rightWrapper.classList.add('hidden');
+        }
+      }
+    } else if (window.spreadMode === 'single') {
+      $('cr-page-wrapper-right')?.classList.add('hidden');
+    }
+
+    setTimeout(adjustReaderResponsiveScale, 100);
+
+    // Advanced E-Reader Feature updates
+    if (typeof logInteraction === 'function') {
+      logInteraction('page-turn', { bookTitle: book.title, page: pageNum });
+    }
+    if (typeof window.updatePageSummaryDisplay === 'function') {
+      window.updatePageSummaryDisplay(pageNum);
+    }
+    if (window.reflowModeActive && typeof window.renderReflowContent === 'function') {
+      window.renderReflowContent();
+    }
+    if (typeof redrawMarginVectors === 'function') {
+      setTimeout(() => { redrawMarginVectors('cr-markup-canvas', false); }, 150);
+      if (window.spreadMode === 'spread') {
+        setTimeout(() => { redrawMarginVectors('cr-markup-canvas-right', false); }, 150);
+      }
+    }
+  }
+
+  function renderReaderPageSide(pageNum, isRightSide) {
+    const suffix = isRightSide ? '-right' : '';
+    const contentDiv = $(`cr-page-content${suffix}`);
+    const canvasPdf = $(`cr-pdf-canvas${suffix}`);
     const ctxPdf = canvasPdf?.getContext('2d');
+    const markupCanvas = $(`cr-markup-canvas${suffix}`);
+    const ctxMarkup = markupCanvas?.getContext('2d');
+
+    if (!contentDiv || !canvasPdf) return;
 
     if (book.fileType === 'pdf') {
       if (pdfDoc) {
@@ -1863,6 +2071,13 @@ function openBookReader(book) {
                 const nativeText = textContent.items.map(item => item.str).join(' ').trim();
                 book.pdfTextCache = book.pdfTextCache || {};
                 book.pdfTextCache[pageNum] = nativeText;
+                
+                if (window.reflowModeActive && typeof window.renderReflowContent === 'function') {
+                  window.renderReflowContent();
+                }
+                if (typeof window.updatePageSummaryDisplay === 'function') {
+                  window.updatePageSummaryDisplay(pageNum);
+                }
                 
                 if (nativeText.length > 10) {
                   contentDiv.innerHTML = '';
@@ -1909,7 +2124,7 @@ function openBookReader(book) {
                   if (book.ocrData[pageNum]) {
                     renderOcrTextOverlay(book.ocrData[pageNum], book.selectedSearchMatch);
                   } else {
-                    runOcrOnCanvas(pageNum);
+                    if (!isRightSide) runOcrOnCanvas(pageNum);
                   }
                 }
               });
@@ -1917,66 +2132,49 @@ function openBookReader(book) {
           });
         });
       } else {
-        if (contentDiv) contentDiv.innerHTML = `<p class="empty-hint" style="padding: 40px; font-size: 16px;">Loading PDF contents...</p>`;
+        contentDiv.innerHTML = `<p class="empty-hint" style="padding: 40px; font-size: 16px;">Loading PDF contents...</p>`;
       }
     } else {
       if (canvasPdf && ctxPdf) {
         ctxPdf.clearRect(0, 0, canvasPdf.width, canvasPdf.height);
       }
-      if (contentDiv) {
-        book.highlights = book.highlights || {};
-        if (book.highlights[pageNum]) {
-          contentDiv.innerHTML = book.highlights[pageNum];
-        } else if (book.fileContent) {
-          const words = book.fileContent.split(/\s+/);
-          const startIdx = (pageNum - 1) * 200;
-          const pageWords = words.slice(startIdx, startIdx + 200);
-          
-          let htmlContent = pageWords.join(' ');
-          if (book.selectedSearchMatch && book.selectedSearchMatch.page === pageNum) {
-            const query = book.selectedSearchMatch.query;
-            const matchIndex = book.selectedSearchMatch.matchIndex;
-            let occ = 0;
-            htmlContent = htmlContent.replace(new RegExp(escapeRegExp(query), 'gi'), match => {
-              if (occ === matchIndex) {
-                occ++;
-                return `<span class="cr-highlight" style="background-color:rgba(0, 122, 255, 0.38);">${match}</span>`;
-              }
+      book.highlights = book.highlights || {};
+      if (book.highlights[pageNum]) {
+        contentDiv.innerHTML = book.highlights[pageNum];
+      } else if (book.fileContent) {
+        const words = book.fileContent.split(/\s+/);
+        const startIdx = (pageNum - 1) * 200;
+        const pageWords = words.slice(startIdx, startIdx + 200);
+        
+        let htmlContent = pageWords.join(' ');
+        if (book.selectedSearchMatch && book.selectedSearchMatch.page === pageNum) {
+          const query = book.selectedSearchMatch.query;
+          const matchIndex = book.selectedSearchMatch.matchIndex;
+          let occ = 0;
+          htmlContent = htmlContent.replace(new RegExp(escapeRegExp(query), 'gi'), match => {
+            if (occ === matchIndex) {
               occ++;
-              return match;
-            });
-          }
-          contentDiv.innerHTML = `<h3 style="margin-top:0; color:var(--cascara); font-family:var(--font);">${book.title}</h3><p style="white-space: pre-wrap; font-family:Georgia, serif; font-size:16px;">${htmlContent}</p>`;
+              return `<span class="cr-highlight" style="background-color:rgba(0, 122, 255, 0.38);">${match}</span>`;
+            }
+            occ++;
+            return match;
+          });
         }
+        contentDiv.innerHTML = `<h3 style="margin-top:0; color:var(--cascara); font-family:var(--font);">${book.title}</h3><p style="white-space: pre-wrap; font-family:Georgia, serif; font-size:16px;">${htmlContent}</p>`;
       }
     }
 
     // Load drawings
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    book.drawings = book.drawings || {};
-    if (book.drawings[pageNum]) {
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0);
-      };
-      img.src = book.drawings[pageNum];
-    }
-    
-    renderPageAnnotations();
-    setTimeout(adjustReaderResponsiveScale, 100);
-
-    // Advanced E-Reader Feature updates
-    if (typeof logInteraction === 'function') {
-      logInteraction('page-turn', { bookTitle: book.title, page: pageNum });
-    }
-    if (typeof updatePageSummaryDisplay === 'function') {
-      updatePageSummaryDisplay(pageNum);
-    }
-    if (window.reflowModeActive && typeof renderReflowContent === 'function') {
-      renderReflowContent();
-    }
-    if (typeof redrawMarginVectors === 'function') {
-      setTimeout(() => { redrawMarginVectors('cr-markup-canvas', false); }, 150);
+    if (ctxMarkup) {
+      ctxMarkup.clearRect(0, 0, markupCanvas.width, markupCanvas.height);
+      book.drawings = book.drawings || {};
+      if (book.drawings[pageNum]) {
+        const img = new Image();
+        img.onload = () => {
+          ctxMarkup.drawImage(img, 0, 0);
+        };
+        img.src = book.drawings[pageNum];
+      }
     }
   }
 
@@ -2313,35 +2511,34 @@ function openBookReader(book) {
         const popover = $(targetPopoverId);
         const wasHidden = popover?.classList.contains('hidden');
         hideAllPopovers();
-        if (wasHidden && popover) popover.classList.remove('hidden');
-      } else {
-        hideAllPopovers();
+        if (wasHidden && popover) {
+          popover.classList.remove('hidden');
+          newBtn.classList.add('active');
+        }
+        if (toolName === 'pen') {
+          activeTool = 'pen';
+          overlay.dataset.activeTool = activeTool;
+        }
+        return;
       }
 
       // 5. Two-Page Spread toggle
       if (toolName === 'spread') {
+        hideAllPopovers();
         const spreadBtn = $('cr-tool-spread');
-        if (window.spreadMode === 'single') {
-          window.spreadMode = 'spread';
-          spreadBtn.classList.add('active');
-          triggerNotification('Two-Page Spread', 'Showing consecutive pages of the book');
-          $('cr-page-wrapper-right')?.classList.remove('hidden');
-          $('cr-synthesis-gutter')?.classList.add('hidden');
-          $('cr-page-view-right-doc')?.classList.add('hidden');
-          renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
-        } else if (window.spreadMode === 'spread') {
-          window.spreadMode = 'split';
-          spreadBtn.classList.add('active');
-          triggerNotification('Multi-Doc Split View', 'Cross-book synthesis notes gutter active');
-          $('cr-page-wrapper-right')?.classList.add('hidden');
-          $('cr-synthesis-gutter')?.classList.remove('hidden');
-          $('cr-page-view-right-doc')?.classList.remove('hidden');
-          initSplitscreenRightDoc();
-        } else {
+        const dualBtn = $('cr-btn-dual');
+        if (window.spreadMode === 'spread') {
           window.spreadMode = 'single';
           spreadBtn.classList.remove('active');
-          triggerNotification('Single Page view', 'Restored default reader viewport');
+          triggerNotification('Single Page View', 'Restored default reader viewport');
           $('cr-page-wrapper-right')?.classList.add('hidden');
+          renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
+        } else {
+          window.spreadMode = 'spread';
+          spreadBtn.classList.add('active');
+          dualBtn?.classList.remove('active');
+          triggerNotification('Two-Page Spread', 'Showing consecutive pages of the book');
+          $('cr-page-wrapper-right')?.classList.remove('hidden');
           $('cr-synthesis-gutter')?.classList.add('hidden');
           $('cr-page-view-right-doc')?.classList.add('hidden');
           renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
@@ -2350,8 +2547,35 @@ function openBookReader(book) {
         return;
       }
 
+      // 5b. Dual Page / Multi-Doc View toggle
+      if (toolName === 'dual') {
+        hideAllPopovers();
+        const spreadBtn = $('cr-tool-spread');
+        const dualBtn = $('cr-btn-dual');
+        if (window.spreadMode === 'split') {
+          window.spreadMode = 'single';
+          dualBtn?.classList.remove('active');
+          triggerNotification('Single Page View', 'Restored default reader viewport');
+          $('cr-synthesis-gutter')?.classList.add('hidden');
+          $('cr-page-view-right-doc')?.classList.add('hidden');
+          renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
+        } else {
+          window.spreadMode = 'split';
+          dualBtn?.classList.add('active');
+          spreadBtn.classList.remove('active');
+          triggerNotification('Multi-Doc Split View', 'Cross-book synthesis notes gutter active');
+          $('cr-page-wrapper-right')?.classList.add('hidden');
+          $('cr-synthesis-gutter')?.classList.remove('hidden');
+          $('cr-page-view-right-doc')?.classList.remove('hidden');
+          initSplitscreenRightDoc();
+        }
+        adjustReaderResponsiveScale();
+        return;
+      }
+
       // 6. MCQ Sidebar toggle
       if (toolName === 'mcq') {
+        hideAllPopovers();
         const side = $('cr-mcq-sidebar');
         if (side) {
           const isHidden = side.classList.toggle('hidden');
@@ -2363,6 +2587,7 @@ function openBookReader(book) {
 
       // 7. Reflow Mode toggle
       if (toolName === 'reflow') {
+        hideAllPopovers();
         window.reflowModeActive = !window.reflowModeActive;
         newBtn.classList.toggle('active', window.reflowModeActive);
         const reflowContainer = $('cr-reflow-container');
@@ -2381,15 +2606,50 @@ function openBookReader(book) {
       // 8. Progressive Summarization toggle
       if (toolName === 'summary') {
         const summaryPanel = $('cr-summarization-panel');
-        const isHidden = summaryPanel?.classList.toggle('hidden');
-        newBtn.classList.toggle('active', !isHidden);
-        if (!isHidden) {
-          if (typeof updatePageSummaryDisplay === 'function') {
-            updatePageSummaryDisplay(currentReaderBook ? currentReaderBook.currentPage || 1 : 1);
+        const wasHidden = summaryPanel?.classList.contains('hidden');
+        hideAllPopovers();
+        if (wasHidden && summaryPanel) {
+          summaryPanel.classList.remove('hidden');
+          newBtn.classList.add('active');
+          if (typeof window.updatePageSummaryDisplay === 'function') {
+            window.updatePageSummaryDisplay(currentReaderBook ? currentReaderBook.currentPage || 1 : 1);
           } else {
             const summaryContent = $('cr-summary-content');
             if (summaryContent) summaryContent.innerHTML = "Progressive Summarization enabled for this page block.";
           }
+        }
+        return;
+      }
+
+      // 8b. Reading Notes Panel toggle
+      if (toolName === 'notes') {
+        const notesPanel = $('cr-notes-panel');
+        const wasHidden = notesPanel?.classList.contains('hidden');
+        hideAllPopovers();
+        if (wasHidden && notesPanel) {
+          notesPanel.classList.remove('hidden');
+          newBtn.classList.add('active');
+          if (currentReaderBook) {
+            const notesTextarea = $('cr-notes-textarea');
+            if (notesTextarea) {
+              notesTextarea.value = currentReaderBook.notes || "";
+              notesTextarea.focus();
+            }
+          }
+        }
+        return;
+      }
+      // 8c. Global Quick Notes toggle
+      if (toolName === 'quick-notes') {
+        const wasHidden = $('jw-notes-panel')?.classList.contains('hidden');
+        hideAllPopovers();
+        if (wasHidden) {
+          $('jw-notes-panel')?.classList.remove('hidden');
+          newBtn.classList.add('active');
+          if (typeof window.renderQuickNotes === 'function') window.renderQuickNotes();
+        } else {
+          $('jw-notes-panel')?.classList.add('hidden');
+          newBtn.classList.remove('active');
         }
         return;
       }
@@ -2427,19 +2687,187 @@ function openBookReader(book) {
     });
   });
 
+  // Dynamic Reading Notes Binding
+  const notesPanel = $('cr-notes-panel');
+  const notesCloseBtn = $('cr-notes-close');
+  const notesSaveBtn = $('cr-notes-save-btn');
+  const notesMicBtn = $('cr-notes-mic-btn');
+
+  let activeTextarea = notesTextarea;
+  if (notesTextarea) {
+    const newTextarea = notesTextarea.cloneNode(true);
+    notesTextarea.parentNode.replaceChild(newTextarea, notesTextarea);
+    newTextarea.value = book.notes || "";
+    activeTextarea = newTextarea;
+    
+    // Auto-save notes on input
+    newTextarea.addEventListener('input', () => {
+      book.notes = newTextarea.value;
+      save();
+    });
+  }
+
+  if (notesCloseBtn && notesPanel) {
+    const newCloseBtn = notesCloseBtn.cloneNode(true);
+    notesCloseBtn.parentNode.replaceChild(newCloseBtn, notesCloseBtn);
+    newCloseBtn.onclick = () => {
+      notesPanel.classList.add('hidden');
+      $('cr-btn-notes')?.classList.remove('active');
+      if (isNotesRecording && notesSpeechRec) {
+        notesSpeechRec.stop();
+        isNotesRecording = false;
+        const currentMicBtn = $('cr-notes-mic-btn');
+        if (currentMicBtn) {
+          currentMicBtn.style.background = '';
+          currentMicBtn.style.borderColor = '';
+          currentMicBtn.style.color = '';
+          currentMicBtn.innerHTML = '🎙️ Dictate';
+        }
+      }
+    };
+  }
+
+  if (notesSaveBtn && activeTextarea) {
+    console.log("Binding cr-notes-save-btn click handler dynamically.");
+    const newSaveBtn = notesSaveBtn.cloneNode(true);
+    notesSaveBtn.parentNode.replaceChild(newSaveBtn, notesSaveBtn);
+    newSaveBtn.onclick = () => {
+      console.log("cr-notes-save-btn clicked!");
+      const notesValue = activeTextarea.value;
+      console.log("Notes value to save:", notesValue);
+      book.notes = notesValue;
+
+      // Sync to Journal (incorporate tags in the body text so renderJournal handles them correctly)
+      const title = `Reading Notes: ${book.title}`;
+      const tags = `#reading #notes #${book.title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}`;
+      const cleanNotesValue = notesValue.replace(/#reading|#notes/g, '').trim();
+      const bodyWithTags = cleanNotesValue + '\n\n' + tags;
+
+      let entry = STATE.journalEntries.find(e => e.title === title);
+      if (entry) {
+        entry.body = bodyWithTags;
+        entry.updatedAt = Date.now();
+        console.log("Updating existing journal entry:", title);
+      } else {
+        entry = {
+          id: randomId(),
+          title: title,
+          body: bodyWithTags,
+          timestamp: Date.now(),
+          date: new Date().toISOString(),
+          mood: '🙂',
+          gradient: GRADIENTS[STATE.journalEntries.length % GRADIENTS.length],
+          attachments: [
+            { type: 'location', name: `Notes on: ${book.title}` }
+          ]
+        };
+        STATE.journalEntries.unshift(entry);
+        console.log("Creating new journal entry:", title);
+      }
+
+      save();
+      renderJournal();
+      console.log("Successfully saved books and journal entries.");
+      showGlassyToast('Saved', 'Reading notes saved and synced to Journal. 📝');
+    };
+  }
+
+  if (notesMicBtn && activeTextarea) {
+    const newMicBtn = notesMicBtn.cloneNode(true);
+    notesMicBtn.parentNode.replaceChild(newMicBtn, notesMicBtn);
+    newMicBtn.onclick = () => {
+      console.log("notesMicBtn click registered dynamically");
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        console.log("SpeechRecognition not supported, showing prompt fallback");
+        showPrompt('Voice Dictation Fallback', 'Speech Recognition is not supported by your environment. Please type or paste your notes here:', '', (input) => {
+          if (input) {
+            activeTextarea.value = (activeTextarea.value + ' ' + input).trim();
+            book.notes = activeTextarea.value;
+            save();
+          }
+        });
+        return;
+      }
+
+      if (isNotesRecording) {
+        if (notesSpeechRec) {
+          notesSpeechRec.stop();
+        }
+        isNotesRecording = false;
+        newMicBtn.style.background = '';
+        newMicBtn.style.borderColor = '';
+        newMicBtn.style.color = '';
+        newMicBtn.innerHTML = '🎙️ Dictate';
+        triggerNotification('Dictation Stopped', 'Voice dictation has ended. Notes saved! 📝');
+      } else {
+        try {
+          notesSpeechRec = new SpeechRecognition();
+          notesSpeechRec.continuous = true;
+          notesSpeechRec.interimResults = false;
+          notesSpeechRec.onresult = (ev) => {
+            let finalTranscript = '';
+            for (let i = ev.resultIndex; i < ev.results.length; ++i) {
+              if (ev.results[i].isFinal) {
+                finalTranscript += ev.results[i][0].transcript;
+              }
+            }
+            if (finalTranscript.trim()) {
+              const currentVal = activeTextarea.value;
+              activeTextarea.value = (currentVal ? currentVal + ' ' : '') + finalTranscript.trim();
+              book.notes = activeTextarea.value;
+              save();
+            }
+          };
+          notesSpeechRec.onend = () => {
+            if (isNotesRecording) {
+              try { notesSpeechRec.start(); } catch (e) {}
+            }
+          };
+          notesSpeechRec.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            if (event.error === 'not-allowed') {
+              triggerNotification('Microphone Blocked', 'Please grant microphone access to this page.');
+            } else if (event.error === 'network') {
+              triggerNotification('Network Error', 'Speech recognition requires active internet connection.');
+            } else {
+              triggerNotification('Dictation Error', 'Error: ' + event.error);
+            }
+            isNotesRecording = false;
+            newMicBtn.style.background = '';
+            newMicBtn.style.borderColor = '';
+            newMicBtn.style.color = '';
+            newMicBtn.innerHTML = '🎙️ Dictate';
+          };
+
+          notesSpeechRec.start();
+          isNotesRecording = true;
+          newMicBtn.style.background = 'rgba(255, 69, 58, 0.2)';
+          newMicBtn.style.borderColor = 'rgba(255, 69, 58, 0.5)';
+          newMicBtn.style.color = '#ff453a';
+          newMicBtn.innerHTML = '🛑 Listening...';
+          triggerNotification('Dictation Active', 'Speak to dictate reading notes... 🎙');
+        } catch (err) {
+          triggerNotification('Microphone Error', 'Could not start voice dictation.');
+        }
+      }
+    };
+  }
+
   // Keyboard navigation
   const handleKeyboardNav = e => {
     if (overlay.classList.contains('hidden')) return;
     if (document.activeElement && (document.activeElement.id === 'cr-search-input' || document.activeElement.id === 'cr-chat-input')) return;
     
+    const step = window.spreadMode === 'spread' ? 2 : 1;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
       if (book.currentPage < book.totalPages) {
-        renderReaderPage(book.currentPage + 1);
+        renderReaderPage(book.currentPage + step);
         e.preventDefault();
       }
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       if (book.currentPage > 1) {
-        renderReaderPage(book.currentPage - 1);
+        renderReaderPage(book.currentPage - step);
         e.preventDefault();
       }
     }
@@ -2463,6 +2891,17 @@ function openBookReader(book) {
     $('cr-speech-settings')?.classList.add('hidden');
     $('cr-font-settings')?.classList.add('hidden');
     $('cr-pen-settings')?.classList.add('hidden');
+    $('cr-summarization-panel')?.classList.add('hidden');
+    $('cr-notes-panel')?.classList.add('hidden');
+    $('jw-notes-panel')?.classList.add('hidden');
+    
+    // Reset active states for popover buttons
+    $('cr-tool-speech')?.classList.remove('active');
+    $('cr-tool-font')?.classList.remove('active');
+    $('cr-tool-pen')?.classList.remove('active');
+    $('cr-btn-summary')?.classList.remove('active');
+    $('cr-btn-notes')?.classList.remove('active');
+    $('cr-btn-quick-notes')?.classList.remove('active');
   };
 
   // Typography Preferences
@@ -2843,6 +3282,8 @@ function openBookReader(book) {
     window.removeEventListener('keydown', handleKeyboardNav);
     window.removeEventListener('resize', adjustReaderResponsiveScale);
     overlay.classList.add('hidden');
+    $('cr-notes-panel')?.classList.add('hidden');
+    $('cr-summarization-panel')?.classList.add('hidden');
     document.querySelector('.tab-bar')?.classList.remove('hidden');
     $('cr-chat-widget')?.classList.add('hidden');
     $('cr-chat-fab')?.classList.add('hidden');
@@ -2883,11 +3324,13 @@ function openBookReader(book) {
 };
 
   $('cr-prev-page').onclick = () => {
-    if (book.currentPage > 1) renderReaderPage(book.currentPage - 1);
+    const step = window.spreadMode === 'spread' ? 2 : 1;
+    if (book.currentPage > 1) renderReaderPage(book.currentPage - step);
   };
 
   $('cr-next-page').onclick = () => {
-    if (book.currentPage < book.totalPages) renderReaderPage(book.currentPage + 1);
+    const step = window.spreadMode === 'spread' ? 2 : 1;
+    if (book.currentPage < book.totalPages) renderReaderPage(book.currentPage + step);
   };
 
   $('cr-page-slider').oninput = function() {
@@ -3184,6 +3627,7 @@ function openBookReader(book) {
         }).promise.then(pdf => {
           console.log("openBookReader: pdfjsLib.getDocument resolved successfully, pages:", pdf.numPages);
           pdfDoc = pdf;
+          window.pdfDoc = pdf;
           book.totalPages = pdf.numPages;
           save();
 
@@ -3580,22 +4024,40 @@ function renderCalEvents(dateStr){
     li.style.animationDelay = `${i * 0.05}s`;
     
     // Determine color based on event type if not provided
-    let glowColor = ev.color || '#30d158'; // default green
-    if (ev.type === 'journal') glowColor = '#0a84ff';
-    if (ev.type === 'margin') glowColor = '#ff9500'; // orange
-    if (ev.type === 'highlight') glowColor = '#ffcc00'; // yellow
+    let glowColor = ev.color;
+    if (!glowColor) {
+      if (ev.type === 'personal') glowColor = '#30d158';
+      else if (ev.type === 'work') glowColor = '#0a84ff';
+      else if (ev.type === 'important') glowColor = '#ff453a';
+      else if (ev.type === 'project') glowColor = '#a855f7';
+      else if (ev.type === 'journal') glowColor = '#0a84ff';
+      else if (ev.type === 'margin') glowColor = '#ff9500';
+      else if (ev.type === 'highlight') glowColor = '#ffcc00';
+      else if (ev.type === 'dictation') glowColor = '#30d158';
+      else glowColor = '#30d158';
+    }
     
     const timeText = ev.time || '12:00 PM';
+    
+    const isManual = ev.type !== 'journal' && ev.type !== 'highlight' && ev.type !== 'dictday' && ev.type !== 'dictation' && ev.type !== 'margin' && ev.type !== 'interaction';
+    const deleteBtnHtml = isManual ? `
+      <button class="glassy-del-btn" onclick="event.stopPropagation(); appDeleteCalEvent('${dateStr}', '${ev.id}')" title="Delete Event">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </button>
+    ` : '';
 
     li.innerHTML = `
       <div class="cal-timeline-track">
         <div class="cal-timeline-dot" style="background: ${glowColor}; box-shadow: 0 0 10px ${glowColor};"></div>
         <div class="cal-timeline-line"></div>
       </div>
-      <div class="cal-timeline-card">
-        <div class="cal-timeline-time">${timeText}</div>
-        <div class="cal-timeline-title">${ev.title}</div>
-        ${ev.desc ? `<div class="cal-timeline-desc">${ev.desc}</div>` : ''}
+      <div class="cal-timeline-card" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; width: 100%;">
+        <div style="flex: 1;">
+          <div class="cal-timeline-time">${timeText}</div>
+          <div class="cal-timeline-title" style="font-weight: 600; color: var(--txt1);">${ev.title}</div>
+          ${(ev.desc || ev.notes) ? `<div class="cal-timeline-desc" style="font-size: 12px; color: var(--txt2); margin-top: 4px;">${ev.desc || ev.notes}</div>` : ''}
+        </div>
+        ${deleteBtnHtml}
       </div>
     `;
     list.appendChild(li);
@@ -3605,52 +4067,46 @@ function renderCalEvents(dateStr){
 
 
 function applyManualTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
   if (!document.startViewTransition) {
-
-  document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
-  if (theme === 'light') {
-    document.body.classList.add('theme-paper');
-  } else if (theme === 'dark') {
-    document.body.classList.add('theme-dark-vault');
-  }
-
+    document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
+    if (theme === 'light') {
+      document.body.classList.add('theme-paper');
+    } else if (theme === 'dark') {
+      document.body.classList.add('theme-dark-vault');
+    }
     return;
   }
   document.startViewTransition(() => {
-
-  document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
-  if (theme === 'light') {
-    document.body.classList.add('theme-paper');
-  } else if (theme === 'dark') {
-    document.body.classList.add('theme-dark-vault');
-  }
-
+    document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
+    if (theme === 'light') {
+      document.body.classList.add('theme-paper');
+    } else if (theme === 'dark') {
+      document.body.classList.add('theme-dark-vault');
+    }
   });
 }
 
 function applyAutoTheme() {
-  if (!document.startViewTransition) {
-
   const h = new Date().getHours();
-  document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
-  if (h >= 6 && h < 18) {
-    document.body.classList.add('theme-paper');
-  } else {
-    document.body.classList.add('theme-dark-vault');
-  }
-
+  const autoTheme = (h >= 6 && h < 18) ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', autoTheme);
+  if (!document.startViewTransition) {
+    document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
+    if (h >= 6 && h < 18) {
+      document.body.classList.add('theme-paper');
+    } else {
+      document.body.classList.add('theme-dark-vault');
+    }
     return;
   }
   document.startViewTransition(() => {
-
-  const h = new Date().getHours();
-  document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
-  if (h >= 6 && h < 18) {
-    document.body.classList.add('theme-paper');
-  } else {
-    document.body.classList.add('theme-dark-vault');
-  }
-
+    document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
+    if (h >= 6 && h < 18) {
+      document.body.classList.add('theme-paper');
+    } else {
+      document.body.classList.add('theme-dark-vault');
+    }
   });
 }
 
@@ -3724,9 +4180,89 @@ function updateClock(){
 function renderJournal(){
   const grid=$('journal-entries'),empty=$('journal-empty');if(!grid)return;
   grid.innerHTML='';
-  const entries=[...STATE.journalEntries].reverse();
-  if(!entries.length){empty?.classList.remove('hidden');return;}
+
+  // Dynamically extract all unique hashtags from journal entries
+  const tagsSet = new Set();
+  STATE.journalEntries.forEach(entry => {
+    const text = (entry.title || '') + ' ' + (entry.body || '');
+    const matches = text.match(/#\w+/g);
+    if (matches) {
+      matches.forEach(m => tagsSet.add(m));
+    }
+  });
+  const uniqueTags = Array.from(tagsSet);
+
+  // Render tag filter bar
+  const filterContainer = $('journal-tag-filter-container');
+  if (filterContainer) {
+    filterContainer.innerHTML = '';
+    
+    // All tag option
+    const allPill = document.createElement('button');
+    allPill.className = 'tag-filter-pill' + (STATE.activeJournalTagFilter === 'All' ? ' active' : '');
+    allPill.textContent = 'All';
+    allPill.style.cssText = `
+      padding: 6px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: ${STATE.activeJournalTagFilter === 'All' ? 'var(--cascara)' : 'rgba(255, 255, 255, 0.05)'};
+      color: ${STATE.activeJournalTagFilter === 'All' ? '#000' : 'var(--txt2)'};
+      flex-shrink: 0;
+    `;
+    allPill.addEventListener('click', () => {
+      STATE.activeJournalTagFilter = 'All';
+      renderJournal();
+    });
+    filterContainer.appendChild(allPill);
+    
+    // Distinct tag options from data
+    uniqueTags.forEach(tag => {
+      const pill = document.createElement('button');
+      pill.className = 'tag-filter-pill' + (STATE.activeJournalTagFilter === tag ? ' active' : '');
+      pill.textContent = tag;
+      pill.style.cssText = `
+        padding: 6px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: ${STATE.activeJournalTagFilter === tag ? 'var(--cascara)' : 'rgba(255, 255, 255, 0.05)'};
+        color: ${STATE.activeJournalTagFilter === tag ? '#000' : 'var(--txt2)'};
+        flex-shrink: 0;
+      `;
+      pill.addEventListener('click', () => {
+        STATE.activeJournalTagFilter = tag;
+        renderJournal();
+      });
+      filterContainer.appendChild(pill);
+    });
+  }
+
+  let entries = [...STATE.journalEntries].reverse();
+  if (STATE.activeJournalTagFilter && STATE.activeJournalTagFilter !== 'All') {
+    entries = entries.filter(e => {
+      const text = (e.title || '') + ' ' + (e.body || '');
+      return text.toLowerCase().includes(STATE.activeJournalTagFilter.toLowerCase());
+    });
+  }
+
+  if(!entries.length){
+    if (STATE.activeJournalTagFilter === 'All') {
+      empty?.classList.remove('hidden');
+    } else {
+      grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--txt3); padding: 40px 20px; font-size: 13px;">No entries match tag ${STATE.activeJournalTagFilter}</div>`;
+      empty?.classList.add('hidden');
+    }
+    return;
+  }
   empty?.classList.add('hidden');
+
   entries.forEach((e,i)=>{
     const wrapper=document.createElement('div'); wrapper.className='journal-card-wrapper swipe-wrap';
     wrapper.style.animationDelay=`${i*.07}s`;
@@ -3754,6 +4290,20 @@ function renderJournal(){
       attachHtml += '</div>';
     }
 
+    const entryTags = [];
+    const textMatches = ((e.title || '') + ' ' + (e.body || '')).match(/#\w+/g);
+    if (textMatches) {
+      [...new Set(textMatches)].forEach(tag => entryTags.push(tag));
+    }
+    let tagsHtml = '';
+    if (entryTags.length > 0) {
+      tagsHtml = '<div class="card-tags-row" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">';
+      entryTags.forEach(tag => {
+        tagsHtml += `<span class="entry-tag-chip" style="display: inline-block; background: rgba(168, 85, 247, 0.1); color: #a855f7; border-radius: 12px; padding: 2px 8px; font-size: 10px; font-weight: 600;">${tag}</span>`;
+      });
+      tagsHtml += '</div>';
+    }
+
     const moodColors = {
       '😆': '#E8652A',
       '😊': '#30D158',
@@ -3772,6 +4322,7 @@ function renderJournal(){
         <div class="jc-top"><span class="jc-date" style="color:rgba(18,18,20,0.55);">${dateText}</span><span class="jc-mood">${e.mood||'🙂'}</span></div>
         <div class="jc-title" style="color:#121214; font-weight:700;">${e.title||'Untitled'}</div>
         <div class="jc-preview" style="color:rgba(18,18,20,0.7);">${e.body||''}</div>
+        ${tagsHtml}
         ${attachHtml}
       </div>
       </div>
@@ -5241,6 +5792,7 @@ function initJournalEditorIntelligence() {
       listEl.appendChild(card);
     });
   };
+  window.renderQuickNotes = renderQuickNotes;
 
   $('jw-notes-add')?.addEventListener('click', () => {
     quickNotes.push({ id: randomId(), text: '', color: 'note-orange', timestamp: Date.now() });
@@ -6704,6 +7256,17 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCalendar();
   });
 
+  $('cc-calendar-type')?.addEventListener('change', (e) => {
+    const type = e.target.value;
+    const dot = document.querySelector('#cc-calendar-group .dot-indicator');
+    if (dot) {
+      if (type === 'personal') dot.style.background = '#30d158';
+      else if (type === 'work') dot.style.background = '#0a84ff';
+      else if (type === 'important') dot.style.background = '#ff453a';
+      else if (type === 'project') dot.style.background = '#a855f7';
+    }
+  });
+
   $('cc-cancel')?.addEventListener('click', closeCalCreator);
   $('cc-save')?.addEventListener('click', () => {
     const title = $('cc-title')?.value.trim();
@@ -6713,6 +7276,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const dateStr = STATE.selectedDate || today();
     
+    const type = $('cc-calendar-type')?.value || 'personal';
+    let color = '#30d158';
+    if (type === 'personal') color = '#30d158';
+    else if (type === 'work') color = '#0a84ff';
+    else if (type === 'important') color = '#ff453a';
+    else if (type === 'project') color = '#a855f7';
+
     const newEv = {
       id: randomId(),
       title,
@@ -6720,6 +7290,8 @@ document.addEventListener('DOMContentLoaded', () => {
       time: isAllDay ? 'All day' : startTime,
       url: $('cc-url')?.value.trim() || '',
       notes: $('cc-notes')?.value || '',
+      type,
+      color,
     };
     
     if(!STATE.events[dateStr]) STATE.events[dateStr] = [];
@@ -7148,7 +7720,55 @@ document.addEventListener('DOMContentLoaded', () => {
 // Global references for e-reader features
 let currentReaderBook = null;
 window.reflowModeActive = false;
+let notesSpeechRec = null;
+let isNotesRecording = false;
 let drawingVectors = JSON.parse(localStorage.getItem('nv-drawing-vectors') || '{}');
+
+window.appCloseReflow = () => {
+  window.reflowModeActive = false;
+  document.getElementById('cr-btn-reflow')?.classList.remove('active');
+  document.getElementById('cr-reflow-container')?.classList.add('hidden');
+  document.getElementById('cr-page-view')?.classList.remove('hidden');
+  if (typeof window.renderReaderPage === 'function' && currentReaderBook) {
+    window.renderReaderPage(currentReaderBook.currentPage || 1);
+  }
+};
+
+window.logInteraction = (action, payload) => {
+  const logEntry = {
+    timestamp: Date.now(),
+    action,
+    payload: typeof payload === 'string' ? payload : JSON.stringify(payload)
+  };
+  STATE.interactionLog = STATE.interactionLog || [];
+  STATE.interactionLog.push(logEntry);
+  localStorage.setItem('nv-interaction-log', JSON.stringify(STATE.interactionLog));
+  if (typeof broadcastSyncEvent === 'function') {
+    broadcastSyncEvent('sync-log', logEntry);
+  }
+  
+  // Re-render calendar events if viewing today
+  const activeDate = STATE.selectedDate || today();
+  const entryDate = new Date(logEntry.timestamp).toISOString().split('T')[0];
+  if (activeDate === entryDate && typeof renderCalEvents === 'function') {
+    renderCalEvents(activeDate);
+  }
+};
+
+window.appDeleteCalEvent = (dateStr, id) => {
+  showConfirm('Delete Event', 'Are you sure you want to delete this event?', () => {
+    if (STATE.events[dateStr]) {
+      STATE.events[dateStr] = STATE.events[dateStr].filter(ev => ev.id !== id);
+      save();
+      renderCalendar();
+      renderCalEvents(dateStr);
+      
+      if (typeof broadcastSyncEvent === 'function') {
+        broadcastSyncEvent('sync-delete-event', { dateStr, id });
+      }
+    }
+  });
+};
 
 // 10 Ecosystem-Beating E-Reader & Knowledge Base Features
 function initEReaderAdvancedFeatures() {
@@ -7432,8 +8052,11 @@ function initEReaderAdvancedFeatures() {
     $('cr-rec-stop-btn').onclick = () => {
       recOverlay.remove();
       style.remove();
-      micBtn.classList.remove('active');
-      micBtn.classList.remove('recording-active');
+      const currentMicBtn = $('cr-mic-capture-btn');
+      if (currentMicBtn) {
+        currentMicBtn.classList.remove('active');
+        currentMicBtn.classList.remove('recording-active');
+      }
 
       const docTitle = currentReaderBook ? currentReaderBook.title : 'Comprehensive Conservation Report';
       const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 16;
@@ -7458,11 +8081,25 @@ function initEReaderAdvancedFeatures() {
       };
       
       STATE.journalEntries.push(newEntry);
+      
+      // Also save to book's reading notes (Feature addition)
+      if (currentReaderBook) {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const notePrefix = `\n[Audio Capture - ${timeStr}]: `;
+        currentReaderBook.notes = (currentReaderBook.notes || "") + notePrefix + transcription + "\n";
+        
+        // Dynamically update the notes textarea if it's currently open
+        const notesTextarea = $('cr-notes-textarea');
+        if (notesTextarea) {
+          notesTextarea.value = currentReaderBook.notes;
+        }
+      }
+
       save();
       renderJournal();
       renderSmartCaptureList();
       logInteraction('smart-capture', { bookTitle: docTitle, page: pageNum, transcription });
-      triggerNotification('Micro-Journal Created', 'Smart capture note successfully saved 🔥');
+      triggerNotification('Smart Capture Saved', 'Stored inside your Journal & appended to Reading Notes! 📝');
     };
   }
 
@@ -7656,21 +8293,20 @@ function initEReaderAdvancedFeatures() {
     let touchStartX = 0;
     let touchCurrentX = 0;
     let isDraggingCard = false;
-    let lastTap = 0;
     const cardEl = $('fc-carousel-card');
+
+    if (cardEl) {
+      cardEl.onclick = () => {
+        const isFlipped = cardInner.style.transform.includes('rotateY(180deg)');
+        cardInner.style.transform = isFlipped ? 'none' : 'rotateY(180deg)';
+      };
+    }
 
     cardEl.addEventListener('touchstart', (e) => {
       touchStartX = e.touches[0].clientX;
       touchCurrentX = touchStartX;
       isDraggingCard = true;
       cardEl.style.transition = 'none';
-
-      const now = Date.now();
-      if (now - lastTap < 300) { // Double tap
-         const isFlipped = cardInner.style.transform.includes('rotateY(180deg)');
-         cardInner.style.transform = isFlipped ? 'none' : 'rotateY(180deg)';
-      }
-      lastTap = now;
     }, {passive: true});
 
     cardEl.addEventListener('touchmove', (e) => {
@@ -7958,6 +8594,17 @@ function initEReaderAdvancedFeatures() {
     });
   }
 
+  function renderSynthesisNotes() {
+    const list = $('cr-synthesis-list');
+    if (!list) return;
+    list.innerHTML = STATE.synthesisNotes.map(n => `
+      <div class="synthesis-note-item" style="padding:10px; border-bottom:1px solid var(--border); font-size:12px;">
+        <p style="margin:0; color:var(--txt1);">${n.text}</p>
+        <span style="font-size:10px; color:var(--txt3);">${new Date(n.timestamp).toLocaleTimeString()}</span>
+      </div>
+    `).join('');
+  }
+
   renderSynthesisNotes();
 
   // 8. Progressive Summarization (Feature 8)
@@ -7970,16 +8617,111 @@ function initEReaderAdvancedFeatures() {
   if (summaryBtn && summaryPanel && summaryCloseBtn) {
     summaryCloseBtn.onclick = () => {
       summaryPanel.classList.add('hidden');
-      summaryBtn.classList.remove('active');
+      $('cr-btn-summary')?.classList.remove('active');
     };
   }
 
-  if (summaryDepthSlider && summaryContent) {
-    summaryDepthSlider.oninput = (e) => {
-      const depth = e.target.value;
-      if (depth === '1') summaryContent.innerHTML = "<b>Brief:</b> This page discusses main topic features.";
-      else if (depth === '2') summaryContent.innerHTML = "<b>Detailed:</b> The page outlines multiple strategies for the project and discusses environmental policies in detail. Concepts include Zonal mapping.";
-      else summaryContent.innerHTML = "<b>Complete:</b> The Comprehensive Conservation Report on this page goes into full analytical depth regarding western India policies, mapping specific zones like Ranibennur, and establishing Q3 strategies for the future.";
+
+
+  const fetchPageTextAsync = (pageNum) => {
+    if (!currentReaderBook) return Promise.resolve("");
+    currentReaderBook.pdfTextCache = currentReaderBook.pdfTextCache || {};
+    if (currentReaderBook.pdfTextCache[pageNum]) {
+      return Promise.resolve(currentReaderBook.pdfTextCache[pageNum]);
+    }
+    
+    if (currentReaderBook.fileType === 'pdf') {
+      const pdf = window.pdfDoc;
+      if (pdf) {
+        return pdf.getPage(pageNum).then(page => {
+          return page.getTextContent().then(textContent => {
+            const nativeText = textContent.items.map(item => item.str).join(' ').trim();
+            currentReaderBook.pdfTextCache[pageNum] = nativeText;
+            save();
+            return nativeText;
+          });
+        }).catch(err => {
+          console.error("fetchPageTextAsync PDF error:", err);
+          return "";
+        });
+      }
+      return Promise.resolve("");
+    } else {
+      if (currentReaderBook.fileContent) {
+        const words = currentReaderBook.fileContent.split(/\s+/);
+        const startIdx = (pageNum - 1) * 200;
+        const pageWords = words.slice(startIdx, startIdx + 200);
+        const txt = pageWords.join(' ');
+        currentReaderBook.pdfTextCache[pageNum] = txt;
+        save();
+        return Promise.resolve(txt);
+      }
+      return Promise.resolve("");
+    }
+  };
+
+  function getPageText(pageNum) {
+    if (!currentReaderBook) return "";
+    if (currentReaderBook.fileType === 'pdf') {
+      if (currentReaderBook.pdfTextCache && currentReaderBook.pdfTextCache[pageNum]) {
+        return currentReaderBook.pdfTextCache[pageNum];
+      }
+      if (currentReaderBook.ocrData && currentReaderBook.ocrData[pageNum]) {
+        return currentReaderBook.ocrData[pageNum].map(w => w.text).join(' ');
+      }
+      return "";
+    } else {
+      if (currentReaderBook.fileContent) {
+        const words = currentReaderBook.fileContent.split(/\s+/);
+        const startIdx = (pageNum - 1) * 200;
+        const pageWords = words.slice(startIdx, startIdx + 200);
+        return pageWords.join(' ');
+      }
+      return "";
+    }
+  }
+
+  window.updatePageSummaryDisplay = (pageNum) => {
+    const summaryContent = $('cr-summary-content');
+    const depthSlider = $('cr-summary-depth');
+    if (!summaryContent || !depthSlider) return;
+
+    const depth = depthSlider.value;
+    const bookTitle = currentReaderBook ? currentReaderBook.title : 'Comprehensive Conservation Report';
+    let pageText = getPageText(pageNum);
+    
+    const renderSummaryText = (text) => {
+      if (depth === '1') {
+        const sentences = text.split(/[.!?]/).filter(s => s.trim().length > 0);
+        const brief = sentences.length > 0 ? sentences[0].trim() + '.' : text;
+        summaryContent.innerHTML = `<b>Brief:</b> ${brief}`;
+      } else if (depth === '2') {
+        const sentences = text.split(/[.!?]/).filter(s => s.trim().length > 0);
+        const medium = sentences.slice(0, 3).map(s => s.trim() + '.').join(' ');
+        summaryContent.innerHTML = `<b>Detailed:</b> ${medium || text}`;
+      } else {
+        summaryContent.innerHTML = `<b>Complete Analysis:</b> ${text}`;
+      }
+    };
+
+    if (!pageText) {
+      summaryContent.innerHTML = `<p class="empty-hint" style="padding: 10px; font-size: 13px; text-align: center; color: var(--txt3);">Generating progressive summary... Please wait.</p>`;
+      fetchPageTextAsync(pageNum).then(text => {
+        if (text) {
+          renderSummaryText(text);
+        } else {
+          summaryContent.innerHTML = `<b>Brief:</b> Page ${pageNum} discusses the core methodologies, buffer corridors, and zonal policies outlined in ${bookTitle}.`;
+        }
+      });
+    } else {
+      renderSummaryText(pageText);
+    }
+  };
+
+  if (summaryDepthSlider) {
+    summaryDepthSlider.oninput = () => {
+      const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 1;
+      updatePageSummaryDisplay(pageNum);
     };
   }
 
@@ -7989,26 +8731,33 @@ function initEReaderAdvancedFeatures() {
   const mainPageView = $('cr-page-view');
 
   if (reflowBtn && reflowContainer) {
-    $('cr-reflow-close-btn').onclick = () => {
-      window.reflowModeActive = false;
-      reflowBtn.classList.remove('active');
-      reflowContainer.classList.add('hidden');
-      mainPageView.classList.remove('hidden');
-    };
+    const closeBtn = $('cr-reflow-close-btn');
+    if (closeBtn) {
+      closeBtn.onclick = window.appCloseReflow;
+    }
   }
 
   window.renderReflowContent = () => {
     const reflowBody = $('cr-reflow-body');
     if (!reflowBody) return;
 
-    const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 16;
+    const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 1;
     const docId = currentReaderBook ? currentReaderBook.id : 'default';
 
-    const defaultText = (currentReaderBook && currentReaderBook.pdfTextCache && currentReaderBook.pdfTextCache[pageNum]) 
-      ? currentReaderBook.pdfTextCache[pageNum] 
-      : "The tiger reserve boundaries map directly to the proposed conservation strategy. Zonal buffer corridors outline migration channels across regional sectors.";
+    let defaultText = getPageText(pageNum);
+    if (!defaultText) {
+      reflowBody.innerHTML = `<p class="empty-hint" style="padding: 20px; font-size: 15px; text-align: center; color: var(--txt3);">Extracting text content from book page... Please wait.</p>`;
+      fetchPageTextAsync(pageNum).then(text => {
+        if (text && window.reflowModeActive) {
+          renderReflowContent();
+        } else if (!text) {
+          reflowBody.innerHTML = `<p class="empty-hint" style="padding: 20px; font-size: 15px; text-align: center; color: var(--txt3);">No text content could be extracted from this page.</p>`;
+        }
+      });
+      return;
+    }
 
-    const sentences = defaultText.split('.').filter(s => s.trim().length > 0);
+    const sentences = defaultText.split(/[.!?]/).filter(s => s.trim().length > 0);
     reflowBody.innerHTML = sentences.map((s, idx) => {
       const patchKey = `${docId}-${pageNum}-${idx}`;
       const savedText = STATE.reflowPatches[patchKey] || s.trim() + '.';
@@ -8051,6 +8800,15 @@ function initEReaderAdvancedFeatures() {
       if (label && label.textContent) {
         const dateStr = STATE.selectedDate || today();
         renderCalEvents(dateStr);
+      }
+    } else if (type === 'sync-delete-event') {
+      const { dateStr, id } = data;
+      if (STATE.events[dateStr]) {
+        STATE.events[dateStr] = STATE.events[dateStr].filter(ev => ev.id !== id);
+        save();
+        renderCalendar();
+        const activeDate = STATE.selectedDate || today();
+        if (activeDate === dateStr) renderCalEvents(dateStr);
       }
     }
   };
