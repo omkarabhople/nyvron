@@ -134,6 +134,42 @@
           <div id="ns-quote-author" class="ns-author">— Sam Levenson</div>
         </div>
 
+      <!-- Pulse Intelligent Task Orchestrator -->
+      <div style="margin: 20px 16px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding:16px; border-radius:16px;" id="dash-widget-pulse">
+        <div style="font-size: 14px; font-weight: 700; color: white; display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cascara)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Pulse Orchestrator
+        </div>
+        <p style="font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 12px;">Tasks auto-sorted by your current energy state.</p>
+        <div id="pulse-tasks-container">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Advanced Modules -->
+      <div style="margin: 20px 16px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: white;">Nyvron Sub-Systems</h2>
+        <div class="module-grid">
+          <div class="module-card module-cortex" onclick="openSubApp('cortex')">
+            <div class="module-title">Cortex</div>
+            <div class="module-desc">Project & Infrastructure Hub</div>
+          </div>
+          <div class="module-card module-canopy" onclick="openSubApp('canopy')">
+            <div class="module-title">Canopy</div>
+            <div class="module-desc">Macro-Strategy Synthesis</div>
+          </div>
+          <div class="module-card module-prism" onclick="openSubApp('prism')">
+            <div class="module-title">Prism</div>
+            <div class="module-desc">Spatial Ideation Canvas</div>
+          </div>
+          <div class="module-card module-ledger" onclick="openSubApp('ledger')">
+            <div class="module-title">Ledger</div>
+            <div class="module-desc">Strategic Retrospective</div>
+          </div>
+        </div>
+      </div>
+
+
         <!-- Energy -->
         <div class="card card-pad" style="margin:0 16px 12px">
           <div class="card-hdr"><span class="card-icon">⚡</span><span class="card-title">Energy</span></div>
@@ -497,6 +533,28 @@
           <span class="story-label">My Vents</span>
         </div>
       </div>
+
+
+  <!-- AI Insights Injections -->
+  <div class="emotional-synthesis-card">
+    <div class="es-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#bf5af2" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Weekly Emotional Synthesis
+    </div>
+    <div class="es-body">
+      Based on your entries this week, you've shown immense focus but underlying stress regarding upcoming deadlines. Your energy peaked on Wednesday. Consider scheduling a mandatory 2-hour disconnect block this weekend to prevent burnout.
+    </div>
+  </div>
+
+  <div class="graph-recommendation" onclick="switchTab('tab-home')">
+    <div class="gr-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </div>
+    <div>
+      <div class="gr-title">Nyvron Knowledge Graph</div>
+      <div class="gr-text">You've mentioned "quantum mechanics" twice today. Autonomously mapped to: <strong>Principles of Quantum Mechanics (Ch. 4)</strong> in your Library. Click to open.</div>
+    </div>
+  </div>
 
       <div id="journal-entries" class="journal-grid"></div>
       <div class="" id="journal-empty" style="text-align:center;padding:40px 20px;color:var(--txt3)">
@@ -1336,6 +1394,24 @@
         <span class="tb-label">Settings</span>
       </button>
 
+    <!-- Advanced Modules Icons -->
+    <button class="tb-item" onclick="openSubApp('cortex')" aria-label="Cortex">
+      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <span class="tb-label">Cortex</span>
+    </button>
+    <button class="tb-item" onclick="openSubApp('canopy')" aria-label="Canopy">
+      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <span class="tb-label">Canopy</span>
+    </button>
+    <button class="tb-item" onclick="openSubApp('prism')" aria-label="Prism">
+      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#bf5af2" stroke-width="2" stroke-linecap="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
+      <span class="tb-label">Prism</span>
+    </button>
+    <button class="tb-item" onclick="openSubApp('ledger')" aria-label="Ledger">
+      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#ff9f0a" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span class="tb-label">Ledger</span>
+    </button>
+
     </div>
     <!-- Search button separate pill on the right -->
     <button class="dock-action-btn" id="dock-search-btn" aria-label="Search">
@@ -1531,4 +1607,99 @@
   </div>
 </div>
 <script src="app.js"></script>
+
+<!-- Chronos Focus Engine -->
+<div id="chronos-overlay" class="hidden">
+  <div class="chronos-ring">
+    <div class="chronos-time">45:00</div>
+  </div>
+  <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 8px;">Deep Focus Activated</h2>
+  <p style="color: rgba(255,255,255,0.6);">Nyvron is shielding your environment.</p>
+
+  <div class="chronos-auto-response">
+    <div class="chronos-label">Auto-Response Active</div>
+    <div style="font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.9);">
+      "I am currently in a deep focus session for the next 45 minutes. I will review your message when I emerge."
+    </div>
+  </div>
+
+  <button id="chronos-exit" style="margin-top: 40px; background: rgba(255,255,255,0.1); border: none; padding: 12px 24px; border-radius: 20px; color: white; cursor: pointer;">Exit Chronos</button>
+</div>
+
+<!-- Autonomous Flow Prompt -->
+<div id="auto-flow-prompt">
+  <div>
+    <div style="font-weight: 700; color: #fff; margin-bottom: 4px;">Flow State Detected</div>
+    <div style="font-size: 14px; color: rgba(255,255,255,0.7);">You were focused on Reading for 42 minutes. Log this?</div>
+  </div>
+  <button class="flow-btn" id="flow-log-btn">Log Time</button>
+  <button style="background:transparent; color:#ff453a; border:none; cursor:pointer;" id="flow-dismiss-btn">Dismiss</button>
+</div>
+
+
+<!-- SUB-APP OVERLAYS -->
+<div id="subapp-cortex" class="sub-app-overlay">
+  <div class="sub-app-header">
+    <h2 style="font-size: 24px; font-weight: 700; color: #0a84ff;">Cortex <span style="font-size:14px; font-weight:400; color:gray;">Project & Infrastructure Hub</span></h2>
+    <button class="overlay-close-btn" onclick="closeSubApps()">✕</button>
+  </div>
+  <div class="sub-app-content">
+    <div style="padding: 20px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+      <h3 style="color:white; margin-bottom: 12px;">Active Deployment: "Project Phoenix"</h3>
+      <div style="color: #0a84ff; font-size: 14px; margin-bottom: 8px;">↳ Generating architectural blueprint...</div>
+      <div style="color: rgba(255,255,255,0.6); font-size: 14px;">[Mock] DNS settings configured. Beta portal performance evaluated (A+). Tickets auto-generated.</div>
+    </div>
+  </div>
+</div>
+
+<div id="subapp-canopy" class="sub-app-overlay">
+  <div class="sub-app-header">
+    <h2 style="font-size: 24px; font-weight: 700; color: #30d158;">Canopy <span style="font-size:14px; font-weight:400; color:gray;">Macro-Strategy Engine</span></h2>
+    <button class="overlay-close-btn" onclick="closeSubApps()">✕</button>
+  </div>
+  <div class="sub-app-content">
+     <div style="padding: 20px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+      <h3 style="color:white; margin-bottom: 12px;">UPSC Prelims Syllabus Matrix</h3>
+      <div style="color: #30d158; font-size: 14px; margin-bottom: 8px;">↳ 120 PYQs Ingested. Extracting Micro-Themes...</div>
+      <div style="color: rgba(255,255,255,0.6); font-size: 14px;">High Weightage Identified: "Environmental Ecology". Cross-referenced with Book: "Conservation Report Ch.4".</div>
+    </div>
+  </div>
+</div>
+
+<div id="subapp-prism" class="sub-app-overlay">
+  <div class="sub-app-header">
+    <h2 style="font-size: 24px; font-weight: 700; color: #bf5af2;">Prism <span style="font-size:14px; font-weight:400; color:gray;">Spatial Canvas</span></h2>
+    <button class="overlay-close-btn" onclick="closeSubApps()">✕</button>
+  </div>
+  <div class="sub-app-content" style="background: radial-gradient(circle at center, rgba(191,90,242,0.1) 0%, transparent 70%); display:flex; justify-content:center; align-items:center;">
+    <div style="text-align: center;">
+      <div style="width:100px; height:100px; border-radius:50%; background:rgba(191,90,242,0.2); border:2px dashed #bf5af2; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:white;">Drop Idea</div>
+      <p style="color: rgba(255,255,255,0.5);">Nyvron will autonomously cluster and mind-map your chaotic inputs.</p>
+    </div>
+  </div>
+</div>
+
+<div id="subapp-ledger" class="sub-app-overlay">
+  <div class="sub-app-header">
+    <h2 style="font-size: 24px; font-weight: 700; color: #ff9f0a;">Ledger <span style="font-size:14px; font-weight:400; color:gray;">Strategic Retrospective</span></h2>
+    <button class="overlay-close-btn" onclick="closeSubApps()">✕</button>
+  </div>
+  <div class="sub-app-content">
+     <div style="padding: 20px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+      <h3 style="color:white; margin-bottom: 12px;">Weekly Execution Metrics</h3>
+      <div style="display:flex; justify-content:space-between; margin-bottom: 12px;">
+        <span style="color:rgba(255,255,255,0.6);">North Star Alignment:</span>
+        <span style="color:#ff9f0a; font-weight:700;">85%</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom: 12px;">
+        <span style="color:rgba(255,255,255,0.6);">Deep Focus Hours:</span>
+        <span style="color:white; font-weight:700;">32h</span>
+      </div>
+       <div style="color: rgba(255,255,255,0.6); font-size: 14px; margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+        Note: You had a time leak on Thursday evening (social media). Autonomously adjusting next week's schedule to block that window.
+       </div>
+    </div>
+  </div>
+</div>
+
 </body></html>

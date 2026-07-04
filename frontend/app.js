@@ -8010,3 +8010,141 @@ function initDragToDismissSidebar() {
   });
 }
 document.addEventListener('DOMContentLoaded', initDragToDismissSidebar);
+
+// ==========================================
+// NYVRON ADVANCED SYSTEMS MOCK LOGIC
+// ==========================================
+
+// 1. Dashboard Autonomous Reorganization & Pulse
+function initAutonomousDashboard() {
+  const currentHour = new Date().getHours();
+  const dashContainer = $('dash-widgets-container');
+  if (dashContainer) {
+      document.body.classList.add('breathing-bg');
+      let widgets = Array.from(dashContainer.children);
+      if (currentHour < 12) {
+        widgets.sort((a, b) => (a.id.includes('calendar') || a.id.includes('task') || a.id.includes('pulse') ? -1 : 1));
+      } else if (currentHour >= 18) {
+        widgets.sort((a, b) => (a.id.includes('journal') || a.id.includes('book') ? -1 : 1));
+      }
+      dashContainer.innerHTML = '';
+      widgets.forEach(w => dashContainer.appendChild(w));
+  }
+}
+
+function renderPulseTasks() {
+    const container = $('pulse-tasks-container');
+    if (!container) return;
+    const currentEnergy = STATE.energy || 'High';
+    let tasks = [
+        { id: 1, title: 'Solve 20 Physics Dynamics Problems', energyRequired: 'High' },
+        { id: 2, title: 'Review Chapter 3 Summary Notes', energyRequired: 'Low' },
+        { id: 3, title: 'Draft email to Professor', energyRequired: 'Medium' }
+    ];
+    if (currentEnergy === 'High') tasks.sort((a,b) => a.energyRequired === 'High' ? -1 : 1);
+    else if (currentEnergy === 'Low') tasks.sort((a,b) => a.energyRequired === 'Low' ? -1 : 1);
+    else tasks.sort((a,b) => a.energyRequired === 'Medium' ? -1 : 1);
+
+    container.innerHTML = '';
+    tasks.forEach(t => {
+        const isOptimal = t.energyRequired === currentEnergy || (currentEnergy==='High' && t.energyRequired==='Medium');
+        container.innerHTML += `
+          <div class="pulse-task ${isOptimal ? '' : 'low-priority'}">
+            <div class="pulse-task-checkbox"></div>
+            <div style="flex:1;">
+              <div style="font-size: 14px; color: white;">${t.title}</div>
+              <div style="font-size: 11px; color: rgba(255,255,255,0.4);">${t.energyRequired} Energy Task</div>
+            </div>
+          </div>
+        `;
+    });
+}
+
+// 2. Sub-Apps Overlays
+window.openSubApp = function(id) {
+   const overlay = $('subapp-' + id);
+   if (overlay) overlay.classList.add('active');
+};
+window.closeSubApps = function() {
+    document.querySelectorAll('.sub-app-overlay').forEach(el => el.classList.remove('active'));
+};
+
+// 3. Chronos & Flow State
+let flowStartTime = 0;
+$('chronos-exit')?.addEventListener('click', () => $('chronos-overlay').classList.add('hidden'));
+$('flow-log-btn')?.addEventListener('click', () => {
+  $('auto-flow-prompt').classList.remove('show');
+  STATE.timeBlocks = STATE.timeBlocks || [];
+  STATE.timeBlocks.push({ id: Date.now(), title: "Autonomous Flow", time: 42 * 60, subjectId: "mock" });
+  save();
+});
+$('flow-dismiss-btn')?.addEventListener('click', () => $('auto-flow-prompt').classList.remove('show'));
+
+const originalOpenBookReaderAdvanced = openBookReader;
+window.openBookReader = function(book) {
+    if (originalOpenBookReaderAdvanced) originalOpenBookReaderAdvanced(book);
+    flowStartTime = Date.now();
+};
+
+const crCloseBtnAdv = $('cr-close');
+if (crCloseBtnAdv) {
+    const oldCloseAdv = crCloseBtnAdv.onclick;
+    crCloseBtnAdv.onclick = function(e) {
+        if (oldCloseAdv) oldCloseAdv(e);
+        if (flowStartTime > 0) {
+            const elapsedMins = (Date.now() - flowStartTime) / 60000;
+            if (elapsedMins > 0.05) { // Show prompt if open for even a few seconds for demo
+                $('auto-flow-prompt').classList.add('show');
+                setTimeout(() => $('auto-flow-prompt').classList.remove('show'), 10000);
+            }
+            flowStartTime = 0;
+        }
+    };
+}
+
+// 4. Anti-Calendar Input
+$('anti-calendar-input')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+     const val = e.target.value.trim();
+     if (val) {
+         $('anti-calendar-feedback').style.display = 'block';
+         const todayStr = new Date().toISOString().split('T')[0];
+         STATE.events[todayStr] = STATE.events[todayStr] || [];
+         STATE.events[todayStr].push({
+             type: 'event',
+             time: 'Auto',
+             title: 'Auto: ' + val.split(' ')[0] + ' Session',
+             color: '#bf5af2'
+         });
+         renderCalEvents(todayStr);
+         e.target.value = '';
+         setTimeout(() => { $('anti-calendar-feedback').style.display = 'none'; }, 5000);
+     }
+  }
+});
+
+// 5. X-Ray Mode Toggle
+$('cr-xray-toggle')?.addEventListener('click', () => {
+  $('cr-xray-sidebar')?.classList.toggle('hidden');
+  $('cr-sidebar')?.classList.add('hidden');
+  $('cr-mcq-sidebar')?.classList.add('hidden');
+});
+$('cr-xray-close')?.addEventListener('click', () => $('cr-xray-sidebar')?.classList.add('hidden'));
+
+// 6. Inject Glowing Ember into Energy Display dynamically
+const originalRenderHome = renderHome;
+window.renderHome = function() {
+    originalRenderHome();
+    const energyTxtBox = document.querySelector('.dash-card-title'); // Rough selector for energy block
+    // We'll just hook into the existing state render
+    const energyCard = Array.from(document.querySelectorAll('.dash-card-title')).find(el => el.textContent.includes('Current Energy'));
+    if (energyCard && STATE.energy === 'High' && !energyCard.innerHTML.includes('energy-high-ember')) {
+        energyCard.nextElementSibling.innerHTML += '<span class="energy-high-ember"></span>';
+    }
+};
+
+// Hook Initialization
+setTimeout(() => {
+    initAutonomousDashboard();
+    renderPulseTasks();
+}, 500);
