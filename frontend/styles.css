@@ -3729,3 +3729,13 @@ body.theme-light, body.theme-dark-vault {
     display: flex;
   }
 }
+
+/* Fix boundaries for Chat and Calendar */
+@media (max-width: 768px) {
+  #tab-ai, #tab-calendar {
+    bottom: calc(85px + env(safe-area-inset-bottom, 0px)) !important;
+    top: calc(44px + env(safe-area-inset-top, 0px)) !important;
+    height: auto !important;
+    padding-bottom: 0 !important;
+  }
+}

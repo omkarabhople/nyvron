@@ -9581,6 +9581,16 @@ function initPhysicsSafely() {
   if (dockMoreBtn && dockVerticalMenu) {
     dockMoreBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      
+      const rect = dockMoreBtn.getBoundingClientRect();
+      dockVerticalMenu.style.position = 'fixed';
+      dockVerticalMenu.style.left = (rect.left + rect.width / 2) + 'px';
+      dockVerticalMenu.style.bottom = (window.innerHeight - rect.top + 16) + 'px';
+      
+      if (dockVerticalMenu.parentNode !== document.body) {
+        document.body.appendChild(dockVerticalMenu);
+      }
+      
       dockVerticalMenu.classList.toggle('hidden');
       dockVerticalMenu.classList.toggle('active');
     });
