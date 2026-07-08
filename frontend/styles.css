@@ -3566,3 +3566,27 @@ body.theme-light, body.theme-dark-vault {
   color: #F59E0B;
   font-weight: 600;
 }
+
+/* Dock Fix */
+
+@media (max-width: 768px) {
+  .tab-bar {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    gap: 8px !important;
+    justify-content: space-between !important;
+    transform: translateX(-50%) scale(1) !important;
+  }
+  .tab-bar-pill {
+    overflow-x: auto !important;
+    max-width: calc(100% - 50px) !important; /* Leave space for search btn */
+    justify-content: flex-start !important;
+    padding-right: 20px !important; /* Extra padding for scrolling */
+  }
+  .tab-bar-pill::-webkit-scrollbar {
+    display: none !important;
+  }
+  .tb-item {
+    flex-shrink: 0 !important;
+  }
+}
