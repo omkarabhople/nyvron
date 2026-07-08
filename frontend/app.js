@@ -9446,7 +9446,7 @@ function initDockPhysics() {
       if (e.cancelable) e.preventDefault(); // Stop native scrolling
     }
     handleMove(e);
-  }, { passive: false });
+  }, { passive: true });
   window.addEventListener('touchend', handlePointerUp);
   window.addEventListener('touchcancel', handlePointerUp);
 }

@@ -3620,7 +3620,9 @@ body.theme-light, body.theme-dark-vault {
   .tab-bar-pill {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    touch-action: pan-x !important;
+    touch-action: auto !important;
     pointer-events: auto !important;
   }
 }
+
+.cr-tool-btn { flex-shrink: 0 !important; }
