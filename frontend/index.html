@@ -1479,22 +1479,51 @@
       </button>
 
     <!-- Advanced Modules Icons -->
-    <button class="tb-item" onclick="openSubApp('cortex')" aria-label="Cortex">
-      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-      <span class="tb-label">Cortex</span>
-    </button>
-    <button class="tb-item" onclick="openSubApp('canopy')" aria-label="Canopy">
-      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-      <span class="tb-label">Canopy</span>
-    </button>
-    <button class="tb-item" onclick="openSubApp('prism')" aria-label="Prism">
-      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#bf5af2" stroke-width="2" stroke-linecap="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
-      <span class="tb-label">Prism</span>
-    </button>
-    <button class="tb-item" onclick="openSubApp('ledger')" aria-label="Ledger">
-      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#ff9f0a" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      <span class="tb-label">Ledger</span>
-    </button>
+    <div class="advanced-modules-desktop">
+      <button class="tb-item" onclick="openSubApp('cortex')" aria-label="Cortex">
+        <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <span class="tb-label">Cortex</span>
+      </button>
+      <button class="tb-item" onclick="openSubApp('canopy')" aria-label="Canopy">
+        <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span class="tb-label">Canopy</span>
+      </button>
+      <button class="tb-item" onclick="openSubApp('prism')" aria-label="Prism">
+        <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#bf5af2" stroke-width="2" stroke-linecap="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
+        <span class="tb-label">Prism</span>
+      </button>
+      <button class="tb-item" onclick="openSubApp('ledger')" aria-label="Ledger">
+        <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#ff9f0a" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span class="tb-label">Ledger</span>
+      </button>
+    </div>
+
+    <!-- Mobile More Button -->
+    <div class="dock-more-container">
+      <button class="tb-item dock-more-btn" id="dock-more-btn" aria-label="More">
+        <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle>
+        </svg>
+        <span class="tb-label">More</span>
+      </button>
+      
+      <!-- Vertical Menu Container -->
+      <div id="dock-vertical-menu" class="dock-vertical-menu hidden">
+        <div class="dock-vertical-indicator" id="dock-vertical-indicator" style="transform: translateY(2px); height: 44px;"></div>
+        <button class="vertical-tb-item" onclick="openSubApp('cortex')" aria-label="Cortex">
+          <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </button>
+        <button class="vertical-tb-item" onclick="openSubApp('canopy')" aria-label="Canopy">
+          <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </button>
+        <button class="vertical-tb-item" onclick="openSubApp('prism')" aria-label="Prism">
+          <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#bf5af2" stroke-width="2" stroke-linecap="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
+        </button>
+        <button class="vertical-tb-item" onclick="openSubApp('ledger')" aria-label="Ledger">
+          <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#ff9f0a" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </button>
+      </div>
+    </div>
 
     </div>
 

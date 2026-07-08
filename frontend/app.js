@@ -9209,6 +9209,126 @@ window.openSubApp = function(appId) {
 // Liquid Glass Dock Physics & Fluid Scrubbing Engine
 window.dockEngine = null;
 
+
+window.dockVerticalEngine = null;
+
+function initVerticalDockPhysics() {
+  const menu = document.getElementById('dock-vertical-menu');
+  const indicator = document.getElementById('dock-vertical-indicator');
+  if (!menu || !indicator) return;
+
+  const items = Array.from(menu.querySelectorAll('.vertical-tb-item'));
+  if (!items.length) return;
+
+  // Disable CSS transitions so JS can take over 60fps physics
+  indicator.style.transition = 'none';
+  items.forEach(item => {
+    item.style.transition = 'none';
+  });
+
+  const initialY = 2; // initial top offset
+  const initialHeight = 44;
+
+  window.dockVerticalEngine = {
+    y: initialY, targetY: initialY, velocity: 0,
+    isDragging: false, lastTime: performance.now(),
+    lastPointerY: 0, pointerY: 0,
+    height: initialHeight, targetHeight: initialHeight, heightVelocity: 0,
+    scale: 1, scaleVelocity: 0,
+    
+    update(time) {
+      let dt = (time - this.lastTime) / 1000;
+      if (dt <= 0 || isNaN(dt)) dt = 0.016; 
+      dt = Math.min(dt, 0.05);
+      this.lastTime = time;
+
+      if (this.isDragging) {
+        const dy = this.pointerY - this.lastPointerY;
+        this.velocity = dy / dt;
+        this.lastPointerY = this.pointerY;
+        
+        const speed = Math.abs(this.velocity);
+        this.height = this.targetHeight + Math.min(speed * 0.05, 50); 
+        this.y = this.pointerY - (this.height - this.targetHeight) / 2;
+        this.scale += (1.5 - this.scale) * (dt * 15);
+      } else {
+        const STEPS = 3;
+        const stepDt = dt / STEPS;
+        
+        for (let i = 0; i < STEPS; i++) {
+          const tension = 400; 
+          const friction = 35; 
+          
+          const dy = this.y - this.targetY;
+          const springForce = -tension * dy;
+          const dampingForce = -friction * this.velocity;
+          this.velocity += (springForce + dampingForce) * stepDt;
+          this.y += this.velocity * stepDt;
+          
+          const dh = this.height - this.targetHeight;
+          const hSpringForce = -300 * dh;
+          const hDampingForce = -25 * this.heightVelocity;
+          this.heightVelocity += (hSpringForce + hDampingForce) * stepDt;
+          this.height += this.heightVelocity * stepDt;
+          
+          const ds = this.scale - 1.0;
+          const sSpringForce = -300 * ds;
+          const sDampingForce = -25 * this.scaleVelocity;
+          this.scaleVelocity += (sSpringForce + sDampingForce) * stepDt;
+          this.scale += this.scaleVelocity * stepDt;
+        }
+        
+        let renderHeight = this.height;
+        const speed = Math.abs(this.velocity);
+        if (speed > 50) {
+            renderHeight += Math.min(60, speed * 0.05);
+        }
+        
+        this._renderHeight = renderHeight;
+      }
+
+      const finalHeight = this.isDragging ? this.height : this._renderHeight;
+      indicator.style.transform = `translateY(${this.y}px) scale(${this.scale})`;
+      indicator.style.height = `${finalHeight}px`;
+
+      const indicatorCenter = this.y + 22; 
+      items.forEach(item => {
+        const itemTop = item.offsetTop;
+        const itemCenter = itemTop + 22;
+        const dist = Math.abs(indicatorCenter - itemCenter);
+        
+        const AFFECTED_RANGE = 50; 
+        
+        if (dist < AFFECTED_RANGE) {
+          const intensity = Math.cos((dist / AFFECTED_RANGE) * (Math.PI / 2));
+          item.style.transform = `translateX(${intensity*8}px)`;
+          item.style.color = `rgba(255, 255, 255, ${0.5 + 0.5 * intensity})`;
+        } else {
+          item.style.transform = 'translateX(0px)';
+          item.style.color = '';
+        }
+      });
+
+      requestAnimationFrame(this.update.bind(this));
+    }
+  };
+
+  requestAnimationFrame(window.dockVerticalEngine.update.bind(window.dockVerticalEngine));
+
+  // Hover bindings for vertical items
+  items.forEach(item => {
+    item.addEventListener('mouseenter', () => {
+      if (!window.dockVerticalEngine) return;
+      window.dockVerticalEngine.targetY = item.offsetTop;
+    });
+    // touchstart logic for mobile
+    item.addEventListener('touchstart', () => {
+      if (!window.dockVerticalEngine) return;
+      window.dockVerticalEngine.targetY = item.offsetTop;
+    }, {passive: true});
+  });
+}
+
 function initDockPhysics() {
   const dockPill = document.querySelector('.tab-bar-pill');
   const indicator = document.getElementById('dock-indicator');
@@ -9454,6 +9574,24 @@ function initDockPhysics() {
 // Ensure physics run safely
 function initPhysicsSafely() {
   setTimeout(initDockPhysics, 500);
+  setTimeout(initVerticalDockPhysics, 500);
+
+  const dockMoreBtn = document.getElementById('dock-more-btn');
+  const dockVerticalMenu = document.getElementById('dock-vertical-menu');
+  if (dockMoreBtn && dockVerticalMenu) {
+    dockMoreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dockVerticalMenu.classList.toggle('hidden');
+      dockVerticalMenu.classList.toggle('active');
+    });
+    document.addEventListener('click', (e) => {
+      if (!dockVerticalMenu.contains(e.target) && !dockMoreBtn.contains(e.target)) {
+        dockVerticalMenu.classList.add('hidden');
+        dockVerticalMenu.classList.remove('active');
+      }
+    });
+  }
+
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initPhysicsSafely);

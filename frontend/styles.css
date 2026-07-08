@@ -3626,3 +3626,106 @@ body.theme-light, body.theme-dark-vault {
 }
 
 .cr-tool-btn { flex-shrink: 0 !important; }
+
+/* Desktop Modules Container */
+.advanced-modules-desktop {
+  display: contents; /* Behaves as if children were direct children of flex container */
+}
+
+.dock-more-container {
+  display: none; /* Hidden on desktop */
+  position: relative;
+}
+
+.dock-more-btn {
+  /* same as tb-item but inside the container */
+}
+
+.dock-vertical-menu {
+  position: absolute;
+  bottom: calc(100% + 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  padding: 8px 0px;
+  width: 56px;
+  box-shadow: rgba(0, 0, 0, 0.4) 0px 8px 32px, inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  z-index: 100001;
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: bottom center;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dock-vertical-menu.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+.dock-vertical-menu.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(20px) scale(0.9);
+}
+
+.vertical-tb-item {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--txt3);
+  transition: all .3s var(--spring);
+  z-index: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin: 2px 0;
+}
+
+.vertical-tb-item svg, .vertical-tb-item img {
+  width: 22px;
+  height: 22px;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.vertical-tb-item:hover svg, .vertical-tb-item:hover img {
+  transform: scale(1.1);
+  color: var(--txt1);
+}
+
+.vertical-tb-item:active svg, .vertical-tb-item:active img {
+  transform: scale(0.9);
+}
+
+.dock-vertical-indicator {
+  position: absolute;
+  top: 8px; /* Accounts for padding */
+  left: 6px; /* (56 - 44) / 2 */
+  width: 44px;
+  height: 44px;
+  background: var(--txt1);
+  border-radius: 50%;
+  box-shadow: 0px 0px 10px var(--txt1);
+  mix-blend-mode: difference;
+  z-index: 0;
+  transition: transform 0.4s var(--spring);
+  will-change: transform;
+}
+
+@media (max-width: 768px) {
+  .advanced-modules-desktop {
+    display: none;
+  }
+  .dock-more-container {
+    display: flex;
+  }
+}
