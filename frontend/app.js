@@ -2567,7 +2567,7 @@ function openBookReader(book) {
           $('cr-page-wrapper-right')?.classList.add('hidden');
           $('cr-synthesis-gutter')?.classList.remove('hidden');
           $('cr-page-view-right-doc')?.classList.remove('hidden');
-          initSplitscreenRightDoc();
+          window.initSplitscreenRightDoc?.();
         }
         adjustReaderResponsiveScale();
         return;
@@ -2595,7 +2595,7 @@ function openBookReader(book) {
         if (window.reflowModeActive) {
           reflowContainer?.classList.remove('hidden');
           mainPageView?.classList.add('hidden');
-          renderReflowContent();
+          window.renderReflowContent?.();
         } else {
           reflowContainer?.classList.add('hidden');
           mainPageView?.classList.remove('hidden');
@@ -8499,13 +8499,17 @@ function initEReaderAdvancedFeatures() {
   // 5. Multi-Doc splitscreen & synthesis (Feature 5)
   window.spreadMode = 'single';
 
-  function initSplitscreenRightDoc() {
+  window.initSplitscreenRightDoc = function initSplitscreenRightDoc() {
     const select = $('cr-right-book-select');
     if (!select) return;
     select.innerHTML = '<option value="">Select Second Book...</option>' + 
-      STATE.books.map(b => `<option value="${b.id}">${b.title}</option>`).join('');
+      STATE.books
+        .filter(b => !currentReaderBook || b.id !== currentReaderBook.id)
+        .map(b => `<option value="${b.id}">${b.title}</option>`)
+        .join('');
 
     let rightPdfDoc = null;
+    let rightBook = null;
     let rightCurrentPage = 1;
 
     select.onchange = () => {
@@ -8513,16 +8517,30 @@ function initEReaderAdvancedFeatures() {
       if (!bookId) return;
       const b = STATE.books.find(book => book.id === bookId);
       if (!b) return;
+      rightBook = b;
+      rightCurrentPage = b.currentPage || 1;
+      rightPdfDoc = null;
 
+      if (b.fileType !== 'pdf') {
+        renderRightDocPage();
+        return;
+      }
+
+      if (!window.pdfjsLib) {
+        triggerNotification('PDF Library Missing', 'Reload once, then open the second PDF again.');
+        return;
+      }
       getFile(b.id).then(blob => {
         if (!blob) return;
         const fileReader = new FileReader();
         fileReader.onload = function() {
           const typedarray = new Uint8Array(this.result);
-          pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+          pdfjsLib.getDocument({ data: typedarray }).promise.then(pdf => {
             rightPdfDoc = pdf;
-            rightCurrentPage = 1;
+            rightBook.totalPages = pdf.numPages;
+            rightCurrentPage = Math.min(rightCurrentPage, pdf.numPages);
             renderRightDocPage();
+            save();
           });
         };
         fileReader.readAsArrayBuffer(blob);
@@ -8530,11 +8548,38 @@ function initEReaderAdvancedFeatures() {
     };
 
     function renderRightDocPage() {
+      if (!rightBook) return;
+      const canvas = $('cr-right-pdf-canvas');
+      const content = $('cr-right-page-content');
+      const wrapper = $('cr-right-page-wrapper');
+      if (!canvas || !content || !wrapper) return;
+
+      const totalPages = rightBook.fileType === 'pdf'
+        ? (rightPdfDoc?.numPages || rightBook.totalPages || 1)
+        : (rightBook.totalPages || Math.ceil((rightBook.fileContent || '').split(/\s+/).length / 200) || 1);
+      rightCurrentPage = Math.max(1, Math.min(rightCurrentPage, totalPages));
+      $('cr-right-page-label').textContent = `Page ${rightCurrentPage} of ${totalPages}`;
+      rightBook.currentPage = rightCurrentPage;
+      rightBook.progress = Math.round((rightCurrentPage / totalPages) * 100);
+      save();
+
+      if (rightBook.fileType !== 'pdf') {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.width = 600;
+        canvas.height = 780;
+        wrapper.style.width = '600px';
+        wrapper.style.height = '780px';
+        const words = (rightBook.fileContent || '').split(/\s+/);
+        const text = words.slice((rightCurrentPage - 1) * 200, rightCurrentPage * 200).join(' ');
+        content.innerHTML = `<h3 style="margin-top:0; color:var(--cascara); font-family:var(--font);">${rightBook.title}</h3><p style="white-space:pre-wrap; font-family:Georgia, serif; font-size:16px; line-height:1.6;">${text}</p>`;
+        return;
+      }
+
       if (!rightPdfDoc) return;
-      $('cr-right-page-label').textContent = `Page ${rightCurrentPage} of ${rightPdfDoc.numPages}`;
+      content.innerHTML = '';
       
       rightPdfDoc.getPage(rightCurrentPage).then(page => {
-        const canvas = $('cr-right-pdf-canvas');
         const ctx = canvas.getContext('2d');
         const viewport = page.getViewport({ scale: 1.0 });
         const scale = 600 / viewport.width;
@@ -8543,7 +8588,6 @@ function initEReaderAdvancedFeatures() {
         canvas.width = 600;
         canvas.height = 780;
 
-        const wrapper = $('cr-right-page-wrapper');
         wrapper.style.width = '600px';
         wrapper.style.height = '780px';
 
@@ -8558,12 +8602,15 @@ function initEReaderAdvancedFeatures() {
       }
     };
     $('cr-right-next').onclick = () => {
-      if (rightPdfDoc && rightCurrentPage < rightPdfDoc.numPages) {
+      const totalPages = rightBook?.fileType === 'pdf'
+        ? (rightPdfDoc?.numPages || rightBook.totalPages || 1)
+        : (rightBook?.totalPages || 1);
+      if (rightBook && rightCurrentPage < totalPages) {
         rightCurrentPage++;
         renderRightDocPage();
       }
     };
-  }
+  };
 
   // Drag and drop text selections to Synthesis notes
   const dropGutter = $('cr-synthesis-gutter');
@@ -8721,7 +8768,7 @@ function initEReaderAdvancedFeatures() {
   if (summaryDepthSlider) {
     summaryDepthSlider.oninput = () => {
       const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 1;
-      updatePageSummaryDisplay(pageNum);
+      window.updatePageSummaryDisplay?.(pageNum);
     };
   }
 
@@ -8749,7 +8796,7 @@ function initEReaderAdvancedFeatures() {
       reflowBody.innerHTML = `<p class="empty-hint" style="padding: 20px; font-size: 15px; text-align: center; color: var(--txt3);">Extracting text content from book page... Please wait.</p>`;
       fetchPageTextAsync(pageNum).then(text => {
         if (text && window.reflowModeActive) {
-          renderReflowContent();
+          window.renderReflowContent?.();
         } else if (!text) {
           reflowBody.innerHTML = `<p class="empty-hint" style="padding: 20px; font-size: 15px; text-align: center; color: var(--txt3);">No text content could be extracted from this page.</p>`;
         }
@@ -8792,7 +8839,7 @@ function initEReaderAdvancedFeatures() {
     if (type === 'sync-reflow') {
       STATE.reflowPatches[data.patchKey] = data.text;
       localStorage.setItem('nv-reflow-patches', JSON.stringify(STATE.reflowPatches));
-      if (window.reflowModeActive) renderReflowContent();
+      if (window.reflowModeActive) window.renderReflowContent?.();
     } else if (type === 'sync-log') {
       STATE.interactionLog.push(data);
       localStorage.setItem('nv-interaction-log', JSON.stringify(STATE.interactionLog));

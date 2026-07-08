@@ -4,26 +4,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="NYVRON — Your personal command center.">
   <script>
-    // Force unregister all stale service workers and clear cache storage
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(registrations => {
-        for (const r of registrations) {
-          r.unregister().then(() => {
-            console.log('Unregistered stale service worker');
-            window.location.reload();
-          });
-        }
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then(keys => {
-        Promise.all(keys.map(k => caches.delete(k))).then(() => {
-          console.log('Cleared all cache storage');
+    const NYVRON_BUILD = '2026-07-05-reader-fix';
+    const cachedBuild = localStorage.getItem('nyvron-active-build');
+    if (cachedBuild !== NYVRON_BUILD) {
+      localStorage.setItem('nyvron-active-build', NYVRON_BUILD);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(registration => registration.unregister());
         });
-      });
+      }
+      if ('caches' in window) {
+        caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))));
+      }
     }
   </script>
-  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="stylesheet" href="styles.css?v=20260705-reader-fix">
   <style>
     @keyframes spin {
       from { transform: rotate(0deg); }
@@ -1140,6 +1135,32 @@
         </div>
       </div>
 
+      <!-- Dual-book synthesis gutter -->
+      <div id="cr-synthesis-gutter" class="cr-synthesis-gutter hidden" style="width: 260px; min-width: 240px; max-width: 300px;">
+        <div style="padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 12px; font-weight: 800; color: var(--cascara); text-transform: uppercase; letter-spacing: 0.5px;">Synthesis Notes</span>
+          <span style="font-size: 11px; color: var(--txt3);">Drop selected passages here</span>
+        </div>
+        <div id="cr-synthesis-list" style="flex: 1; overflow-y: auto;"></div>
+        <div class="synthesis-drop-placeholder" style="margin: 12px; padding: 14px; border-radius: 10px; color: var(--txt3); font-size: 12px; text-align: center;">
+          Save cross-book snippets
+        </div>
+      </div>
+
+      <!-- Right-side document for dual-book mode -->
+      <div id="cr-page-view-right-doc" class="cr-page-view theme-dark hidden" style="flex: 1; min-width: 0; position: relative;">
+        <div style="position: absolute; top: 14px; left: 14px; right: 14px; z-index: 20; display: flex; align-items: center; gap: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 8px;">
+          <select id="cr-right-book-select" style="flex: 1; min-width: 0; background: var(--surface); color: var(--txt1); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 12px;"></select>
+          <button id="cr-right-prev" class="cr-page-nav-btn" style="width: 30px; height: 30px;">‹</button>
+          <button id="cr-right-next" class="cr-page-nav-btn" style="width: 30px; height: 30px;">›</button>
+          <span id="cr-right-page-label" style="font-size: 11px; color: var(--txt2); min-width: 90px; text-align: right;">Page 1 of 1</span>
+        </div>
+        <div id="cr-right-page-wrapper" class="cr-page-wrapper" style="margin-top: 66px;">
+          <canvas id="cr-right-pdf-canvas" class="cr-pdf-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:1;"></canvas>
+          <div id="cr-right-page-content" class="cr-page-content" style="position:absolute;inset:0;z-index:2;background:none;padding:40px;overflow:auto;"></div>
+        </div>
+      </div>
+
       <!-- PDF/ePUB Reflow Mode Panel (Feature 9) -->
       <div id="cr-reflow-container" class="cr-reflow-container hidden" style="flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--bg2); border-left: 1px solid var(--border); box-sizing: border-box; z-index: 10;">
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border); background: var(--surface2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);">
@@ -1619,5 +1640,5 @@
     <p style="font-size:11px; text-transform:uppercase; color:rgba(255,255,255,0.4); margin-top:6px; letter-spacing:0.1em;">disappears forever on expiry</p>
   </div>
 </div>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=20260705-reader-fix"></script>
 </body></html>
