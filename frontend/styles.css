@@ -3590,3 +3590,11 @@ body.theme-light, body.theme-dark-vault {
     flex-shrink: 0 !important;
   }
 }
+
+
+@media (max-width: 768px) {
+  /* Push JAI input row above the dock, keeping background full screen */
+  .journal-ai-overlay {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
