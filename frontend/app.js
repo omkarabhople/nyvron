@@ -9400,10 +9400,12 @@ function initDockPhysics() {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const dockRect = dockPill.getBoundingClientRect();
     
-    // Immediate 1:1 drag binding on touch/click anywhere on the dock
-    let localX = clientX - dockRect.left - 22;
-    localX = Math.max(0, Math.min(localX, dockRect.width - 44));
-    window.dockEngine.startDrag(localX);
+    // Immediate 1:1 drag binding on touch/click anywhere on the dock (Desktop only)
+    if (window.innerWidth > 768) {
+      let localX = clientX - dockRect.left - 22;
+      localX = Math.max(0, Math.min(localX, dockRect.width - 44));
+      window.dockEngine.startDrag(localX);
+    }
     
     // Sinking Pocket effect
     const item = e.target.closest('.tb-item');
@@ -9440,7 +9442,7 @@ function initDockPhysics() {
   
   dockPill.addEventListener('touchstart', handlePointerDown);
   window.addEventListener('touchmove', (e) => {
-    if (window.dockEngine.isDragging) {
+    if (window.dockEngine.isDragging && window.innerWidth > 768) {
       if (e.cancelable) e.preventDefault(); // Stop native scrolling
     }
     handleMove(e);
