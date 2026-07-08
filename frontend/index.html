@@ -2250,7 +2250,7 @@
   </div>
 
   <!-- Close Button -->
-  <button class="overlay-close-btn prism-close" style="position:absolute; top:20px; right:20px; z-index:100;" onclick="closeSubApps()">✕</button>
+  <button class="overlay-close-btn prism-close" style="position:absolute; top:calc(20px + env(safe-area-inset-top, 0px)); right:20px; z-index:100;" onclick="closeSubApps()">✕</button>
 </div>
 
 <div id="subapp-ledger" class="sub-app-overlay" style="background: rgba(0,0,0,0.8); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);">
@@ -2334,7 +2334,7 @@
   </div>
 
   <!-- Close Button -->
-  <button class="overlay-close-btn prism-close" style="position:absolute; top:20px; right:20px; z-index:100;" onclick="closeSubApps()">✕</button>
+  <button class="overlay-close-btn prism-close" style="position:absolute; top:calc(20px + env(safe-area-inset-top, 0px)); right:20px; z-index:100;" onclick="closeSubApps()">✕</button>
 </div>
 
 </body></html>
