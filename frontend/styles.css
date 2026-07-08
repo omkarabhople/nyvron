@@ -3598,3 +3598,29 @@ body.theme-light, body.theme-dark-vault {
     padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
+
+
+@media (max-width: 768px) {
+  /* Fix Main AI Chat layout boundaries */
+  #tab-ai .ai-layout {
+    padding-top: env(safe-area-inset-top, 40px) !important;
+    padding-bottom: calc(75px + env(safe-area-inset-bottom, 0px)) !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Fix Calendar boundaries */
+  #tab-calendar .cal-top-bar {
+    padding-top: calc(16px + env(safe-area-inset-top, 40px)) !important;
+  }
+  #tab-calendar .cal-day-panel {
+    padding-bottom: calc(75px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  
+  /* Fix Dock scrolling */
+  .tab-bar-pill {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x !important;
+    pointer-events: auto !important;
+  }
+}
