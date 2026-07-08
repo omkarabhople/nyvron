@@ -1,0 +1,55 @@
+CANOPY - MACRO-STRATEGY ENGINE
+Core UI/UX Architecture & Functional Specification
+(Strictly Unseeded - Structural & Functional Logic Only)
+
+=========================================
+SCROLL 1: STRATEGIC COMMAND & SYLLABUS MATRIX
+=========================================
+[Panel] Macro Goal Countdown & Status
+- Functioning: Calculates time delta between current date and target execution date.
+- Data Bindings: 
+  > Target Date: [Date Object] 
+  > Days Remaining: [Dynamic Integer]
+  > Global Readiness Score: [Dynamic Float Percentage] based on aggregated node mastery.
+
+[Panel] Dynamic Syllabus Heatmap
+- Functioning: Renders a dense matrix grid representing the entire syllabus/curriculum.
+- Data Bindings: X/Y axes map to [Macro-Subjects] and [Sub-Topics]. Cell color intensity (alpha channel) is bound to [Confidence Score Float] (0.0 to 1.0).
+- Interaction: Clicking a cell opens a detail popover listing the linked study materials and historical performance on that specific node.
+
+=========================================
+SCROLL 2: KNOWLEDGE GRAPH & INGESTION
+=========================================
+[Panel] Autonomous Ingestion Pipeline
+- Functioning: Visualizes the OCR/NLP processing of uploaded documents (e.g., past papers, textbooks).
+- Data Bindings: 
+  > Ingestion Queue: [Array of Document Metadata]
+  > Extraction Status: Progress bar bound to [Pages Processed / Total Pages].
+  > Auto-Tagged Themes: [Array of Strings] dynamically populating as text analysis completes.
+
+[Panel] Micro-Theme Dependency Graph
+- Functioning: A force-directed node graph mapping relationships between concepts.
+- Data Bindings: Nodes represent [Extracted Themes]; Edges represent [Algorithmic Relationships] (e.g., "Prerequisite to", "Frequently tested with"). Node size corresponds to [Weightage/Frequency Integer].
+- Interaction: Scroll/pinch to zoom. Clicking a node highlights all its 1st and 2nd-degree connections, dimming the rest of the canvas.
+
+=========================================
+SCROLL 3: VELOCITY & PREDICTIVE TRAJECTORY
+=========================================
+[Panel] Burn-Down & Velocity Chart
+- Functioning: Tracks actual progress against the required pace to complete the matrix by the target date.
+- Data Bindings: 
+  > Ideal Trajectory: Linear line from [Total Syllabus Volume] to 0.
+  > Actual Trajectory: Plotted line based on [Completed Nodes] over [Time Series].
+- Interaction: Hovering over the delta between the two lines displays an automated advisory (e.g., "Currently 4 days behind optimal pace").
+
+[Panel] High-Weightage Alert Center
+- Functioning: Algorithmic feed prioritizing study areas based on historical frequency and current user weakness.
+- Data Bindings: List sorted by a computed score `([Historical Frequency] * (1 - [User Confidence]))`.
+
+=========================================
+SCROLL 4: ADAPTIVE ACTION PLAN
+=========================================
+[Panel] Tactical Resource Allocation
+- Functioning: Recommends specific chapters or active recall sessions based on the current matrix gaps.
+- Data Bindings: Generates [Action Item Objects] linking directly to the 'Library' or 'Cascara Timer'.
+- Interaction: Includes a 1-click "Add to Today's Plan" button that dispatches the task to the global schedule state.

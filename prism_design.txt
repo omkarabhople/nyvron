@@ -1,0 +1,44 @@
+PRISM - SPATIAL CANVAS
+Visual Design & UI Layout Blueprint (Image Substitute)
+Theme: Apple HIG / Infinite Glass Canvas / Dark Mode
+
+========================================================================
+GLOBAL CANVAS (THE VOID)
+========================================================================
+* Background: Absolute true black (#000000). 
+* Texture: A faint geometric dot grid. Dots are pure white but set to exactly 4% opacity. 
+* Navigation: The standard floating global dock remains at the bottom center.
+
+========================================================================
+STATE 1: EMPTY / INGESTION MODE
+========================================================================
+[ CENTRAL "DROP IDEA" HUB ]
+- Position: Dead center of the viewport.
+- UI: A perfect circle (approx 150x150px).
+- Styling: Dashed border (2pt width, 8pt dash array) colored in a vibrant, glowing neon purple (#A855F7).
+- Animation: Breathing effect (scales from 95% to 105% continuously).
+- Text: "Drop Idea" in SF Pro Display, Medium, centered inside the circle.
+- Subtitle: Below the circle, subtle gray text: "Nyvron will autonomously cluster and mind-map your chaotic inputs."
+
+========================================================================
+STATE 2: POPULATED & CLUSTERED (After dropping inputs)
+========================================================================
+[ FLOATING NODES ]
+- Appearance: Small, rounded rectangles (16pt corner radius) scattered across the canvas.
+- Material: Frosted glass (.systemThinMaterialDark) with heavy background blur.
+- Node Types:
+  > Text Snippet: Clean white text (SF Pro Text).
+  > Image Node: Image masked directly to the squircle shape.
+  > Link Node: Favicon + Page Title + subtle domain name.
+
+[ SEMANTIC EDGES (CONNECTIONS) ]
+- UI: Bezier curves connecting related nodes.
+- Styling: Gradient lines starting at 10% opacity and peaking at 40% in the middle. The color matches the cluster's assigned theme (e.g., purple for tech, green for environment).
+
+[ FLOATING ACTION BAR (Top Center) ]
+- UI: A horizontal glass pill floating 20px from the top edge.
+- Tools (SF Symbols): 
+  1. 'cursorarrow' (Select)
+  2. 'textformat' (Add Text)
+  3. 'photo' (Add Media)
+  4. 'wand.and.stars' (Nyvron Auto-Sort/Mindmap - Highlighted in purple)

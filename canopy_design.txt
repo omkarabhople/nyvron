@@ -1,0 +1,53 @@
+CANOPY - MACRO-STRATEGY ENGINE
+iOS / Apple HIG Component Architecture Mapping
+=========================================
+
+## Global System Layer & Core Materials
+* Background Material: Matches Cortex (UIColor.systemBackground / Dark Mode) but introduces a subtle, shifting ambient gradient (.systemTeal to .systemIndigo) at 5% opacity to differentiate the "Strategy" environment from "Infrastructure".
+* Typography: 
+  - Macro Headers: SF Pro Display (Heavy).
+  - Graph Labels & Nodes: SF Compact Text (Medium) for maximum legibility at small scales.
+
+=========================================
+SCROLL 1: STRATEGIC COMMAND & SYLLABUS MATRIX
+=========================================
+[Panel] Macro Goal Countdown
+* iOS Component: UIStackView with custom animated UILabel counting transitions (matching the iOS Timer app typography styling).
+* Design Implementation: Massive, thin-weight typography for the countdown, seated above a frosted glass pill containing the readiness percentage.
+
+[Panel] Dynamic Syllabus Heatmap
+* iOS Component: UICollectionView (Custom UICollectionViewLayout for dense grid packing).
+* Design Implementation: Inspired by the GitHub contribution graph but styled with Apple's Activity Ring gradients. Cells feature a 4pt corner radius. 
+* Control/Interaction: UILongPressGestureRecognizer triggers a native Context Menu to quickly mark a syllabus block as "Review Needed" or "Mastered".
+
+=========================================
+SCROLL 2: KNOWLEDGE GRAPH & INGESTION
+=========================================
+[Panel] Autonomous Ingestion Pipeline
+* iOS Component: UIProgressView (Customized) + UIListContentConfiguration.
+* Design Implementation: Minimalist rows showing document icons (SF Symbol: doc.text.viewfinder) with a fluid, continuous progress track beneath them.
+
+[Panel] Micro-Theme Dependency Graph
+* iOS Component: SpriteKit (SKView) or Metal (MTKView) for physics-based node rendering.
+* Design Implementation: Nodes are rendered as floating glassmorphic orbs (.systemThinMaterial). High-weightage nodes emit a subtle outer glow (Shadow Radius: 8pt, Color: .systemYellow).
+* Control/Interaction: UIPanGestureRecognizer for canvas navigation. UIPinchGestureRecognizer for semantic zooming (zooming out groups nodes into macro-clusters; zooming in reveals specific micro-themes).
+
+=========================================
+SCROLL 3: VELOCITY & PREDICTIVE TRAJECTORY
+=========================================
+[Panel] Burn-Down & Velocity Chart
+* iOS Component: SwiftUI.Charts
+* Design Implementation: Uses a dual-axis line chart. The "Ideal Trajectory" is a dashed .systemGray line. The "Actual" line uses a vibrant gradient stroke with a drop shadow to elevate it above the grid.
+* Control/Interaction: Dragging a finger across the chart scrubs through time, updating a floating tracking label above the user's touch point.
+
+[Panel] High-Weightage Alert Center
+* iOS Component: UITableView (Inset Grouped Style).
+* Design Implementation: Uses the native iOS notifications aesthetic. Each row has a leading SF Symbol (exclamationmark.triangle.fill) tinted dynamically based on urgency.
+
+=========================================
+SCROLL 4: ADAPTIVE ACTION PLAN
+=========================================
+[Panel] Tactical Resource Allocation
+* iOS Component: UICollectionViewListCell (Modeled after iOS 17 Reminders App).
+* Design Implementation: Clear, actionable rows. Each row contains a leading circular checkbox and trailing metadata (e.g., estimated time to complete).
+* Control/Interaction: Tapping the checkbox triggers a crisp UIImpactFeedbackGenerator (Light) haptic and a strikethrough animation before smoothly animating the row out of the list.

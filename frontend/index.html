@@ -3,22 +3,8 @@
   <title>NYVRON</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="NYVRON — Your personal command center.">
-  <script>
-    const NYVRON_BUILD = '2026-07-05-reader-fix';
-    const cachedBuild = localStorage.getItem('nyvron-active-build');
-    if (cachedBuild !== NYVRON_BUILD) {
-      localStorage.setItem('nyvron-active-build', NYVRON_BUILD);
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          registrations.forEach(registration => registration.unregister());
-        });
-      }
-      if ('caches' in window) {
-        caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))));
-      }
-    }
-  </script>
-  <link rel="stylesheet" href="styles.css?v=20260705-reader-fix">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="cortex.css">
   <style>
     @keyframes spin {
       from { transform: rotate(0deg); }
@@ -36,6 +22,14 @@
   </style>
 </head>
 <body class="theme-paper">
+  <div class="mesh-bg">
+    <div class="mesh-blob b1"></div>
+    <div class="mesh-blob b2"></div>
+    <div class="mesh-blob b3"></div>
+    <div class="mesh-blob b4"></div>
+    <div class="mesh-blob b5"></div>
+  </div>
+  <div class="app-container">
 
   <!-- Vault Shutter (Iris Lock Animation) -->
   <div id="vault-shutter" class="vault-shutter hidden">
@@ -128,10 +122,31 @@
 
 
   <!-- ══ HOME ══ -->
-  <section id="tab-home" class="tab active">
+  <section id="tab-home" class="tab">
     <div class="tab-scroll">
       <div class="tab-inner">
         <div class="home-hero">
+
+          <div class="nyvron-bloom-wrap home-bloom" style="width: 160px; height: 160px; margin: 0 auto 16px;">
+            <svg class="nyvron-bloom" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+              <defs>
+                <radialGradient id="bgr" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(46,204,113,0.08)"></stop><stop offset="100%" stop-color="transparent"></stop></radialGradient>
+                <linearGradient id="pg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1a9e4e"></stop><stop offset="100%" stop-color="#2ECC71"></stop></linearGradient>
+                <linearGradient id="pg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2ECC71"></stop><stop offset="100%" stop-color="#52D68A"></stop></linearGradient>
+              </defs>
+              <circle cx="0" cy="0" r="45" fill="url(#bgr)"></circle>
+              <g class="bloom-inner">
+                <path class="bloom-petal p1" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg1)"></path>
+                <path class="bloom-petal p2" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg2)" transform="rotate(60)"></path>
+                <path class="bloom-petal p3" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg1)" transform="rotate(120)"></path>
+                <path class="bloom-petal p4" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg2)" transform="rotate(180)"></path>
+                <path class="bloom-petal p5" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg1)" transform="rotate(240)"></path>
+                <path class="bloom-petal p6" d="M0,0 C-9,-16 9,-16 0,-38 C14,-22 14,-9 0,0" fill="url(#pg2)" transform="rotate(300)"></path>
+              </g>
+              <circle cx="0" cy="0" r="5" fill="#2ECC71" class="bloom-center"></circle>
+            </svg>
+          </div>
+
           <div class="live-pill"><span class="live-dot"></span>NYVRON · Live</div>
           <div id="home-time" class="home-clock"></div>
           <div id="home-date" class="home-date">Friday, 3 Jul</div>
@@ -148,6 +163,42 @@
           <div id="ns-quote-text" class="ns-quote">"Don't watch the clock; do what it does. Keep going."</div>
           <div id="ns-quote-author" class="ns-author">— Sam Levenson</div>
         </div>
+
+      <!-- Pulse Intelligent Task Orchestrator -->
+      <div style="margin: 20px 16px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding:16px; border-radius:16px;" id="dash-widget-pulse">
+        <div style="font-size: 14px; font-weight: 700; color: white; display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cascara)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Pulse Orchestrator
+        </div>
+        <p style="font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 12px;">Tasks auto-sorted by your current energy state.</p>
+        <div id="pulse-tasks-container">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Advanced Modules -->
+      <div style="margin: 20px 16px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: white;">Nyvron Sub-Systems</h2>
+        <div class="module-grid">
+          <div class="module-card module-cortex" onclick="openSubApp('cortex')">
+            <div class="module-title">Cortex</div>
+            <div class="module-desc">Project & Infrastructure Hub</div>
+          </div>
+          <div class="module-card module-canopy" onclick="openSubApp('canopy')">
+            <div class="module-title">Canopy</div>
+            <div class="module-desc">Macro-Strategy Synthesis</div>
+          </div>
+          <div class="module-card module-prism" onclick="openSubApp('prism')">
+            <div class="module-title">Prism</div>
+            <div class="module-desc">Spatial Ideation Canvas</div>
+          </div>
+          <div class="module-card module-ledger" onclick="openSubApp('ledger')">
+            <div class="module-title">Ledger</div>
+            <div class="module-desc">Strategic Retrospective</div>
+          </div>
+        </div>
+      </div>
+
 
         <!-- Energy -->
         <div class="card card-pad" style="margin:0 16px 12px">
@@ -356,7 +407,7 @@
   </section>
 
   <!-- ══ AI ══ -->
-  <section id="tab-ai" class="tab">
+  <section id="tab-ai" class="tab active">
     <div class="ai-layout">
       <!-- AI Mode Switcher Segment -->
       <div class="ai-segment-control" style="display:flex; padding:4px; background:rgba(255,255,255,0.05); border-radius:10px; margin: 12px 16px; border: 1px solid var(--border);">
@@ -513,8 +564,28 @@
         </div>
       </div>
 
-      <!-- Tag Filter Bar -->
-      <div id="journal-tag-filter-container" style="padding: 8px 16px; display: flex; gap: 8px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin-bottom: 8px;"></div>
+
+  <!-- AI Insights Injections -->
+  <div class="emotional-synthesis-card">
+    <div class="es-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#bf5af2" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Weekly Emotional Synthesis
+    </div>
+    <div class="es-body">
+      Based on your entries this week, you've shown immense focus but underlying stress regarding upcoming deadlines. Your energy peaked on Wednesday. Consider scheduling a mandatory 2-hour disconnect block this weekend to prevent burnout.
+    </div>
+  </div>
+
+  <div class="graph-recommendation" onclick="switchTab('tab-home')">
+    <div class="gr-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </div>
+    <div>
+      <div class="gr-title">Nyvron Knowledge Graph</div>
+      <div class="gr-text">You've mentioned "quantum mechanics" twice today. Autonomously mapped to: <strong>Principles of Quantum Mechanics (Ch. 4)</strong> in your Library. Click to open.</div>
+    </div>
+  </div>
+
       <div id="journal-entries" class="journal-grid"></div>
       <div class="" id="journal-empty" style="text-align:center;padding:40px 20px;color:var(--txt3)">
         <div style="font-size:40px;margin-bottom:12px">📓</div>
@@ -534,7 +605,7 @@
       <div class="ios-group" style="margin-bottom:24px;">
         <div class="ios-group-body">
           <div class="ios-row" id="profile-card-btn" style="cursor:pointer;padding:14px 16px;">
-            <div class="settings-avatar" id="profile-avatar" style="width:60px;height:60px;background:url('./avatar_profile_icon.jpg') center/cover; border:2px solid rgba(255,255,255,0.1);"></div>
+            <div class="settings-avatar" id="profile-avatar" style="width:60px;height:60px;font-size:24px;background:url('https://source.unsplash.com/random/100x100/?nature') center/cover;">U</div>
             <div class="settings-profile-info">
               <div class="settings-profile-name" id="profile-name" style="font-size:22px;font-weight:400;">User</div>
               <div class="settings-profile-sub" style="font-size:13px;color:var(--txt2);">NYVRON Account, Data and more</div>
@@ -889,7 +960,7 @@
       <div class="spotlight-input-row">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <input id="spotlight-input" class="spotlight-field" type="text" placeholder="Search NYVRON…" autocomplete="off">
-        <kbd class="spotlight-esc">ESC</kbd>
+        <kbd class="spotlight-esc" id="spotlight-close-btn" style="cursor: pointer;"></kbd>
       </div>
       <ul id="spotlight-results" class="spotlight-list"></ul>
     </div>
@@ -979,12 +1050,10 @@
           <div class="cc-row">
             <span class="cc-row-label">Calendar</span>
             <div class="cc-row-right select-wrapper">
-              <span class="dot-indicator" style="background:#30d158;width:8px;height:8px;border-radius:50%;margin-right:6px;display:inline-block;"></span>
+              <span class="dot-indicator" style="background:#FF9500;width:8px;height:8px;border-radius:50%;margin-right:6px;display:inline-block;"></span>
               <select id="cc-calendar-type" class="ios-select">
-                <option value="personal">Personal</option>
+                <option value="personal">Calendar</option>
                 <option value="work">Work</option>
-                <option value="important">Important</option>
-                <option value="project">Project</option>
               </select>
               <span class="ios-row-chevron">›</span>
             </div>
@@ -1009,9 +1078,7 @@
         </div>
 
         <div class="cc-card">
-          <input id="cc-url" class="cc-input" type="text" placeholder="URL" autocomplete="off">
-          <div class="cc-divider"></div>
-          <textarea id="cc-notes" class="cc-input" placeholder="Notes" style="height: 80px; resize: none; padding-top: 10px; font-family: inherit; font-size: 15px; border: none; outline: none; background: transparent; width: 100%; box-sizing: border-box; color: var(--txt1);"></textarea>
+                    <input id="cc-url" class="cc-input" type="text" placeholder="URL" autocomplete="off">
         </div>
       </div>
     </div>
@@ -1021,6 +1088,9 @@
   <div id="cascara-reader-overlay" class="cascara-reader-overlay theme-dark hidden" role="dialog" aria-modal="true">
     <div class="cr-header-toolbar">
       <button id="cr-back-btn" class="cr-back-btn">‹ Library</button>
+      <button id="cr-notes-toggle" class="cr-tool-btn" title="Marginal Notes" style="margin-left:8px; display:flex; align-items:center;">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      </button>
       <div class="cr-title-group">
         <div id="cr-doc-title" class="cr-doc-title">Hehe</div>
         <div id="cr-doc-author" class="cr-doc-author">by See</div>
@@ -1033,12 +1103,7 @@
           <button id="cr-tool-find" class="cr-tool-btn" title="Search Finder">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </button>
-          <button id="cr-tool-pen" class="cr-tool-btn" title="Markup Drawing Pen">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-          </button>
-          <button id="cr-tool-eraser" class="cr-tool-btn" title="Eraser">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16c-1-1-1-2.5 0-3.5L13 2c1-1 2.5-1 3.5 0l4 4c1 1 1 2.5 0 3.5L11 18"></path><path d="M12 11l4 4"></path></svg>
-          </button>
+
           <button id="cr-tool-font" class="cr-tool-btn" title="Font Settings">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
           </button>
@@ -1054,22 +1119,11 @@
           <button id="cr-mic-capture-btn" class="cr-tool-btn" title="Ambient Smart Capture">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
           </button>
-
-          <button id="cr-btn-dual" class="cr-tool-btn" title="Dual Page / Multi-Doc View">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
-          </button>
-
           <button id="cr-btn-reflow" class="cr-tool-btn" title="Reflow Layout Mode">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="21" y1="18" x2="3" y2="18"></line></svg>
           </button>
           <button id="cr-btn-summary" class="cr-tool-btn" title="Page Summaries">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-          </button>
-          <button id="cr-btn-notes" class="cr-tool-btn" title="Reading Notes">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-          </button>
-          <button id="cr-btn-quick-notes" class="cr-tool-btn" title="Global Quick Notes">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
           </button>
           <div style="width:1px; height:20px; background:rgba(255,255,255,0.12); margin:0 4px; flex-shrink:0;"></div>
           <button id="cr-tool-zoom-out" class="cr-tool-btn" title="Zoom Out" style="width:24px; height:24px; padding:0;">
@@ -1102,7 +1156,18 @@
     </div>
 
     <div class="cr-workspace">
-      <!-- Sidebar (Outline) -->
+      <!-- Marginal Notes Sidebar (Left) -->
+      <aside id="cr-notes-sidebar" class="cr-sidebar hidden" style="border-right: 1px solid var(--border); border-left: none;">
+        <div class="cr-sidebar-header">
+          <span>Marginal Notes</span>
+          <button id="cr-notes-close" class="cr-sidebar-close" title="Close Notes">✕</button>
+        </div>
+        <ul id="cr-notes-list" class="cr-outline-list" style="padding: 16px; display: flex; flex-direction: column; gap: 12px; font-size: 13px; color: var(--txt1);">
+          <!-- Populated dynamically -->
+        </ul>
+      </aside>
+
+      <!-- Sidebar (Outline) (Right) -->
       <aside id="cr-sidebar" class="cr-sidebar hidden">
         <div class="cr-sidebar-header">
           <span>Chapters &amp; Outline</span>
@@ -1116,7 +1181,7 @@
 
       <!-- Main page workspace -->
       <div id="cr-page-view" class="cr-page-view theme-dark">
-        <div id="cr-page-container" style="display: flex; gap: 58px; justify-content: center; align-items: center; transform-origin: center center; transition: transform 0.2s var(--spring);">
+        <div id="cr-page-container" style="display: flex; gap: 20px; justify-content: center; align-items: center; transform-origin: center center; transition: transform 0.2s var(--spring);">
           <div id="cr-page-wrapper" class="cr-page-wrapper">
             <div id="cr-zoom-layer" style="position:absolute;top:0;left:0;transform-origin:top left;">
               <canvas id="cr-pdf-canvas" class="cr-pdf-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:1;"></canvas>
@@ -1132,46 +1197,6 @@
               <canvas id="cr-markup-canvas-right" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:5;"></canvas>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- Dual-book synthesis gutter -->
-      <div id="cr-synthesis-gutter" class="cr-synthesis-gutter hidden" style="width: 260px; min-width: 240px; max-width: 300px;">
-        <div style="padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px;">
-          <span style="font-size: 12px; font-weight: 800; color: var(--cascara); text-transform: uppercase; letter-spacing: 0.5px;">Synthesis Notes</span>
-          <span style="font-size: 11px; color: var(--txt3);">Drop selected passages here</span>
-        </div>
-        <div id="cr-synthesis-list" style="flex: 1; overflow-y: auto;"></div>
-        <div class="synthesis-drop-placeholder" style="margin: 12px; padding: 14px; border-radius: 10px; color: var(--txt3); font-size: 12px; text-align: center;">
-          Save cross-book snippets
-        </div>
-      </div>
-
-      <!-- Right-side document for dual-book mode -->
-      <div id="cr-page-view-right-doc" class="cr-page-view theme-dark hidden" style="flex: 1; min-width: 0; position: relative;">
-        <div style="position: absolute; top: 14px; left: 14px; right: 14px; z-index: 20; display: flex; align-items: center; gap: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 8px;">
-          <select id="cr-right-book-select" style="flex: 1; min-width: 0; background: var(--surface); color: var(--txt1); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 12px;"></select>
-          <button id="cr-right-prev" class="cr-page-nav-btn" style="width: 30px; height: 30px;">‹</button>
-          <button id="cr-right-next" class="cr-page-nav-btn" style="width: 30px; height: 30px;">›</button>
-          <span id="cr-right-page-label" style="font-size: 11px; color: var(--txt2); min-width: 90px; text-align: right;">Page 1 of 1</span>
-        </div>
-        <div id="cr-right-page-wrapper" class="cr-page-wrapper" style="margin-top: 66px;">
-          <canvas id="cr-right-pdf-canvas" class="cr-pdf-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:1;"></canvas>
-          <div id="cr-right-page-content" class="cr-page-content" style="position:absolute;inset:0;z-index:2;background:none;padding:40px;overflow:auto;"></div>
-        </div>
-      </div>
-
-      <!-- PDF/ePUB Reflow Mode Panel (Feature 9) -->
-      <div id="cr-reflow-container" class="cr-reflow-container hidden" style="flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--bg2); border-left: 1px solid var(--border); box-sizing: border-box; z-index: 10;">
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border); background: var(--surface2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 16px;">📖</span>
-            <span style="font-size: 14px; font-weight: 700; color: var(--txt1);">Reflow &amp; Sentence Editor</span>
-          </div>
-          <button id="cr-reflow-close-btn" onclick="appCloseReflow()" style="background: none; border: none; color: var(--txt3); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='none'">✕</button>
-        </div>
-        <div id="cr-reflow-body" style="flex: 1; overflow-y: auto; padding: 24px; font-family: var(--font-serif); font-size: 18px; line-height: 1.8; color: var(--txt1); max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box;">
-          <!-- Reflowed paragraphs go here -->
         </div>
       </div>
 
@@ -1236,44 +1261,6 @@
           </div>
         </div>
 
-
-    <!-- Progressive Summarization Panel (Feature 8) -->
-    <div id="cr-summarization-panel" class="cr-floating-panel hidden" style="position: absolute; right: 24px; top: 80px; width: 300px; padding: 16px; z-index: 1040;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <span>📝</span>
-          <span style="font-size: 13px; font-weight: 700; color: var(--txt1);">Progressive Summary</span>
-        </div>
-        <button id="cr-summarization-close" style="background: none; border: none; color: var(--txt3); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;">✕</button>
-      </div>
-      <div style="margin-bottom: 12px; background: var(--surface3); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
-        <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--txt3); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-          <span>Brief</span>
-          <span>Medium</span>
-          <span>Detail</span>
-        </div>
-        <input type="range" id="cr-summary-depth" min="1" max="3" value="1" style="width: 100%; accent-color: var(--cascara); cursor: pointer; height: 4px;" />
-      </div>
-      <div id="cr-summary-content" style="font-size: 13px; line-height: 1.5; color: var(--txt1); padding: 12px; background: var(--surface3); border-radius: 8px; border: 1px solid var(--border); min-height: 100px; max-height: 200px; overflow-y: auto;">
-        <b>Brief:</b> This page discusses main topic features.
-      </div>
-    </div>
-
-    <!-- Reading Notes Panel -->
-    <div id="cr-notes-panel" class="cr-floating-panel hidden" style="position: absolute; right: 24px; top: 80px; width: 300px; padding: 16px; z-index: 1040; display: flex; flex-direction: column; gap: 12px; height: 320px; box-sizing: border-box;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <span>📝</span>
-          <span style="font-size: 13px; font-weight: 700; color: #fff;">Reading Notes</span>
-        </div>
-        <button id="cr-notes-close" style="background: none; border: none; color: var(--txt3); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;">✕</button>
-      </div>
-      <textarea id="cr-notes-textarea" placeholder="Type reading notes here... Audio captures sync here too!" style="flex: 1; width: 100%; padding: 10px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #fff; font-family: inherit; font-size: 12px; line-height: 1.5; resize: none; outline: none; box-sizing: border-box;"></textarea>
-      <div style="display: flex; justify-content: flex-end; gap: 8px;">
-        <button id="cr-notes-mic-btn" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.2s;" title="Voice Dictation">🎙️ Dictate</button>
-        <button id="cr-notes-save-btn" style="background: var(--cascara); border: none; color: #000; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">Save Notes</button>
-      </div>
-    </div>
 
     <div id="cr-pen-settings" class="cr-floating-panel hidden" style="position: absolute; right: 200px; bottom: 65px; background: rgba(28,28,30,0.95); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); backdrop-filter: blur(10px); z-index: 1020; width: 180px;">
       <div class="cr-panel-label" style="font-size:12px; font-weight:600; color:var(--txt3); margin-bottom:8px;">Pen Color</div>
@@ -1342,7 +1329,49 @@
         <input type="text" id="cr-chat-input" placeholder="Type a message..." style="flex:1; padding:8px 12px; border-radius:20px; background:var(--surface); border:1px solid var(--border); color:var(--txt1); font-size:13px; outline:none;" />
         <button id="cr-chat-send" style="background:var(--cascara); border:none; color:#000; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold;">→</button>
       </div>
+    </div> <!-- Close cr-chat-widget -->
+
+    <!-- Reflow Mode Container -->
+    <div id="cr-reflow-container" class="cr-reflow-container hidden" style="flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.2); height: 100%; border-radius: 12px; overflow: hidden; padding: 20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:10px;">
+        <h3 style="margin:0; font-size:16px; color:#ff9500; font-weight:700;">📖 SENTENCE REFLOW EDITOR</h3>
+        <button id="cr-reflow-close-btn" style="background:none; border:none; color:var(--txt3); cursor:pointer; font-size:18px;">✕</button>
+      </div>
+      <div id="cr-reflow-body" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-right:10px;">
+        <!-- Sentences will render here -->
+      </div>
     </div>
+
+    <!-- Summarization Panel -->
+    <aside id="cr-summarization-panel" class="cr-sidebar hidden" style="position: absolute; right: 24px; top: 80px; bottom: 120px; width: 320px; display: flex; flex-direction: column; background: rgba(28,28,30,0.8); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 1000; overflow: hidden;">
+      <div class="cr-sidebar-header" style="display:flex; justify-content:space-between; align-items:center; padding:14px 18px; border-bottom:1px solid rgba(255,255,255,0.08); background:transparent;">
+        <div>
+          <div style="font-weight:700; font-size:14px; color: var(--cascara);">📋 Summarizer</div>
+          <div style="font-size:11px; color:var(--txt3); margin-top:2px;">Current page analysis</div>
+        </div>
+        <button id="cr-summarization-close" style="background:none; border:none; color:var(--txt3); cursor:pointer; font-size:18px; line-height:1; padding:4px 8px; border-radius:6px; transition:0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.08)'" onmouseleave="this.style.background='none'">✕</button>
+      </div>
+      <div style="padding:14px 18px; border-bottom:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div style="font-size:10px; color:var(--txt3); font-weight:700; text-transform:uppercase; letter-spacing:1px;">Summary Depth</div>
+          <div id="cr-summary-depth-label" style="font-size:10px; font-weight:700; color:var(--cascara); background:rgba(255,149,0,0.1); padding:2px 8px; border-radius:10px; letter-spacing:1px;">NORMAL</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:10px; color:var(--txt3);">Normal</span>
+          <input type="range" id="cr-summary-depth" min="1" max="3" value="1" style="flex:1; accent-color:var(--cascara); cursor:pointer;" />
+          <span style="font-size:10px; color:var(--txt3);">Detailed</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:9px; color:var(--txt3); padding:0 2px;">
+          <span>Bullets</span>
+          <span>Medium</span>
+          <span>Full Analysis</span>
+        </div>
+        <button id="cr-summary-generate-btn" style="margin-top:12px; width:100%; padding:8px 0; border-radius:8px; border:none; background:var(--cascara); color:#fff; font-weight:600; font-size:12px; cursor:pointer; letter-spacing:0.5px; transition:0.15s;" onmouseenter="this.style.opacity='0.85'" onmouseleave="this.style.opacity='1'">⚡ Generate Summary</button>
+      </div>
+      <div id="cr-summary-content" style="flex:1; overflow-y:auto; padding:18px; font-size:13px; line-height:1.7; color:var(--txt1);">
+        <div style="color:var(--txt3); text-align:center; padding:30px 0; font-size:12px;">Click Generate Summary or open a book page to start.</div>
+      </div>
+    </aside>
 
     </div> <!-- Close cr-workspace -->
 
@@ -1379,10 +1408,12 @@
 
       <div class="cr-sidebar-header" style="display: flex; justify-content: space-between; align-items: center;">
         <span>Practice Quiz</span>
-        <button id="cr-mcq-refresh-btn" style="background: none; border: none; color: var(--cascara); cursor: pointer; padding: 4px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-        </button>
-      </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="cr-mcq-refresh-btn" style="background: none; border: none; color: var(--cascara); cursor: pointer; padding: 4px; display: flex; align-items: center;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          </button>
+          <button id="cr-mcq-close-btn" style="background: none; border: none; color: var(--txt3); cursor: pointer; font-size: 16px; padding: 4px; display: flex; align-items: center;" title="Close Quiz">✕</button>
+        </div>
       <div id="cr-mcq-content" style="padding: 16px; overflow-y: auto; height:calc(100% - 50px);">
         <!-- MCQs will be generated here -->
       </div>
@@ -1395,7 +1426,7 @@
     <div class="tab-bar-pill">
       <div class="dock-indicator" id="dock-indicator" style="transform: translateX(2px); width: 44px;"></div>
 
-      <button class="tb-item active" data-tab="tab-home" aria-label="Home">
+      <button class="tb-item" data-tab="tab-home" aria-label="Home">
         <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
           <polyline points="9 22 9 12 15 12 15 22"></polyline>
@@ -1408,19 +1439,6 @@
         <span class="tb-label">Cascara</span>
       </button>
 
-      <button class="tb-item" data-tab="tab-ai" aria-label="NYVRON AI">
-        <svg class="tb-icon tb-bloom-icon" viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg">
-          <g class="tb-bloom">
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor"></path>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor" transform="rotate(60)" opacity=".7"></path>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor" transform="rotate(120)" opacity=".5"></path>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor" transform="rotate(180)"></path>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor" transform="rotate(240)" opacity=".7"></path>
-            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor" transform="rotate(300)" opacity=".5"></path>
-          </g>
-        </svg>
-        <span class="tb-label">AI</span>
-      </button>
 
       <button class="tb-item" data-tab="tab-calendar" aria-label="Calendar">
         <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -1446,9 +1464,42 @@
         <span class="tb-label">Settings</span>
       </button>
 
+      <!-- AI Primary Action (Moved to center for mobile) -->
+      <button class="tb-item floating-primary-btn active" data-tab="tab-ai" aria-label="NYVRON AI">
+        <svg class="tb-icon tb-bloom-icon" viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg" style="width: 28px; height: 28px;">
+          <g class="tb-bloom">
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor"></path>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor" transform="rotate(60)" opacity=".7"></path>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor" transform="rotate(120)" opacity=".5"></path>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor" transform="rotate(180)"></path>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor" transform="rotate(240)" opacity=".7"></path>
+            <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="currentColor" transform="rotate(300)" opacity=".5"></path>
+          </g>
+        </svg>
+      </button>
+
+    <!-- Advanced Modules Icons -->
+    <button class="tb-item" onclick="openSubApp('cortex')" aria-label="Cortex">
+      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <span class="tb-label">Cortex</span>
+    </button>
+    <button class="tb-item" onclick="openSubApp('canopy')" aria-label="Canopy">
+      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <span class="tb-label">Canopy</span>
+    </button>
+    <button class="tb-item" onclick="openSubApp('prism')" aria-label="Prism">
+      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#bf5af2" stroke-width="2" stroke-linecap="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
+      <span class="tb-label">Prism</span>
+    </button>
+    <button class="tb-item" onclick="openSubApp('ledger')" aria-label="Ledger">
+      <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="#ff9f0a" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span class="tb-label">Ledger</span>
+    </button>
+
     </div>
+
     <!-- Search button separate pill on the right -->
-    <button class="dock-action-btn" id="dock-search-btn" aria-label="Search">
+    <button class="dock-action-btn glass-prominent glass-interactive" id="dock-search-btn" aria-label="Search">
       <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <circle cx="11" cy="11" r="8"></circle>
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -1640,5 +1691,650 @@
     <p style="font-size:11px; text-transform:uppercase; color:rgba(255,255,255,0.4); margin-top:6px; letter-spacing:0.1em;">disappears forever on expiry</p>
   </div>
 </div>
-<script src="app.js?v=20260705-reader-fix"></script>
+<script src="app.js" defer></script>
+<script src="cortex.js" defer></script>
+
+<!-- Chronos Focus Engine -->
+<div id="chronos-overlay" class="hidden">
+  <div class="chronos-ring">
+    <div class="chronos-time">45:00</div>
+  </div>
+  <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 8px;">Deep Focus Activated</h2>
+  <p style="color: rgba(255,255,255,0.6);">Nyvron is shielding your environment.</p>
+
+  <div class="chronos-auto-response">
+    <div class="chronos-label">Auto-Response Active</div>
+    <div style="font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.9);">
+      "I am currently in a deep focus session for the next 45 minutes. I will review your message when I emerge."
+    </div>
+  </div>
+
+  <button id="chronos-exit" style="margin-top: 40px; background: rgba(255,255,255,0.1); border: none; padding: 12px 24px; border-radius: 20px; color: white; cursor: pointer;">Exit Chronos</button>
+</div>
+
+
+<!-- SUB-APP OVERLAYS -->
+<div id="subapp-cortex" class="sub-app-overlay">
+  <div class="sub-app-header">
+    <h2 style="font-size: 24px; font-weight: 700; color: #0a84ff;">Cortex <span style="font-size:14px; font-weight:400; color:gray;">Workspace Hub & Sync System</span></h2>
+    <button class="overlay-close-btn" onclick="closeSubApps()">✕</button>
+  </div>
+  
+  <div class="sub-app-content">
+    <div class="cortex-scrolls-container">
+      
+      <!-- SCROLL 1: SYSTEM OVERVIEW -->
+      <section id="cortex-scroll-system" class="cortex-scroll-section">
+        <div class="cortex-section-title">
+          Workspace Pulse Overview <span>Real-time platform metrics</span>
+        </div>
+        
+        <!-- Bento grid of metrics -->
+        <div class="cortex-bento-grid">
+          <div class="cortex-bento-item success" title="Click to view health logs">
+            <div class="cortex-bento-icon">⚙</div>
+            <div>
+              <div class="cortex-bento-value" id="pulse-instances-val">0</div>
+              <div class="cortex-bento-label">Study Modules</div>
+              <div class="cortex-bento-trend" style="color:var(--cortex-success);">↑ 100% healthy</div>
+            </div>
+          </div>
+          <div class="cortex-bento-item success" title="Click to view API logs">
+            <div class="cortex-bento-icon">⚡</div>
+            <div>
+              <div class="cortex-bento-value" id="pulse-routes-val">0</div>
+              <div class="cortex-bento-label">AI Memory Triggers</div>
+              <div class="cortex-bento-trend" style="color:var(--cortex-success);">↔ active pathways</div>
+            </div>
+          </div>
+          <div class="cortex-bento-item warning" title="Click to view error logs">
+            <div class="cortex-bento-icon">⚠</div>
+            <div>
+              <div class="cortex-bento-value" id="pulse-error-val">0.0%</div>
+              <div class="cortex-bento-label">Tasks Backlog Rate</div>
+              <div class="cortex-bento-trend" style="color:var(--cortex-warning);">↑ backlog variance</div>
+            </div>
+          </div>
+          <div class="cortex-bento-item success" title="Click to view DB logs">
+            <div class="cortex-bento-icon">🗄</div>
+            <div>
+              <div class="cortex-bento-value" id="pulse-db-val">0/50</div>
+              <div class="cortex-bento-label">Notes Cache Load</div>
+              <div class="cortex-bento-trend" style="color:var(--cortex-success);">↓ low pool load</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <!-- Heatmap Card -->
+          <div class="cortex-card">
+            <div class="cortex-card-title">Subject Recall Matrix <span style="font-size:11px; color:var(--cortex-muted);">Hover cell for recall details</span></div>
+            <div class="cortex-heatmap-container" id="cortex-matrix-grid">
+              <!-- Rendered Dynamically in JS -->
+            </div>
+            <!-- Heatmap tooltip container -->
+            <div class="cortex-tooltip" id="cortex-matrix-tooltip"></div>
+          </div>
+
+          <!-- Timeline Card -->
+          <div class="cortex-card">
+            <div class="cortex-card-title">Document Ingestion Pipeline <span style="font-size:11px; color:var(--cortex-muted);">Active textbook sync</span></div>
+            <div class="cortex-timeline">
+              <div class="cortex-timeline-node" data-stage="lint">
+                <div class="cortex-node-header">
+                  <div class="cortex-node-info">
+                    <div class="cortex-node-status passed"></div>
+                    <span class="cortex-node-title">Upload & Verify PDF</span>
+                  </div>
+                  <div>
+                    <span class="cortex-node-duration">12s</span>
+                    <span class="cortex-node-chevron">⌃</span>
+                  </div>
+                </div>
+                <div class="cortex-terminal-container">
+                  <pre class="cortex-terminal-log"></pre>
+                </div>
+              </div>
+              
+              <div class="cortex-timeline-node" data-stage="unit-test">
+                <div class="cortex-node-header">
+                  <div class="cortex-node-info">
+                    <div class="cortex-node-status passed"></div>
+                    <span class="cortex-node-title">Text parsing & Chunking</span>
+                  </div>
+                  <div>
+                    <span class="cortex-node-duration">9s</span>
+                    <span class="cortex-node-chevron">⌃</span>
+                  </div>
+                </div>
+                <div class="cortex-terminal-container">
+                  <pre class="cortex-terminal-log"></pre>
+                </div>
+              </div>
+
+              <div class="cortex-timeline-node" data-stage="build">
+                <div class="cortex-node-header">
+                  <div class="cortex-node-info">
+                    <div class="cortex-node-status running"></div>
+                    <span class="cortex-node-title">QA Flashcards Generation</span>
+                  </div>
+                  <div>
+                    <span class="cortex-node-duration">running</span>
+                    <span class="cortex-node-chevron">⌃</span>
+                  </div>
+                </div>
+                <div class="cortex-terminal-container">
+                  <pre class="cortex-terminal-log"></pre>
+                </div>
+              </div>
+
+              <div class="cortex-timeline-node" data-stage="deploy">
+                <div class="cortex-node-header">
+                  <div class="cortex-node-info">
+                    <div class="cortex-node-status queued"></div>
+                    <span class="cortex-node-title">Sync to Local Database</span>
+                  </div>
+                  <div>
+                    <span class="cortex-node-duration">queued</span>
+                    <span class="cortex-node-chevron">⌃</span>
+                  </div>
+                </div>
+                <div class="cortex-terminal-container">
+                  <pre class="cortex-terminal-log"></pre>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCROLL 2: DEPENDENCY & DATABASE DEEP DIVE -->
+      <section id="cortex-scroll-db" class="cortex-scroll-section">
+        <div class="cortex-section-title">
+          Sync Network & Storage Deep Dive <span>Workspace topology</span>
+        </div>
+
+        <!-- Global Dependency simulator -->
+        <div class="cortex-card">
+          <div class="cortex-card-title">Knowledge Sync Network <span style="font-size:11px; color:var(--cortex-muted);">Right click/long press node to isolate</span></div>
+          <div class="cortex-split-screen">
+            <!-- Left Side Sheet configuration card -->
+            <div class="cortex-split-left" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:18px; padding:16px;">
+              <h3 style="font-size:14px; margin-bottom:12px;">Sync Engine</h3>
+              
+              <div style="margin-bottom:14px;">
+                <div style="font-size:11px; color:var(--cortex-muted);">SYNC STATUS</div>
+                <div style="font-size:14px; font-weight:700; color:var(--cortex-success);" id="globe-sim-status">Fully Operational</div>
+              </div>
+
+              <div style="margin-bottom:14px;">
+                <div style="font-size:11px; color:var(--cortex-muted);">SYNC LATENCY</div>
+                <div style="font-size:14px; font-weight:700; font-family:var(--cortex-font-mono);" id="globe-sim-latency">+0ms avg</div>
+              </div>
+
+              <div style="margin-bottom:14px;">
+                <div style="font-size:11px; color:var(--cortex-muted);">OFFLINE QUEUE</div>
+                <div style="font-size:14px; font-weight:500;" id="globe-sim-impact">0 devices offline</div>
+              </div>
+
+              <div style="margin-top:auto; padding-top:12px; border-top:1.5px dashed rgba(255,255,255,0.1);">
+                <div style="font-size:11px; color:var(--cortex-muted);">SELECTED DEVICE</div>
+                <div style="font-size:13px; font-weight:600;" id="globe-selected-region">Select a device...</div>
+                <div style="font-size:11px; font-weight:700; margin-top:2px;" id="globe-selected-status">-</div>
+              </div>
+            </div>
+
+            <!-- Right interactive Canvas/SVG globe -->
+            <div class="cortex-split-right">
+              <svg class="cortex-globe-canvas" id="cortex-globe" viewBox="0 0 300 300"></svg>
+              
+              <!-- Custom iOS Context menu -->
+              <div class="cortex-context-menu" id="cortex-globe-menu">
+                <div class="cortex-context-item destructive" id="menu-action-isolate">Simulate Regional Cut</div>
+                <div class="cortex-context-divider"></div>
+                <div class="cortex-context-item" id="menu-action-ping">Ping Node</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Database charts -->
+        <div class="cortex-db-charts-grid">
+          <!-- Connection Pool Gauge -->
+          <div class="cortex-chart-box">
+            <div class="cortex-canvas-container">
+              <canvas id="db-chart-pool"></canvas>
+            </div>
+          </div>
+
+          <!-- Latency Line Chart -->
+          <div class="cortex-chart-box">
+            <div class="cortex-card-title" style="margin-bottom:0; font-size:13px;">Vector Search Query Latency (1h)</div>
+            <div class="cortex-canvas-container">
+              <canvas id="db-chart-latency"></canvas>
+              <!-- Scrub label absolute overlay -->
+              <div class="cortex-scrub-label" id="db-latency-scrub-val"></div>
+            </div>
+          </div>
+
+          <!-- Table growth Bar chart -->
+          <div class="cortex-chart-box">
+            <div class="cortex-card-title" style="margin-bottom:0; font-size:13px;">Local SQLite Storage Size</div>
+            <div class="cortex-canvas-container">
+              <canvas id="db-chart-growth"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCROLL 3: RESOURCE TRACKING & TEAM VELOCITY -->
+      <section id="cortex-scroll-telemetry" class="cortex-scroll-section">
+        <div class="cortex-section-title">
+          Cognitive Tracking & Attention <span>Telemetry database logs</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:2fr 1fr; gap:16px;">
+          <!-- Telemetry multi line chart -->
+          <div class="cortex-card">
+            <div class="cortex-segmented-container">
+              <div class="cortex-card-title" style="margin-bottom:0;">Study Session History (Telemetry)</div>
+              <!-- Segment control capsule -->
+              <div class="cortex-segmented-control" id="cortex-telemetry-segments">
+                <div class="cortex-segment-btn" data-value="1h">1h</div>
+                <div class="cortex-segment-btn active" data-value="24h">24h</div>
+                <div class="cortex-segment-btn" data-value="7d">7d</div>
+              </div>
+            </div>
+
+            <div class="cortex-canvas-container" style="min-height: 200px;">
+              <canvas id="cortex-telemetry-canvas"></canvas>
+            </div>
+
+            <!-- Telemetry legend items -->
+            <div class="cortex-legend" id="cortex-telemetry-legend">
+              <div class="cortex-legend-item" data-line="cpu">
+                <span class="cortex-legend-color" style="background:var(--cortex-accent);"></span> CPU Load
+              </div>
+              <div class="cortex-legend-item" data-line="mem">
+                <span class="cortex-legend-color" style="background:var(--cortex-warning);"></span> Memory Allocation
+              </div>
+              <div class="cortex-legend-item" data-line="net">
+                <span class="cortex-legend-color" style="background:var(--cortex-success);"></span> Network I/O
+              </div>
+            </div>
+          </div>
+
+          <!-- Cost Heatmap Card -->
+          <div class="cortex-card">
+            <div class="cortex-card-title">Attention Block Grid <span style="font-size:11px; color:var(--cortex-muted);">Activity vs Time of Day</span></div>
+            <div class="cortex-cost-grid" id="cortex-cost-heatmap-grid">
+              <!-- Rendered Dynamically in JS -->
+            </div>
+            
+            <!-- Warning Banner -->
+            <div class="cortex-warning-banner" id="cortex-cost-warning">
+              <div class="cortex-warning-left">
+                <span style="font-size:16px;">⚠️</span>
+                <div>
+                  <div class="cortex-warning-title">Attention Leak Detected</div>
+                  <div class="cortex-warning-desc">Wasted hours found in Breaks</div>
+                </div>
+              </div>
+              <div style="font-size:16px; color:var(--cortex-warning); font-weight:bold;">&rsaquo;</div>
+            </div>
+
+            <!-- Bottom Action Sheet container overlay -->
+            <div class="cortex-action-sheet-overlay" id="cortex-action-sheet-overlay">
+              <div class="cortex-action-sheet">
+                <div class="cortex-action-title">Study Block Firewalls</div>
+                <div style="font-size:13px; text-align:center; color:var(--cortex-text-secondary); margin-bottom:20px;">
+                  Restrict distractions to save study hours. This will activate a local focus blocking firewall.
+                </div>
+                <div class="cortex-action-group">
+                  <button class="cortex-action-btn primary" id="action-btn-apply">Apply Focus Mode Block</button>
+                  <button class="cortex-action-btn cancel" id="action-btn-cancel">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <!-- Team Synergy list -->
+          <div class="cortex-card">
+            <div class="cortex-card-title">Study Log Tracker <span style="font-size:11px; color:var(--cortex-muted);">Swipe items left to review</span></div>
+            <div class="cortex-table-view" id="cortex-commits-list">
+              <!-- Rendered Dynamically in JS -->
+            </div>
+          </div>
+
+          <!-- Velocity Chart Card -->
+          <div class="cortex-card">
+            <div class="cortex-card-title">Weekly Study Velocity <span style="font-size:11px; color:var(--cortex-muted);">Study hours logged per day</span></div>
+            <div class="cortex-canvas-container" style="min-height: 180px;">
+              <canvas id="cortex-velocity-chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCROLL 4: PERFORMANCE & COMPLIANCE -->
+      <section id="cortex-scroll-perf" class="cortex-scroll-section">
+        <div class="cortex-section-title">
+          Cognitive Profiling & Notes <span>Flame graph summaries</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:2fr 1.5fr; gap:16px;">
+          <!-- Flame Graph Card -->
+          <div class="cortex-card">
+            <div class="cortex-card-title">Cognitive Session Stack <span style="font-size:11px; color:var(--cortex-muted);">Click blocks to zoom</span></div>
+            <div class="cortex-flame-container" id="cortex-flame-wrapper">
+              <!-- Rendered Dynamically in JS -->
+            </div>
+            <button class="cortex-flame-reset" id="cortex-flame-reset">Reset Zoom State</button>
+          </div>
+
+          <!-- Documentation Finder Card -->
+          <div class="cortex-card">
+            <div class="cortex-card-title">Syllabus & Notes Finder <span style="font-size:11px; color:var(--cortex-muted);">Fuzzy matching search</span></div>
+            
+            <!-- Apple Search Box -->
+            <div class="cortex-search-wrapper">
+              <span class="cortex-search-icon">🔍</span>
+              <input class="cortex-search-input" id="cortex-search-input" type="text" placeholder="Search notes & guides...">
+              <button class="cortex-search-clear" id="cortex-search-clear">✕</button>
+            </div>
+
+            <!-- Results Stack -->
+            <div class="cortex-doc-results" id="cortex-doc-results">
+              <!-- Rendered Dynamically in JS -->
+            </div>
+
+            <!-- iOS Detent Sheet Bottom Drawer overlay -->
+            <div class="cortex-detent-overlay" id="cortex-detent-overlay">
+              <div class="cortex-detent-sheet" id="cortex-detent-sheet">
+                <!-- Draggable handle bar -->
+                <div class="cortex-detent-handle-area">
+                  <div class="cortex-detent-handle"></div>
+                </div>
+                <div class="cortex-detent-header">
+                  <div class="cortex-detent-title" id="cortex-detent-title">Documentation Viewer</div>
+                  <button class="cortex-detent-close" id="cortex-detent-close">Done</button>
+                </div>
+                <div class="cortex-detent-body" id="cortex-detent-body">
+                  <!-- Rendered Markdown text content -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Sliding Logs Modal panel sheet -->
+    <div class="cortex-side-panel" id="cortex-logs-panel">
+      <div class="cortex-side-header">
+        <h3 id="cortex-log-title" style="font-size:16px; font-weight:700;">Workspace Logs</h3>
+        <button class="cortex-side-close" id="cortex-logs-close">✕</button>
+      </div>
+      <div class="cortex-side-content">
+        <!-- Log Table Search controls -->
+        <div style="display:flex; gap:10px; margin-bottom:16px;">
+          <input type="text" id="cortex-logs-search" placeholder="Search events..." style="flex:1; background:rgba(255,255,255,0.06); border:none; padding:8px; border-radius:8px; color:white; font-size:12px; outline:none;">
+          <select id="cortex-logs-filter" style="background:rgba(255,255,255,0.06); border:none; padding:8px; border-radius:8px; color:white; font-size:12px; outline:none;">
+            <option value="ALL">ALL</option>
+            <option value="INFO">INFO</option>
+            <option value="WARN">WARN</option>
+            <option value="ERROR">ERROR</option>
+          </select>
+        </div>
+        <div id="cortex-logs-list"></div>
+      </div>
+    </div>
+
+    <!-- FLOATING GLOBAL NAVIGATION DOCK (centered bottom) -->
+    <div class="cortex-floating-dock">
+      <button class="cortex-dock-item active" data-target="system" title="System Overview">
+        <svg viewBox="0 0 24 24" stroke="currentColor">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </button>
+      
+      <button class="cortex-dock-item" data-target="db" title="Dependency & Database">
+        <svg viewBox="0 0 24 24" stroke="currentColor">
+          <ellipse cx="12" cy="5" rx="9" ry="3"/>
+          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+          <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
+        </svg>
+      </button>
+      
+      <button class="cortex-dock-item" data-target="telemetry" title="Resource History & Costs">
+        <svg viewBox="0 0 24 24" stroke="currentColor">
+          <path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
+        </svg>
+        <span class="cortex-dock-badge" id="cortex-cost-badge">1</span>
+      </button>
+      
+      <button class="cortex-dock-item" data-target="perf" title="Profiles & Documentation">
+        <svg viewBox="0 0 24 24" stroke="currentColor">
+          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3.5z"/>
+        </svg>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<div id="subapp-canopy" class="sub-app-overlay canopy-bg">
+  <div class="sub-app-header">
+    <h2 style="font-size: 24px; font-weight: 800; font-family: 'SF Pro Display', -apple-system, sans-serif; color: #fff;">Canopy <span style="font-size:14px; font-weight:400; color:rgba(255,255,255,0.6);">Macro-Strategy</span></h2>
+    <button class="overlay-close-btn" onclick="closeSubApps()">✕</button>
+  </div>
+  
+  <div class="sub-app-content" style="padding: 16px; display: flex; flex-direction: column; gap: 32px;">
+    
+    <!-- SCROLL 1: STRATEGIC COMMAND & SYLLABUS MATRIX -->
+    <div class="canopy-scroll-section" id="canopy-scroll-1">
+      <!-- Macro Goal Countdown -->
+      <div class="canopy-countdown-container">
+        <div class="canopy-countdown-value" id="canopy-days-remaining">124</div>
+        <div class="canopy-countdown-label">Days to Execution</div>
+        <div class="canopy-readiness-pill">
+          <span class="readiness-dot"></span> Readiness: <span id="canopy-readiness-val">42%</span>
+        </div>
+      </div>
+      
+      <!-- Dynamic Syllabus Heatmap -->
+      <div class="canopy-panel">
+        <div class="canopy-panel-header">Syllabus Matrix</div>
+        <div class="canopy-heatmap-grid" id="canopy-heatmap">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+    
+    <!-- SCROLL 2: KNOWLEDGE GRAPH & INGESTION -->
+    <div class="canopy-scroll-section" id="canopy-scroll-2">
+      <!-- Autonomous Ingestion Pipeline -->
+      <div class="canopy-panel">
+        <div class="canopy-panel-header">Autonomous Ingestion Pipeline</div>
+        <div class="canopy-ingestion-list" id="canopy-ingestion-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      
+      <!-- Micro-Theme Dependency Graph -->
+      <div class="canopy-panel">
+        <div class="canopy-panel-header">Micro-Theme Dependency Graph</div>
+        <div class="canopy-graph-container" id="canopy-dependency-graph">
+          <div class="canopy-graph-orb orb-primary">Ecology</div>
+          <div class="canopy-graph-orb orb-secondary" style="top:20%; left:20%;">Bio</div>
+          <div class="canopy-graph-orb orb-secondary" style="top:60%; left:70%;">Clim</div>
+          <svg class="canopy-graph-edges" width="100%" height="100%">
+            <line x1="50%" y1="50%" x2="20%" y2="20%" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+            <line x1="50%" y1="50%" x2="70%" y2="60%" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- SCROLL 3: VELOCITY & PREDICTIVE TRAJECTORY -->
+    <div class="canopy-scroll-section" id="canopy-scroll-3">
+      <!-- Burn-Down Chart -->
+      <div class="canopy-panel">
+        <div class="canopy-panel-header">Burn-Down & Velocity</div>
+        <div class="canopy-chart-container">
+          <svg width="100%" height="120" viewBox="0 0 100 50" preserveAspectRatio="none">
+            <!-- Ideal Trajectory -->
+            <line x1="0" y1="0" x2="100" y2="50" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="2,2"/>
+            <!-- Actual Trajectory -->
+            <path d="M 0 0 Q 30 10 50 35" fill="none" stroke="url(#canopy-chart-grad)" stroke-width="2" style="filter: drop-shadow(0 2px 4px rgba(48,209,88,0.5));" />
+            <defs>
+              <linearGradient id="canopy-chart-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#30d158" />
+                <stop offset="100%" stop-color="#bf5af2" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      </div>
+      
+      <!-- Alert Center -->
+      <div class="canopy-panel" style="background:transparent; border:none; padding:0;">
+        <div class="canopy-panel-header" style="margin-bottom:8px; padding-left:16px;">High-Weightage Alerts</div>
+        <div class="canopy-inset-group" id="canopy-alert-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+    
+    <!-- SCROLL 4: ADAPTIVE ACTION PLAN -->
+    <div class="canopy-scroll-section" id="canopy-scroll-4">
+      <div class="canopy-panel" style="background:transparent; border:none; padding:0; padding-bottom:100px;">
+        <div class="canopy-panel-header" style="margin-bottom:8px; padding-left:16px;">Tactical Resource Allocation</div>
+        <div class="canopy-reminders-list" id="canopy-reminders-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<div id="subapp-prism" class="sub-app-overlay prism-bg">
+  <div class="prism-canvas" id="prism-canvas">
+    <!-- SVG Layer for Semantic Edges -->
+    <svg class="prism-edges-layer" id="prism-edges"></svg>
+    
+    <!-- State 1: Empty / Drop Idea Hub -->
+    <div class="prism-drop-hub-container" id="prism-empty-state">
+      <div class="prism-drop-circle" onclick="populatePrismMock()">
+        Drop Idea
+      </div>
+      <p class="prism-subtitle">Nyvron will autonomously cluster and mind-map your chaotic inputs.</p>
+    </div>
+
+    <!-- State 2: Populated Nodes -->
+    <div id="prism-nodes-layer"></div>
+  </div>
+
+  <!-- Floating Action Bar -->
+  <div class="prism-top-bar">
+    <button class="prism-tool-btn" aria-label="Select"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 3 10 21 14 14 21 10 3 3"></polygon></svg></button>
+    <button class="prism-tool-btn" aria-label="Text"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"></path></svg></button>
+    <button class="prism-tool-btn" aria-label="Media"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>
+    <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.2); margin: 0 8px;"></div>
+    <button class="prism-tool-btn magic-btn" aria-label="Auto-Sort" onclick="populatePrismMock()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-1 3-3 1 3 1 1 3 1-3 3-1-3-1-1-3zM3 13l-1 2-2 1 2 1 1 2 1-2 2-1-2-1-1-2zM21 14l-1 2-2 1 2 1 1 2 1-2 2-1-2-1-1-2zM15 12l-1 2-2 1 2 1 1 2 1-2 2-1-2-1-1-2z"></path></svg></button>
+  </div>
+
+  <!-- Close Button -->
+  <button class="overlay-close-btn prism-close" style="position:absolute; top:20px; right:20px; z-index:100;" onclick="closeSubApps()">✕</button>
+</div>
+
+<div id="subapp-ledger" class="sub-app-overlay" style="background: rgba(0,0,0,0.8); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);">
+  <div class="sub-app-header" style="justify-content: space-between; align-items: flex-start;">
+    <div>
+      <h2 style="font-size: 32px; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase;">LEDGER</h2>
+      <span style="font-size: 15px; font-weight: 400; color: var(--txt2);">Strategic Retrospective</span>
+    </div>
+    <div style="background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; color: white; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+      This Week <span style="font-size: 10px;">▼</span>
+    </div>
+  </div>
+
+  <div class="sub-app-content" style="padding-top: 0;">
+    <div class="ledger-scroll-section">
+      
+      <!-- Execution Metrics (Bento Layout) -->
+      <div class="ledger-bento-grid">
+        <!-- Wide Card 1 -->
+        <div class="ledger-card wide">
+          <div class="ledger-label">North Star Alignment</div>
+          <div class="ledger-metric-value" id="ledger-alignment-val">0%</div>
+          <div class="ledger-metric-subtext">Velocity is matching target exam trajectory.</div>
+        </div>
+        
+        <!-- Square Card 2 -->
+        <div class="ledger-card">
+          <div class="ledger-label">Deep Focus Hours</div>
+          <div class="ledger-metric-value" style="color: white; text-shadow: none;">32h <span style="font-size: 32px; color: var(--txt3);">15m</span></div>
+        </div>
+        
+        <!-- Square Card 3 -->
+        <div class="ledger-card">
+          <div class="ledger-label">Focus Integrity</div>
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div class="ledger-metric-value" style="color: white; text-shadow: none;">92%</div>
+            <!-- Mock Activity Ring -->
+            <svg width="60" height="60" viewBox="0 0 60 60">
+              <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="6"/>
+              <circle cx="30" cy="30" r="24" fill="none" stroke="#F59E0B" stroke-width="6" stroke-linecap="round" stroke-dasharray="150" stroke-dashoffset="15" transform="rotate(-90 30 30)"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Time Leak Banner -->
+      <div class="ledger-alert-banner">
+        <div class="ledger-alert-icon">⚠️</div>
+        <div class="ledger-alert-text">
+          <strong>Time Leak Detected:</strong> Thursday evening (social media). Autonomously adjusting next week's schedule to block that window.
+        </div>
+        <button class="ledger-alert-action">Accept Adjustment</button>
+      </div>
+
+      <!-- Radar and Synthesis -->
+      <div class="ledger-split-grid">
+        <!-- Strategic Alignment Radar -->
+        <div class="ledger-card" style="padding: 16px;">
+          <div class="ledger-label" style="margin-left: 8px;">Strategic Alignment Radar</div>
+          <div id="ledger-radar-container">
+            <!-- Radar will be drawn via JS -->
+          </div>
+        </div>
+
+        <!-- Synthesis -->
+        <div class="ledger-card">
+          <div class="ledger-label" style="display: flex; align-items: center; gap: 8px; color: white;">
+            ✨ Weekly Synthesis
+          </div>
+          <div class="ledger-synthesis-text" style="margin-top: 16px;">
+            You executed <strong>32 hours</strong> of deep focus, outperforming last week by <strong>14%</strong>. 
+            <br><br>
+            Your highest alignment was in <strong>Wildlife (12h)</strong>. However, Journal logs indicate a spike in stress on Thursday, correlating directly with the identified time leak. 
+            <br><br>
+            <strong>Recommendation:</strong> Enforce strict downtime this upcoming Thursday evening.
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- Close Button -->
+  <button class="overlay-close-btn prism-close" style="position:absolute; top:20px; right:20px; z-index:100;" onclick="closeSubApps()">✕</button>
+</div>
+
 </body></html>

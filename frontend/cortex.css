@@ -1,0 +1,1299 @@
+/* 
+  Cortex - Project & Infrastructure Hub CSS Styling
+  iOS / Apple HIG Design System & Components Mapping
+*/
+
+:root {
+  --cortex-bg: #000000;
+  --cortex-card-bg: rgba(28, 28, 30, 0.65);
+  --cortex-card-border: rgba(255, 255, 255, 0.12);
+  --cortex-accent: #0a84ff; /* iOS blue */
+  --cortex-success: #30d158; /* iOS green */
+  --cortex-warning: #ffd60a; /* iOS yellow */
+  --cortex-destructive: #ff453a; /* iOS red */
+  --cortex-muted: rgba(255, 255, 255, 0.4);
+  --cortex-text-primary: #ffffff;
+  --cortex-text-secondary: rgba(255, 255, 255, 0.7);
+  --cortex-font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+  --cortex-font-mono: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Cortex Container Overrides */
+#subapp-cortex {
+  background: var(--cortex-bg) !important;
+  color: var(--cortex-text-primary);
+  font-family: var(--cortex-font-sans);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Subtle background texture grid and lighting effect */
+#subapp-cortex::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: 
+    radial-gradient(circle at 80% 20%, rgba(10, 132, 255, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 15% 80%, rgba(191, 90, 242, 0.12) 0%, transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.007) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.007) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Header style - seamless Apple-style */
+#subapp-cortex .sub-app-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 10;
+  padding: 16px 24px;
+}
+
+#subapp-cortex .sub-app-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+/* Main content scrolling layout */
+#subapp-cortex .sub-app-content {
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  z-index: 1;
+}
+
+/* Side navigation or main scrolls container */
+.cortex-scrolls-container {
+  width: 100%;
+  height: 100%;
+  overflow-y: scroll;
+  scroll-behavior: smooth;
+  padding: 24px 24px 100px 24px; /* extra bottom padding for floating dock */
+  box-sizing: border-box;
+}
+
+/* Scroll snap grouping if desired */
+.cortex-scroll-section {
+  min-height: calc(100% - 24px);
+  margin-bottom: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cortex-scroll-section:last-child {
+  margin-bottom: 0;
+}
+
+.cortex-section-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--cortex-text-primary);
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+}
+
+.cortex-section-title span {
+  font-size: 14px;
+  color: var(--cortex-muted);
+  font-weight: 400;
+}
+
+/* Glassmorphism Card Container */
+.cortex-card {
+  background: var(--cortex-card-bg);
+  border: 0.5px solid var(--cortex-card-border);
+  border-radius: 24px;
+  padding: 20px;
+  position: relative;
+  box-shadow: 
+    0 4px 30px rgba(0, 0, 0, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s ease;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.cortex-card:hover {
+  box-shadow: 
+    0 8px 40px rgba(0, 0, 0, 0.4),
+    0 1px 5px rgba(0, 0, 0, 0.3);
+}
+
+.cortex-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cortex-text-primary);
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* =========================================
+   SCROLL 1: SYSTEM OVERVIEW
+   ========================================= */
+
+/* Bento Grid */
+.cortex-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .cortex-bento-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .cortex-bento-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cortex-bento-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 16px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  aspect-ratio: 1.2;
+  position: relative;
+  overflow: hidden;
+}
+
+.cortex-bento-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.cortex-bento-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cortex-accent);
+  background: rgba(10, 132, 255, 0.15);
+  font-size: 18px;
+}
+
+.cortex-bento-item.warning .cortex-bento-icon {
+  color: var(--cortex-warning);
+  background: rgba(255, 214, 10, 0.15);
+}
+
+.cortex-bento-item.success .cortex-bento-icon {
+  color: var(--cortex-success);
+  background: rgba(48, 209, 88, 0.15);
+}
+
+.cortex-bento-item.danger .cortex-bento-icon {
+  color: var(--cortex-destructive);
+  background: rgba(255, 69, 58, 0.15);
+}
+
+.cortex-bento-value {
+  font-size: 26px;
+  font-weight: 700;
+  font-family: var(--cortex-font-mono);
+  margin-top: 12px;
+  letter-spacing: -1px;
+}
+
+.cortex-bento-label {
+  font-size: 12px;
+  color: var(--cortex-text-secondary);
+  font-weight: 500;
+}
+
+.cortex-bento-trend {
+  font-size: 11px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Sliding Side Logs Panel (pageSheet Modal) */
+.cortex-side-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 420px;
+  max-width: 100%;
+  background: rgba(20, 20, 22, 0.95);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+  z-index: 100;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.cortex-side-panel.active {
+  transform: translateX(0);
+}
+
+.cortex-side-header {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cortex-side-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.cortex-side-close {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cortex-side-close:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Code Integrity Matrix Heatmap */
+.cortex-heatmap-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cortex-heatmap-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cortex-heatmap-label {
+  width: 110px;
+  font-size: 12px;
+  color: var(--cortex-text-secondary);
+  font-weight: 500;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cortex-heatmap-cells {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.cortex-heatmap-cell {
+  flex: 1;
+  aspect-ratio: 1.6;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.1s ease;
+  position: relative;
+}
+
+.cortex-heatmap-cell:hover {
+  transform: scale(1.1);
+  filter: brightness(1.2);
+  z-index: 2;
+}
+
+/* Apple Semantic Muted Variants */
+.cell-green {
+  background: rgba(48, 209, 88, 0.3) !important;
+  border: 1px solid rgba(48, 209, 88, 0.5);
+}
+.cell-yellow {
+  background: rgba(255, 214, 10, 0.3) !important;
+  border: 1px solid rgba(255, 214, 10, 0.5);
+}
+.cell-red {
+  background: rgba(255, 69, 58, 0.3) !important;
+  border: 1px solid rgba(255, 69, 58, 0.5);
+}
+.cell-gray {
+  background: rgba(142, 142, 147, 0.15) !important;
+  border: 1px solid rgba(142, 142, 147, 0.3);
+}
+
+/* Tooltip Custom Presentation */
+.cortex-tooltip {
+  position: absolute;
+  background: rgba(30, 30, 32, 0.95);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--cortex-text-primary);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  pointer-events: none;
+  z-index: 1000;
+  display: none;
+  transform: translate(-50%, -115%);
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+}
+
+.cortex-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(30, 30, 32, 0.95) transparent transparent transparent;
+}
+
+/* Xcode Cloud Timeline Step indicators */
+.cortex-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.cortex-timeline-node {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.cortex-timeline-node:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cortex-node-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cortex-node-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cortex-node-status {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.cortex-node-status.passed { background: var(--cortex-success); }
+.cortex-node-status.failed { background: var(--cortex-destructive); }
+.cortex-node-status.queued { background: #8e8e93; }
+.cortex-node-status.running { 
+  background: var(--cortex-accent);
+  box-shadow: 0 0 8px var(--cortex-accent);
+  animation: cortex-pulse 1.5s infinite;
+}
+
+@keyframes cortex-pulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+
+.cortex-node-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cortex-text-primary);
+}
+
+.cortex-node-duration {
+  font-size: 12px;
+  color: var(--cortex-muted);
+  font-family: var(--cortex-font-mono);
+}
+
+.cortex-node-chevron {
+  font-size: 12px;
+  color: var(--cortex-muted);
+  transition: transform 0.2s ease;
+}
+
+.cortex-timeline-node.expanded .cortex-node-chevron {
+  transform: rotate(90deg);
+}
+
+/* Inline Terminal Container */
+.cortex-terminal-container {
+  height: 0;
+  overflow: hidden;
+  transition: height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  background: #000000;
+  border-radius: 8px;
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cortex-timeline-node.expanded .cortex-terminal-container {
+  height: 160px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.cortex-terminal-log {
+  font-family: var(--cortex-font-mono);
+  font-size: 11px;
+  color: #30d158;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.cortex-terminal-log.error {
+  color: var(--cortex-destructive);
+}
+
+.cortex-terminal-log.warn {
+  color: var(--cortex-warning);
+}
+
+/* =========================================
+   SCROLL 2: DEPENDENCY & DATABASE DEEP DIVE
+   ========================================= */
+
+/* Split-Screen Layout */
+.cortex-split-screen {
+  display: flex;
+  gap: 20px;
+  height: 380px;
+}
+
+@media (max-width: 768px) {
+  .cortex-split-screen {
+    flex-direction: column;
+    height: auto;
+  }
+}
+
+.cortex-split-left {
+  width: 35%;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cortex-split-right {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* SVG interactive 3D Globe Simulator */
+.cortex-globe-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* iOS Context Menu Overlay */
+.cortex-context-menu {
+  position: absolute;
+  background: rgba(30, 30, 32, 0.96);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  width: 180px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 500;
+  display: none;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transform: scale(0.9);
+  opacity: 0;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
+}
+
+.cortex-context-menu.active {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.cortex-context-item {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--cortex-text-primary);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.15s ease;
+}
+
+.cortex-context-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cortex-context-item.destructive {
+  color: var(--cortex-destructive);
+}
+
+.cortex-context-divider {
+  height: 0.5px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Charts Wrapper */
+.cortex-db-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1.5fr;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+@media (max-width: 900px) {
+  .cortex-db-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cortex-chart-box {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 18px;
+  padding: 16px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.cortex-canvas-container {
+  flex: 1;
+  position: relative;
+  min-height: 140px;
+}
+
+.cortex-canvas-container canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Scrub Bar overlay for Latency Chart */
+.cortex-scrub-label {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  background: var(--cortex-accent);
+  color: white;
+  font-family: var(--cortex-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 8px;
+  display: none;
+}
+
+/* =========================================
+   SCROLL 3: RESOURCE TRACKING & TEAM VELOCITY
+   ========================================= */
+
+/* Pinned Segmented capsule control */
+.cortex-segmented-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.cortex-segmented-control {
+  background: rgba(120, 120, 128, 0.24);
+  border-radius: 9px;
+  padding: 2px;
+  display: flex;
+  position: relative;
+  align-self: flex-start;
+}
+
+.cortex-segment-btn {
+  background: transparent;
+  border: none;
+  color: var(--cortex-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  min-width: 50px;
+  text-align: center;
+  z-index: 2;
+}
+
+.cortex-segment-btn.active {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  font-weight: 600;
+}
+
+/* Interactive Legend */
+.cortex-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  justify-content: center;
+}
+
+.cortex-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--cortex-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+
+.cortex-legend-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.cortex-legend-item.hidden {
+  opacity: 0.35;
+}
+
+/* Cost Grid Heatmap */
+.cortex-cost-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 4px;
+}
+
+.cortex-cost-row-label {
+  grid-column: span 24;
+  font-size: 11px;
+  color: var(--cortex-muted);
+  margin-top: 8px;
+  margin-bottom: 2px;
+  font-family: var(--cortex-font-mono);
+}
+
+.cortex-cost-cell {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.cortex-cost-cell:hover {
+  transform: scale(1.2);
+  z-index: 2;
+  outline: 1px solid white;
+}
+
+/* Executive Warning Banner */
+.cortex-warning-banner {
+  background: rgba(255, 214, 10, 0.12);
+  border: 0.5px solid rgba(255, 214, 10, 0.3);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.cortex-warning-banner:hover {
+  background: rgba(255, 214, 10, 0.18);
+}
+
+.cortex-warning-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cortex-warning-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cortex-warning);
+}
+
+.cortex-warning-desc {
+  font-size: 11px;
+  color: var(--cortex-text-secondary);
+}
+
+/* Bottom Action Sheet (alertActionSheet) */
+.cortex-action-sheet-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+  display: none;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.cortex-action-sheet-overlay.active {
+  display: block;
+  opacity: 1;
+}
+
+.cortex-action-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(30, 30, 32, 0.95);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 16px 20px 30px 20px;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.3);
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.cortex-action-sheet-overlay.active .cortex-action-sheet {
+  transform: translateY(0);
+}
+
+.cortex-action-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cortex-muted);
+  text-align: center;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cortex-action-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cortex-action-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  padding: 14px;
+  border-radius: 12px;
+  color: var(--cortex-text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s ease;
+}
+
+.cortex-action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.cortex-action-btn.primary {
+  background: var(--cortex-accent);
+  color: white;
+}
+
+.cortex-action-btn.primary:hover {
+  background: #0070e0;
+}
+
+.cortex-action-btn.cancel {
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cortex-destructive);
+}
+
+/* UITableView-styled Commits List */
+.cortex-table-view {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.cortex-table-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
+  height: 60px;
+  overflow: hidden;
+}
+
+.cortex-table-cell:last-child {
+  border-bottom: none;
+}
+
+/* Swipe actions track */
+.cortex-cell-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: rgba(28, 28, 30, 0.95);
+  z-index: 10;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+}
+
+.cortex-cell-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #5e5e66;
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.cortex-cell-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  text-align: left;
+}
+
+.cortex-cell-msg {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cortex-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cortex-cell-meta {
+  font-size: 11px;
+  color: var(--cortex-muted);
+  margin-top: 2px;
+  display: flex;
+  gap: 8px;
+}
+
+.cortex-cell-author {
+  font-weight: 600;
+  color: var(--cortex-accent);
+}
+
+/* Swipe buttons behind content */
+.cortex-cell-actions {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  z-index: 5;
+  width: 140px;
+}
+
+.cortex-swipe-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  height: 100%;
+}
+
+.cortex-swipe-btn.flag {
+  background: var(--cortex-warning);
+  color: black;
+}
+
+.cortex-swipe-btn.review {
+  background: var(--cortex-accent);
+}
+
+/* =========================================
+   SCROLL 4: PERFORMANCE & COMPLIANCE
+   ========================================= */
+
+/* Profile Flame Graph Container */
+.cortex-flame-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.cortex-flame-row {
+  display: flex;
+  width: 100%;
+  gap: 2px;
+}
+
+.cortex-flame-node {
+  height: 22px;
+  border-radius: 3px;
+  font-family: var(--cortex-font-mono);
+  font-size: 10px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), flex-grow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.cortex-flame-node:hover {
+  filter: brightness(1.2);
+  transform: translateY(-1px);
+}
+
+/* Flame Block categories */
+.flame-v8 { background: rgba(255, 69, 58, 0.65); border: 0.5px solid #ff453a; }
+.flame-user { background: rgba(10, 132, 255, 0.65); border: 0.5px solid #0a84ff; }
+.flame-gc { background: rgba(255, 214, 10, 0.65); border: 0.5px solid #ffd60a; }
+.flame-idle { background: rgba(142, 142, 147, 0.35); border: 0.5px solid #8e8e93; }
+
+/* Dynamic cancel filter button for zoomed state */
+.cortex-flame-reset {
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: white;
+  cursor: pointer;
+  display: none;
+  align-self: flex-start;
+}
+
+.cortex-flame-reset:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* System Documentation Search Bar */
+.cortex-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: rgba(120, 120, 128, 0.24);
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.cortex-search-icon {
+  color: var(--cortex-muted);
+  margin-right: 8px;
+}
+
+.cortex-search-input {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+}
+
+.cortex-search-input::placeholder {
+  color: var(--cortex-muted);
+}
+
+.cortex-search-clear {
+  color: var(--cortex-muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0 4px;
+  display: none;
+}
+
+.cortex-search-cancel {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--cortex-accent);
+  font-size: 14px;
+  margin-left: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cortex-doc-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cortex-doc-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cortex-doc-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cortex-doc-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cortex-doc-meta {
+  font-size: 11px;
+  color: var(--cortex-muted);
+}
+
+/* Interactive iOS Detent Sheet (bottom modal drawer) */
+.cortex-detent-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  display: none;
+  backdrop-filter: blur(2px);
+}
+
+.cortex-detent-overlay.active {
+  display: block;
+}
+
+.cortex-detent-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(25, 25, 28, 0.98);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 -15px 40px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  /* default height */
+  height: 50%;
+}
+
+.cortex-detent-overlay.active .cortex-detent-sheet {
+  transform: translateY(0);
+}
+
+.cortex-detent-handle-area {
+  padding: 10px 0;
+  cursor: grab;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.cortex-detent-handle {
+  width: 36px;
+  height: 5px;
+  border-radius: 2.5px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.cortex-detent-header {
+  padding: 0 20px 12px 20px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cortex-detent-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.cortex-detent-close {
+  background: none;
+  border: none;
+  color: var(--cortex-accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cortex-detent-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--cortex-text-secondary);
+}
+
+.cortex-detent-body h1, .cortex-detent-body h2, .cortex-detent-body h3 {
+  color: white;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.cortex-detent-body p {
+  margin-bottom: 12px;
+}
+
+.cortex-detent-body code {
+  font-family: var(--cortex-font-mono);
+  background: rgba(255,255,255,0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+
+/* =========================================
+   FLOATING GLOBAL NAVIGATION DOCK
+   ========================================= */
+.cortex-floating-dock {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(28, 28, 30, 0.45);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 28px;
+  padding: 4px;
+  display: flex;
+  gap: 4px;
+  box-shadow: 
+    0 12px 30px rgba(0, 0, 0, 0.4),
+    0 2px 5px rgba(0, 0, 0, 0.2);
+  z-index: 90;
+}
+
+.cortex-dock-item {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s ease, transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.cortex-dock-item svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+  fill: none;
+}
+
+.cortex-dock-item:hover {
+  color: white;
+  transform: scale(1.1);
+}
+
+.cortex-dock-item.active {
+  color: var(--cortex-accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Badge for notifications on the dock items */
+.cortex-dock-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--cortex-destructive);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--cortex-font-sans);
+}

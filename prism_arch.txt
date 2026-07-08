@@ -1,0 +1,47 @@
+PRISM - SPATIAL CANVAS
+Core UI/UX Architecture & iOS HIG Component Mapping
+(Strictly Unseeded - Structural & Functional Logic Only)
+
+=========================================
+SYSTEM CONCEPT: INFINITE SPATIAL WORKSPACE
+=========================================
+Prism is an unstructured, infinite canvas designed for raw input ingestion. It acts as the staging ground before data is formalized into Canopy (Strategy) or Journal (Emotional).
+
+=========================================
+1. ARCHITECTURE & FUNCTIONAL SPECIFICATION
+=========================================
+[Core Canvas Engine]
+- Functioning: A boundless 2D coordinate system. Listens for drag-and-drop events, clipboard pastes, and raw text typing anywhere on the screen.
+- Data Bindings:
+  > Viewport Coordinates: [Float X, Float Y, Float ZoomScale]
+  > Node Array: Collection of [Node Objects] (id, type, x, y, width, height, content_payload)
+  > Edge Array: Collection of [Edge Objects] connecting nodes based on AI semantic clustering.
+
+[The "Drop Idea" Zone (Empty State)]
+- Functioning: A centralized hit-box listener. When an item is dropped here, it triggers the 'Nyvron Autonomous Clustering' function, dynamically generating related sub-nodes or linking to existing nodes in the DB.
+- Data Bindings: [Upload/Paste Event Listener] -> pushes to [Node Array].
+
+[AI Clustering Engine (Nyvron Auto-Sort)]
+- Functioning: Runs an NLP/vector-similarity check on all visible nodes on the canvas. Adjusts their X/Y coordinates to physically group similar topics together using a physics-based spring layout.
+- Data Bindings: Updates X/Y values of [Node Array].
+
+=========================================
+2. iOS / Apple HIG Component Architecture
+=========================================
+* Core Canvas (Infinite Scroll):
+  - iOS Component: `UIScrollView` configured with `minimumZoomScale` (e.g., 0.1) and `maximumZoomScale` (e.g., 5.0). Alternatively, `PKCanvasView` if Apple Pencil drawing support is desired.
+  - Design Implementation: Deep black background with a subtle dot-grid pattern (1px dots, 50px spacing, .systemGray6 color) for spatial reference.
+  - Interaction: Standard pan gestures (`UIPanGestureRecognizer`) to move around, pinch gestures (`UIPinchGestureRecognizer`) to zoom.
+
+* Input Nodes (Cards, Images, Links):
+  - iOS Component: Draggable `UIView` subclasses containing `UITextView` (for text), `UIImageView` (for media), or `LPLinkView` (for rich web links).
+  - Design Implementation: Glassmorphic cards (`UIBlurEffect` with `.systemUltraThinMaterialDark`). A 1px border of `.white.withAlphaComponent(0.1)` gives the glass a physical edge.
+  - Interaction: Uses `UIDragInteraction` and `UIDropInteraction` to allow nodes to be freely moved. Haptic feedback (`UISelectionFeedbackGenerator`) triggers when a node snaps into alignment with another.
+
+* The "Drop Idea" Central Hub:
+  - iOS Component: Custom `UIView` with a `CAShapeLayer` rendering a dashed, pulsating circle.
+  - Design Implementation: Uses a CABasicAnimation to slowly pulse the opacity and scale of the circle. Tinted with a deep, electric purple (matching the Prism branding).
+
+* Floating Tools Dock:
+  - iOS Component: `UIVisualEffectView` shaped as a pill (Corner Radius = Height / 2).
+  - Design Implementation: Floats unattached at the top edge of the screen, housing SF Symbols (Text, Image, Auto-Cluster Magic Wand) using `.secondaryLabel` colors that tint on hover/tap.

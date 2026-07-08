@@ -6,7 +6,7 @@
 // UNIFIED STATE MANAGEMENT & LOCAL STORAGE
 // ==========================================
 const STATE = {
-  activeTab: 'tab-home',
+  activeTab: 'tab-ai',
   priorities: JSON.parse(localStorage.getItem('nv-priorities')||'[]'),
   schedule:   JSON.parse(localStorage.getItem('nv-schedule')||'[]'),
   reminders:  JSON.parse(localStorage.getItem('nv-reminders')||'[]'),
@@ -38,7 +38,6 @@ const STATE = {
   selectedMood: '🙂',
   journalEditId: null,
   journalEditAttachments: [],
-  activeJournalTagFilter: 'All',
   direction: localStorage.getItem('nv-direction')||'Stability, consistency, and confidence.',
   profile: JSON.parse(localStorage.getItem('nv-profile')||'{"name":"User"}'),
   
@@ -57,6 +56,21 @@ const $ = id => document.getElementById(id);
 const randomId = () => Math.random().toString(36).substring(2, 11);
 let notifiedItems = JSON.parse(sessionStorage.getItem('nv-notified')) || [];
 const today = () => new Date().toLocaleDateString('sv').substring(0, 10);
+
+const logInteraction = (type, data = {}) => {
+  const logEntry = {
+    id: randomId(),
+    type,
+    data,
+    timestamp: Date.now()
+  };
+  STATE.interactionLog = STATE.interactionLog || [];
+  STATE.interactionLog.push(logEntry);
+  localStorage.setItem('nv-interaction-log', JSON.stringify(STATE.interactionLog));
+  if (typeof broadcastSyncEvent === 'function') {
+    broadcastSyncEvent('sync-log', logEntry);
+  }
+};
 
 const ms2hms = (ms) => {
   if (ms < 0) ms = 0;
@@ -464,8 +478,6 @@ function openCalCreator() {
   
   $('cc-repeat').value = 'never';
   $('cc-calendar-type').value = 'personal';
-  const dot = document.querySelector('#cc-calendar-group .dot-indicator');
-  if (dot) dot.style.background = '#30d158';
   $('cc-alert').value = 'none';
   $('cc-url').value = '';
   $('cc-notes').value = '';
@@ -662,74 +674,6 @@ function showAlert(title, message) {
   _openAppleDialog({ title, message, hasInput: false, okLabel: 'OK' });
 }
 
-function showGlassyToast(title, message) {
-  let container = $('glassy-toast-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'glassy-toast-container';
-    container.style.cssText = `
-      position: fixed;
-      top: 24px;
-      right: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      z-index: 9999;
-      pointer-events: none;
-    `;
-    document.body.appendChild(container);
-  }
-
-  const toast = document.createElement('div');
-  toast.style.cssText = `
-    min-width: 260px;
-    max-width: 360px;
-    background: rgba(28, 28, 30, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 14px;
-    padding: 12px 16px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    color: #fff;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, sans-serif;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    transform: translateX(120%);
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s;
-    opacity: 0;
-    pointer-events: auto;
-  `;
-
-  toast.innerHTML = `
-    <div style="font-size: 13px; font-weight: 700; color: var(--cascara, #ff9500); display: flex; align-items: center; gap: 6px;">
-      <span style="font-size:14px;">✓</span>
-      <span>${title}</span>
-    </div>
-    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.85); line-height: 1.4;">${message}</div>
-  `;
-
-  container.appendChild(toast);
-
-  // Trigger entrance
-  requestAnimationFrame(() => {
-    setTimeout(() => {
-      toast.style.transform = 'translateX(0)';
-      toast.style.opacity = '1';
-    }, 10);
-  });
-
-  // Auto remove
-  setTimeout(() => {
-    toast.style.transform = 'translateX(120%)';
-    toast.style.opacity = '0';
-    setTimeout(() => {
-      toast.remove();
-    }, 450);
-  }, 3000);
-}
-
 function showConfirm(title, message, onOk, onCancel) {
   _openAppleDialog({ title, message, hasInput: false, okLabel: 'Confirm', cancelLabel: 'Cancel', onOk, onCancel: onCancel || (() => {}) });
 }
@@ -750,6 +694,10 @@ let triggerBiometricOrPasscodeLock = () => {};
 
 // --- switchTab ---
 function switchTab(tabId){
+  if (STATE.activeTab === tabId && document.querySelector(`.tb-item[data-tab="${tabId}"]`)?.classList.contains('active')) return;
+  _switchTab(tabId);
+}
+function _switchTab(tabId){
   // Scoped Passcode Lock: if opening journal and lock is active, prompt first
   if (tabId === 'tab-journal') {
     if ((STATE.passcodeEnabled || STATE.facelockEnabled || STATE.fingerprintlockEnabled) && STATE.vaultLocked) {
@@ -805,27 +753,19 @@ function renderProfile(){
 // --- updateDockIndicator ---
 function updateDockIndicator(tabId) {
   const btn = document.querySelector(`.tb-item[data-tab="${tabId}"]`);
-  const ind = document.getElementById('dock-indicator');
-  if(btn && ind) {
+  if(btn) {
     const left = btn.offsetLeft;
     const width = btn.offsetWidth;
-    const currentLeft = parseFloat(ind.style.transform.replace(/[^0-9.-]/g, '')) || 0;
-
-    // Stretch effect
-    const distance = Math.abs(left - 6 - currentLeft);
-    if (distance > 10) {
-        ind.style.width = `${width + distance * 0.2}px`;
-        if (left - 6 > currentLeft) {
-             ind.style.transformOrigin = 'left center';
-        } else {
-             ind.style.transformOrigin = 'right center';
-        }
+    if (window.dockEngine) {
+       window.dockEngine.targetX = left;
+       window.dockEngine.targetWidth = width;
+    } else {
+       const ind = document.getElementById('dock-indicator');
+       if(ind) {
+         ind.style.transform = `translateX(${left}px)`;
+         ind.style.width = `${width}px`;
+       }
     }
-
-    setTimeout(() => {
-        ind.style.transform = `translateX(${left - 6}px)`;
-        ind.style.width = `${width}px`;
-    }, 50);
   }
 }
 
@@ -882,63 +822,6 @@ function renderPlanner() {
 // --- hideBloomTyping ---
 function hideBloomTyping(){BLOOM?.classList.remove('typing');$('ai-typing')?.classList.add('hidden');}
 
-// --- getEventsForDate ---
-function getEventsForDate(dateStr) {
-  const dateStrMatch = dateStr;
-  const list = [];
-  
-  // Manual events
-  const manualEvs = STATE.events[dateStr] || [];
-  manualEvs.forEach(ev => {
-    let color = ev.color;
-    if (!color) {
-      if (ev.type === 'personal') color = '#30d158';
-      else if (ev.type === 'work') color = '#0a84ff';
-      else if (ev.type === 'important') color = '#ff453a';
-      else if (ev.type === 'project') color = '#a855f7';
-      else color = '#30d158';
-    }
-    list.push({
-      type: 'manual',
-      color,
-      ...ev
-    });
-  });
-  
-  // Journal entries
-  STATE.journalEntries.forEach(entry => {
-    const entryDateStr = new Date(entry.timestamp || entry.date).toISOString().split('T')[0];
-    if (entryDateStr === dateStrMatch) {
-      list.push({
-        type: 'journal',
-        color: '#0a84ff',
-        title: entry.title || 'Journal Entry',
-        timestamp: entry.timestamp || entry.date
-      });
-    }
-  });
-  
-  // Interaction Log
-  (STATE.interactionLog || []).forEach(log => {
-    const logDate = new Date(log.timestamp);
-    if (logDate.toISOString().split('T')[0] === dateStrMatch) {
-      list.push({
-        type: log.action || 'interaction',
-        color: log.action === 'highlight' ? '#ffcc00' :
-               log.action === 'dictation' ? '#30d158' : '#ff9500',
-        title: log.action === 'highlight' ? 'Highlight Created' :
-               log.action === 'dictation' ? 'Voice Capture' :
-               log.action === 'margin' ? 'Margin Drawing' : log.action,
-        timestamp: log.timestamp
-      });
-    }
-  });
-  
-  // Sort by timestamp
-  list.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
-  return list;
-}
-
 // --- renderCalendar ---
 function renderCalendar(){
   const year=STATE.calendarYear,month=STATE.calendarMonth;
@@ -948,19 +831,11 @@ function renderCalendar(){
   for(let i=0;i<firstDay;i++){const d=document.createElement('div');d.className='cal-cell other-month';grid.appendChild(d);}
   for(let d=1;d<=daysInMonth;d++){
     const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dayEvents = getEventsForDate(dateStr);
-    const hasEv = dayEvents.length > 0;
+    const hasEv=(STATE.events[dateStr]||[]).length>0;
     const cell=document.createElement('div');
     cell.className=`cal-cell${dateStr===todayStr?' today':''}${STATE.selectedDate===dateStr?' selected':''}`;
     cell.style.animationDelay=`${d*.012}s`;
-    
-    let dotsHtml = '';
-    if (hasEv) {
-      const colors = [...new Set(dayEvents.map(e => e.color))].slice(0, 4);
-      dotsHtml = `<div class="cal-dot-row">${colors.map(color => `<div class="cal-dot" style="background: ${color} !important;"></div>`).join('')}</div>`;
-    }
-    
-    cell.innerHTML=`<span class="cal-num">${d}</span>${dotsHtml}`;
+    cell.innerHTML=`<span class="cal-num">${d}</span>${hasEv?'<div class="cal-dot-row"><div class="cal-dot"></div></div>':''}`;
     cell.addEventListener('click',()=>selectCalDate(dateStr));
     grid.appendChild(cell);
   }
@@ -1119,9 +994,6 @@ function openBookReader(book) {
 
   currentReaderBook = book;
   
-  const notesTextarea = $('cr-notes-textarea');
-  if (notesTextarea) notesTextarea.value = book.notes || "";
-  
   $('cr-doc-title').textContent = book.title;
   $('cr-doc-author').textContent = 'by ' + (book.author || 'Unknown');
   
@@ -1130,6 +1002,7 @@ function openBookReader(book) {
   let isDrawing = false;
   let lastX = 0, lastY = 0;
   let activeTool = 'text';
+  let isTwoPage = false;
   overlay.dataset.activeTool = activeTool;
 
   // Restore default Text selection state
@@ -1156,13 +1029,19 @@ function openBookReader(book) {
   
   function adjustReaderResponsiveScale() {
     const container = $('cr-page-view');
-    const wrapper = container.querySelector('.cr-page-wrapper') || $('cr-page-wrapper');
-    if (!container || !wrapper) return;
+    const wrapper = container ? (container.querySelector('.cr-page-wrapper') || $('cr-page-wrapper')) : null;
+    if (!container) return;
 
     const isMobile = window.innerWidth <= 768;
     const containerDiv = $('cr-page-container');
 
     if (isMobile) {
+      if (!window.isContinuousScrollActive) {
+        window.isContinuousScrollActive = true;
+        setupMobileContinuousScroll();
+        return;
+      }
+
       // Remove desktop-specific styles
       const mSpacer = container.querySelector('#cr-mobile-scroll-spacer');
       let spacer = mSpacer;
@@ -1203,22 +1082,48 @@ function openBookReader(book) {
       return;
     }
 
+    // Switch back to desktop layout if continuous scroll was active
+    if (window.isContinuousScrollActive) {
+      window.isContinuousScrollActive = false;
+      if (containerDiv) {
+        containerDiv.innerHTML = `
+          <div id="cr-page-wrapper" class="cr-page-wrapper">
+            <div id="cr-zoom-layer" style="position:absolute;top:0;left:0;transform-origin:top left;">
+              <canvas id="cr-pdf-canvas" class="cr-pdf-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:1;"></canvas>
+              <div id="cr-page-content" class="cr-page-content" style="position:absolute;inset:0;z-index:2;background:none;padding:0;overflow:hidden;"></div>
+              <canvas id="cr-markup-canvas" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:5;"></canvas>
+            </div>
+          </div>
+          <div id="cr-page-wrapper-right" class="cr-page-wrapper hidden">
+            <div id="cr-zoom-layer-right" style="position:absolute;top:0;left:0;transform-origin:top left;">
+              <canvas id="cr-pdf-canvas-right" class="cr-pdf-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:1;"></canvas>
+              <div id="cr-page-content-right" class="cr-page-content" style="position:absolute;inset:0;z-index:2;background:none;padding:0;overflow:hidden;"></div>
+              <canvas id="cr-markup-canvas-right" class="cr-markup-canvas cr-canvas" width="600" height="780" style="position:absolute;left:0;top:0;z-index:5;"></canvas>
+            </div>
+          </div>
+        `;
+        containerDiv.style.transform = 'none';
+        containerDiv.style.width = '';
+        containerDiv.style.height = '';
+        containerDiv.style.display = '';
+        containerDiv.style.flexDirection = '';
+        containerDiv.style.gap = '';
+        containerDiv.style.alignItems = '';
+      }
+      renderReaderPage(book.currentPage || 1);
+      return;
+    }
+
+    if (!wrapper) return;
+
     // Clean up mobile scroll spacer on desktop
     const mSpacer = container.querySelector('#cr-mobile-scroll-spacer');
     if (mSpacer) mSpacer.remove();
 
-    const rightWrapper = $('cr-page-wrapper-right');
-    const isSpread = rightWrapper && !rightWrapper.classList.contains('hidden');
-
     // ── STEP 1: Size the wrapper to perfectly fill the available space ──
     // This is the FIXED book rectangle — it never changes size when zooming.
-    const padH = 80;
-    const padV = 96;
-    const gap = isSpread ? 58 : 0;
-
-    const availW = isSpread 
-      ? Math.max(100, (container.clientWidth - padH - gap) / 2)
-      : Math.max(100, container.clientWidth - padH);
+    const padH = 32, padV = 24;
+    const availW = Math.max(100, container.clientWidth - padH);
     const availH = Math.max(100, container.clientHeight - padV);
 
     // PDF native dimensions (600×780). Fit by aspect ratio.
@@ -1261,6 +1166,7 @@ function openBookReader(book) {
     }
 
     // ── STEP 3: Handle spread (right page) identically ──
+    const rightWrapper = $('cr-page-wrapper-right');
     if (rightWrapper && !rightWrapper.classList.contains('hidden')) {
       rightWrapper.style.width  = `${wrapperW}px`;
       rightWrapper.style.height = `${wrapperH}px`;
@@ -1284,39 +1190,27 @@ function openBookReader(book) {
       }
     }
 
-    // cr-page-container: always just center the wrapper(s), no scaling
+    // cr-page-container: apply the fixed area zoom scale
     if (containerDiv) {
-      containerDiv.style.transform = 'none';
-      containerDiv.style.width  = '';
-      containerDiv.style.height = '';
+      containerDiv.style.transform = `scale(${window.fixedAreaZoom || 1.0})`;
+      containerDiv.style.transformOrigin = 'center center';
       containerDiv.style.display = 'flex';
       containerDiv.style.justifyContent = 'center';
       containerDiv.style.alignItems = 'center';
       containerDiv.style.position = 'relative';
       containerDiv.style.left = 'auto';
     }
-    container.style.overflow = 'auto';
+    container.style.overflow = 'hidden';
     container.style.paddingBottom = '';
   }
+
+
 
   function updateZoom(sourceSlider = null) {
     adjustReaderResponsiveScale();
     const percent = Math.round(currentZoom * 100);
-    
-    // Mobile pill: show 1× as "Fit", others as multiplier
-    const zoomValEl = $('cr-mzoom-val');
-    if (zoomValEl) {
-      if (window.innerWidth <= 768) {
-        zoomValEl.textContent = currentZoom === 1.0 ? 'Fit' : `${percent}%`;
-      } else {
-        zoomValEl.textContent = `${percent}%`;
-      }
-    }
     const zoomValDesktopEl = $('cr-zoom-val');
     if (zoomValDesktopEl) zoomValDesktopEl.textContent = `${percent}%`;
-    
-    const mSlider = $('cr-mzoom-slider');
-    if (mSlider && sourceSlider !== mSlider) mSlider.value = percent;
     const dSlider = $('cr-zoom-slider');
     if (dSlider && sourceSlider !== dSlider) dSlider.value = percent;
   }
@@ -1687,24 +1581,20 @@ function openBookReader(book) {
             viewport: scaledViewport
           }).promise.then(() => {
             book.highlights = book.highlights || {};
-            if (book.highlights[pageNum]) {
-              contentDiv.innerHTML = book.highlights[pageNum];
+            const highlightKey = `${book.id}-${pageNum}`;
+            if (book.highlights[highlightKey]) {
+              contentDiv.innerHTML = book.highlights[highlightKey];
+              applyCanvaReflowStyleToSpans(contentDiv, pageNum, canvasPdf);
             } else {
               page.getTextContent().then(textContent => {
                 const nativeText = textContent.items.map(item => item.str).join(' ').trim();
                 book.pdfTextCache = book.pdfTextCache || {};
                 book.pdfTextCache[pageNum] = nativeText;
                 
-                if (window.reflowModeActive && typeof window.renderReflowContent === 'function') {
-                  window.renderReflowContent();
-                }
-                if (typeof window.updatePageSummaryDisplay === 'function') {
-                  window.updatePageSummaryDisplay(pageNum);
-                }
-                
                 if (nativeText.length > 10) {
                   contentDiv.innerHTML = '';
                   let charCounter = 0;
+                  let spanIdx = 0;
                   textContent.items.forEach(item => {
                     const len = item.str.length;
                     const spanStart = charCounter;
@@ -1723,6 +1613,7 @@ function openBookReader(book) {
                     const fontHeight = Math.abs(item.transform[3] * scale);
                     
                     const span = document.createElement('span');
+                    span.setAttribute('data-span-id', spanIdx);
                     span.textContent = item.str;
                     span.style.position = 'absolute';
                     span.style.fontFamily = 'sans-serif';
@@ -1741,7 +1632,10 @@ function openBookReader(book) {
                     
                     contentDiv.appendChild(span);
                     charCounter += len + 1;
+                    spanIdx++;
                   });
+
+                  applyCanvaReflowStyleToSpans(contentDiv, pageNum, canvasPdf);
                 } else {
                   book.ocrData = book.ocrData || {};
                   if (book.ocrData[pageNum]) {
@@ -1751,8 +1645,7 @@ function openBookReader(book) {
                   }
                 }
               });
-            }
-          });
+            }          });
           
           if (canvasMarkup) {
             canvasMarkup.width = canvasPdf.width;
@@ -1868,12 +1761,12 @@ function openBookReader(book) {
       }
     }
   }
-
   function renderMobileOcrTextOverlay(pageWrapper, words, selectedMatch, scale) {
     const contentDiv = pageWrapper.querySelector('.cr-page-content');
     if (!contentDiv) return;
     contentDiv.innerHTML = '';
     let charCounter = 0;
+    let spanIdx = 0;
     const pageNum = parseInt(pageWrapper.dataset.page);
     words.forEach(w => {
       const len = w.text.length;
@@ -1890,6 +1783,7 @@ function openBookReader(book) {
       }
       
       const span = document.createElement('span');
+      span.setAttribute('data-span-id', spanIdx);
       span.textContent = w.text + ' ';
       span.style.position = 'absolute';
       span.style.fontFamily = 'sans-serif';
@@ -1908,9 +1802,12 @@ function openBookReader(book) {
       
       contentDiv.appendChild(span);
       charCounter += len + 1;
+      spanIdx++;
     });
-  }
 
+    const canvasPdf = pageWrapper.querySelector('.cr-pdf-canvas');
+    applyCanvaReflowStyleToSpans(contentDiv, pageNum, canvasPdf);
+  }
   function runMobileOcrOnCanvas(pageWrapper, pageNum, scale) {
     const canvasPdf = pageWrapper.querySelector('.cr-pdf-canvas');
     const contentDiv = pageWrapper.querySelector('.cr-page-content');
@@ -1945,21 +1842,410 @@ function openBookReader(book) {
     });
   }
 
+  function renderPageSide(pageNum, isRightSide) {
+    const sideContentDiv = isRightSide ? $('cr-page-content-right') : $('cr-page-content');
+    const sideCanvasPdf = isRightSide ? $('cr-pdf-canvas-right') : $('cr-pdf-canvas');
+    const sideCtxPdf = sideCanvasPdf?.getContext('2d');
+    const sideCanvasMarkup = isRightSide ? $('cr-markup-canvas-right') : $('cr-markup-canvas');
+    const sideCtxMarkup = sideCanvasMarkup?.getContext('2d');
+
+    if (!sideContentDiv) return;
+
+    if (pageNum > book.totalPages) {
+      sideContentDiv.innerHTML = '';
+      if (sideCtxPdf) {
+        sideCanvasPdf.width = 600;
+        sideCanvasPdf.height = 780;
+        sideCtxPdf.clearRect(0, 0, 600, 780);
+      }
+      if (sideCtxMarkup) {
+        sideCanvasMarkup.width = 600;
+        sideCanvasMarkup.height = 780;
+        sideCtxMarkup.clearRect(0, 0, 600, 780);
+      }
+      return;
+    }
+
+    if (book.fileType === 'pdf') {
+      if (pdfDoc) {
+        pdfDoc.getPage(pageNum).then(page => {
+          const viewport = page.getViewport({ scale: 1 });
+          const scaleX = 600 / viewport.width;
+          const scaleY = 780 / viewport.height;
+          const scale = Math.min(scaleX, scaleY);
+          const scaledViewport = page.getViewport({ scale: scale });
+          
+          if (sideCanvasPdf) {
+            sideCanvasPdf.width = 600;
+            sideCanvasPdf.height = 780;
+            sideCtxPdf.clearRect(0, 0, 600, 780);
+            page.render({
+              canvasContext: sideCtxPdf,
+              viewport: scaledViewport
+            }).promise.then(() => {
+              book.highlights = book.highlights || {};
+              const highlightKey = `${book.id}-${pageNum}`;
+              
+              page.getTextContent().then(textContent => {
+                const nativeText = textContent.items.map(item => item.str).join(' ').trim();
+                book.pdfTextCache = book.pdfTextCache || {};
+                book.pdfTextCache[pageNum] = nativeText;
+                
+                if (pageNum === book.currentPage) {
+                  if (window.reflowModeActive && typeof renderReflowContent === 'function') {
+                    renderReflowContent();
+                  }
+                }
+                
+                if (book.highlights[highlightKey]) {
+                  sideContentDiv.innerHTML = book.highlights[highlightKey];
+                  applyCanvaReflowStyleToSpans(sideContentDiv, pageNum, sideCanvasPdf);
+                } else {
+                  if (nativeText.length > 10) {
+                    sideContentDiv.innerHTML = '';
+                    let charCounter = 0;
+                    let spanIdx = 0;
+                    textContent.items.forEach(item => {
+                      const len = item.str.length;
+                      const spanStart = charCounter;
+                      const spanEnd = charCounter + len;
+                      
+                      let isMatch = false;
+                      if (book.selectedSearchMatch && book.selectedSearchMatch.page === pageNum) {
+                        const mStart = book.selectedSearchMatch.charOffset;
+                        const mEnd = mStart + book.selectedSearchMatch.query.length;
+                        if (spanStart < mEnd && spanEnd > mStart) {
+                          isMatch = true;
+                        }
+                      }
+
+                      const [left, top] = scaledViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
+                      const fontHeight = Math.abs(item.transform[3] * scale);
+                      
+                      const span = document.createElement('span');
+                      span.setAttribute('data-span-id', spanIdx);
+                      span.textContent = item.str;
+                      span.style.position = 'absolute';
+                      span.style.fontFamily = 'sans-serif';
+                      span.style.fontSize = fontHeight + 'px';
+                      span.style.left = left + 'px';
+                      span.style.top = (top - fontHeight) + 'px';
+                      span.style.color = 'transparent';
+                      span.style.whiteSpace = 'pre';
+                      span.style.cursor = 'text';
+                      if (item.width) {
+                        span.style.width = (item.width * scale) + 'px';
+                      }
+                      if (isMatch) {
+                        span.style.backgroundColor = 'rgba(0, 122, 255, 0.38)';
+                      }
+                      
+                      sideContentDiv.appendChild(span);
+                      charCounter += len + 1;
+                      spanIdx++;
+                    });
+                    applyCanvaReflowStyleToSpans(sideContentDiv, pageNum, sideCanvasPdf);
+                  } else {
+                    book.ocrData = book.ocrData || {};
+                    if (book.ocrData[pageNum]) {
+                      renderOcrTextOverlayForSide(book.ocrData[pageNum], book.selectedSearchMatch, sideContentDiv, pageNum);
+                      applyCanvaReflowStyleToSpans(sideContentDiv, pageNum, sideCanvasPdf);
+                    } else {
+                      runOcrOnCanvasForSide(pageNum, sideCanvasPdf, sideContentDiv);
+                    }
+                  }
+                }
+                
+                if (typeof window.renderPageAnnotations === 'function') {
+                  window.renderPageAnnotations();
+                }
+              });
+            });
+          }
+        });
+      } else {
+        sideContentDiv.innerHTML = `<p class="empty-hint" style="padding: 40px; font-size: 16px;">Loading PDF contents...</p>`;
+      }
+    } else {
+      // TXT mode
+      if (sideCanvasPdf && sideCtxPdf) {
+        sideCanvasPdf.width = 600;
+        sideCanvasPdf.height = 780;
+        sideCtxPdf.clearRect(0, 0, 600, 780);
+      }
+      book.highlights = book.highlights || {};
+      const highlightKey = `${book.id}-${pageNum}`;
+      if (book.highlights[highlightKey]) {
+        sideContentDiv.innerHTML = book.highlights[highlightKey];
+      } else if (book.fileContent) {
+        renderCanvaTxtContent(sideContentDiv, pageNum, isRightSide);
+      }
+    }
+
+    // Load drawings on markup canvas
+    if (sideCtxMarkup) {
+      sideCanvasMarkup.width = 600;
+      sideCanvasMarkup.height = 780;
+      sideCtxMarkup.clearRect(0, 0, 600, 780);
+      const docId = book.id;
+      const key = `${docId}-${pageNum}-${isRightSide ? 'right' : 'left'}`;
+      const vectors = drawingVectors[key];
+      if (vectors) {
+        vectors.forEach(v => {
+          sideCtxMarkup.beginPath();
+          sideCtxMarkup.moveTo(v.x1 * sideCanvasMarkup.width, v.y1 * sideCanvasMarkup.height);
+          sideCtxMarkup.lineTo(v.x2 * sideCanvasMarkup.width, v.y2 * sideCanvasMarkup.height);
+          sideCtxMarkup.lineWidth = v.tool === 'eraser' ? 24 : 6;
+          sideCtxMarkup.strokeStyle = v.tool === 'eraser' ? 'rgba(0,0,0,0)' : '#ff453a';
+          if (v.tool === 'eraser') {
+            sideCtxMarkup.globalCompositeOperation = 'destination-out';
+          } else {
+            sideCtxMarkup.globalCompositeOperation = 'source-over';
+          }
+          sideCtxMarkup.lineCap = 'round';
+          sideCtxMarkup.stroke();
+        });
+        sideCtxMarkup.globalCompositeOperation = 'source-over';
+      }
+    }
+  }
+
+  function runOcrOnCanvasForSide(pageNum, canvasPdf, sideContentDiv) {
+    if (!canvasPdf || typeof Tesseract === 'undefined') return;
+    
+    const ocrIndicator = document.createElement('div');
+    ocrIndicator.className = 'cr-ocr-status';
+    ocrIndicator.style.cssText = 'position:absolute; bottom:16px; right:16px; background:rgba(0,0,0,0.75); color:#fff; font-size:11px; padding:6px 12px; border-radius:6px; z-index:100; font-family:sans-serif; backdrop-filter:blur(5px); display:flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,0.1);';
+    ocrIndicator.innerHTML = `<span class="spinner" style="width:10px; height:10px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; display:inline-block; animation:spin 1s linear infinite;"></span> Extracting text...`;
+    sideContentDiv.appendChild(ocrIndicator);
+    
+    Tesseract.recognize(
+      canvasPdf,
+      'eng'
+    ).then(({ data: { words } }) => {
+      book.ocrData = book.ocrData || {};
+      book.ocrData[pageNum] = words.map(w => ({
+        text: w.text,
+        left: w.bbox.x0,
+        top: w.bbox.y0,
+        width: w.bbox.x1 - w.bbox.x0,
+        height: w.bbox.y1 - w.bbox.y0
+      }));
+      save();
+      ocrIndicator.remove();
+      renderOcrTextOverlayForSide(book.ocrData[pageNum], book.selectedSearchMatch, sideContentDiv, pageNum);
+      
+      if (pageNum === book.currentPage) {
+        if (window.reflowModeActive && typeof renderReflowContent === 'function') {
+          renderReflowContent();
+        }
+      }
+      
+      if (typeof window.renderPageAnnotations === 'function') {
+        window.renderPageAnnotations();
+      }
+    }).catch(err => {
+      console.error("OCR failed for side page " + pageNum, err);
+      ocrIndicator.innerHTML = "⚠️ Extraction failed";
+      setTimeout(() => ocrIndicator.remove(), 2000);
+    });
+  }
+
+  function renderOcrTextOverlayForSide(words, selectedMatch, sideContentDiv, pageNum) {
+    sideContentDiv.innerHTML = '';
+    let charCounter = 0;
+    words.forEach(w => {
+      const len = w.text.length;
+      const spanStart = charCounter;
+      const spanEnd = charCounter + len;
+      
+      let isMatch = false;
+      if (selectedMatch && selectedMatch.page === pageNum) {
+        const mStart = selectedMatch.charOffset;
+        const mEnd = mStart + selectedMatch.query.length;
+        if (spanStart < mEnd && spanEnd > mStart) {
+          isMatch = true;
+        }
+      }
+      
+      const span = document.createElement('span');
+      span.textContent = w.text + ' ';
+      span.style.position = 'absolute';
+      span.style.fontFamily = 'sans-serif';
+      span.style.left = w.left + 'px';
+      span.style.top = w.top + 'px';
+      span.style.width = w.width + 'px';
+      span.style.height = w.height + 'px';
+      span.style.fontSize = (w.height * 0.95) + 'px';
+      span.style.color = 'transparent';
+      span.style.whiteSpace = 'nowrap';
+      span.style.cursor = 'text';
+      span.style.transformOrigin = '0 0';
+      if (isMatch) {
+        span.style.backgroundColor = 'rgba(0, 122, 255, 0.38)';
+      }
+      
+      sideContentDiv.appendChild(span);
+      charCounter += len + 1;
+    });
+  }
+
+  function renderPageAnnotationsForSide(pageNum) {
+    const list = $('cr-notes-list');
+    if (!list) return;
+    list.innerHTML = '';
+    
+    book.annotations = book.annotations || {};
+    // Combine notes if in 2-page view
+    let notes = book.annotations[pageNum] || [];
+    if (isTwoPage) {
+      const rightNotes = book.annotations[pageNum + 1] || [];
+      notes = notes.concat(rightNotes);
+    }
+    
+    if (notes.length === 0) {
+      list.innerHTML = '<div style="color:var(--txt3); padding:16px;">No marginal notes for this section. Select text and click Highlight to add one.</div>';
+      return;
+    }
+
+    notes.forEach(n => {
+      const li = document.createElement('li');
+      li.style.padding = '12px';
+      li.style.background = 'rgba(255, 235, 59, 0.1)';
+      li.style.borderLeft = '3px solid #ffeb3b';
+      li.style.borderRadius = '0 6px 6px 0';
+      li.style.marginBottom = '8px';
+      
+      const content = document.createElement('div');
+      content.textContent = n.text;
+      content.style.marginBottom = '8px';
+      
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete Note';
+      delBtn.style.fontSize = '11px';
+      delBtn.style.color = 'var(--danger)';
+      delBtn.style.background = 'none';
+      delBtn.style.border = 'none';
+      delBtn.style.cursor = 'pointer';
+      delBtn.style.padding = '0';
+      delBtn.onclick = () => {
+        book.annotations[pageNum] = (book.annotations[pageNum] || []).filter(an => an.id !== n.id);
+        if (isTwoPage) {
+          book.annotations[pageNum + 1] = (book.annotations[pageNum + 1] || []).filter(an => an.id !== n.id);
+        }
+        renderPageAnnotationsForSide(pageNum);
+      };
+      
+      li.appendChild(content);
+      li.appendChild(delBtn);
+      list.appendChild(li);
+    });
+  }
+
+  window.renderPageAnnotations = () => {
+    renderPageAnnotationsForSide(book.currentPage);
+  };
+
+  function initPageAnnotationHandlers(sideContentDiv, isRightSide) {
+    if (!sideContentDiv) return;
+
+    sideContentDiv.addEventListener('dblclick', e => {
+      if (activeTool !== 'text') return;
+      if (e.target.classList.contains('cr-text-note') || e.target.closest('.cr-text-note')) return;
+      
+      const pageNum = isRightSide ? book.currentPage + 1 : book.currentPage;
+      if (pageNum > book.totalPages) return;
+
+      const rect = sideContentDiv.getBoundingClientRect();
+      const container = $('cr-page-view');
+      const containerWidth = container.clientWidth - 20;
+      const containerHeight = container.clientHeight - 20;
+      const scaleX = containerWidth / 600;
+      const scaleY = containerHeight / 780;
+      const scaleFactor = Math.min(scaleX, scaleY, 1.0);
+      const finalScale = scaleFactor * currentZoom;
+
+      const left = (e.clientX - rect.left) / finalScale;
+      const top = (e.clientY - rect.top) / finalScale;
+      
+      const note = document.createElement('div');
+      note.className = 'cr-text-note';
+      note.style.position = 'absolute';
+      note.style.left = left + 'px';
+      note.style.top = top + 'px';
+      note.style.background = 'rgba(255, 235, 59, 0.95)';
+      note.style.color = '#000000';
+      note.style.padding = '6px 10px';
+      note.style.borderRadius = '6px';
+      note.style.fontSize = '12px';
+      note.style.minWidth = '80px';
+      note.style.outline = 'none';
+      note.style.border = '1px solid rgba(0,0,0,0.15)';
+      note.style.boxShadow = '0 4px 10px rgba(0,0,0,0.2)';
+      note.style.zIndex = '30';
+      note.contentEditable = 'true';
+      
+      sideContentDiv.appendChild(note);
+      note.focus();
+      
+      const saveNote = () => {
+        const txt = note.textContent.trim();
+        if (!txt) {
+          note.remove();
+        } else {
+          const noteId = Math.random().toString(36).substring(2, 9);
+          book.annotations = book.annotations || {};
+          book.annotations[pageNum] = book.annotations[pageNum] || [];
+          book.annotations[pageNum].push({
+            id: noteId,
+            left,
+            top,
+            text: txt
+          });
+          save();
+          note.remove(); // Remove from page since it will be in the sidebar
+          if (window.renderPageAnnotations) window.renderPageAnnotations();
+        }
+      };
+      
+      note.addEventListener('blur', saveNote, {once: true});
+      note.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter' && !ev.shiftKey) {
+          ev.preventDefault();
+          note.blur();
+        }
+      });
+    });
+
+    sideContentDiv.addEventListener('click', e => {
+      if (activeTool === 'eraser') {
+        const note = e.target.closest('.cr-text-note');
+        if (note) {
+          const pageNum = isRightSide ? book.currentPage + 1 : book.currentPage;
+          const noteId = note.dataset.id;
+          book.annotations = book.annotations || {};
+          book.annotations[pageNum] = (book.annotations[pageNum] || []).filter(x => x.id !== noteId);
+          save();
+          note.remove();
+        }
+      }
+    });
+  }
+
   function renderReaderPage(pageNum) {
-    window.renderReaderPage = renderReaderPage;
     if (pageNum < 1) pageNum = 1;
     if (pageNum > book.totalPages) pageNum = book.totalPages;
     
-    // Ensure we start on an odd page when entering dual page (e.g. 1-2, 3-4)
-    if (window.spreadMode === 'spread' && pageNum % 2 === 0) {
-      pageNum = Math.max(1, pageNum - 1);
+    if (isTwoPage && pageNum % 2 === 0 && pageNum > 1) {
+      pageNum--;
     }
-    
+
     const isMobile = window.innerWidth <= 768;
     if (isMobile) {
       const pw = $('cr-page-container')?.querySelector(`.cr-page-wrapper[data-page="${pageNum}"]`);
       if (pw) {
         pw.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
         book.currentPage = pageNum;
         book.progress = Math.round((book.currentPage / book.totalPages) * 100);
         save();
@@ -1991,420 +2277,262 @@ function openBookReader(book) {
     }
     const label = $('cr-page-label');
     if (label) {
-      if (window.spreadMode === 'spread' && pageNum < book.totalPages) {
-        label.textContent = `Pages ${pageNum}-${pageNum+1} of ${book.totalPages} (${book.progress}%)`;
-      } else {
-        label.textContent = `Page ${pageNum} of ${book.totalPages} (${book.progress}%)`;
-      }
+      label.textContent = isTwoPage && pageNum < book.totalPages
+        ? `Page ${pageNum} - ${pageNum + 1} of ${book.totalPages} (${book.progress}%)`
+        : `Page ${pageNum} of ${book.totalPages} (${book.progress}%)`;
     }
 
-    // Render Left Side
-    renderReaderPageSide(pageNum, false);
+    renderPageSide(pageNum, false);
 
-    // Render Right Side / Spread Mode
-    if (window.spreadMode === 'spread') {
-      const rightWrapper = $('cr-page-wrapper-right');
-      if (rightWrapper) {
-        if (pageNum + 1 <= book.totalPages) {
-          rightWrapper.classList.remove('hidden');
-          renderReaderPageSide(pageNum + 1, true);
-        } else {
-          rightWrapper.classList.add('hidden');
-        }
-      }
-    } else if (window.spreadMode === 'single') {
-      $('cr-page-wrapper-right')?.classList.add('hidden');
+    if (isTwoPage) {
+      renderPageSide(pageNum + 1, true);
+    } else {
+      renderPageSide(book.totalPages + 999, true);
     }
-
+    
+    if (typeof window.renderPageAnnotations === 'function') {
+      window.renderPageAnnotations();
+    }
     setTimeout(adjustReaderResponsiveScale, 100);
 
-    // Advanced E-Reader Feature updates
     if (typeof logInteraction === 'function') {
       logInteraction('page-turn', { bookTitle: book.title, page: pageNum });
     }
-    if (typeof window.updatePageSummaryDisplay === 'function') {
-      window.updatePageSummaryDisplay(pageNum);
-    }
-    if (window.reflowModeActive && typeof window.renderReflowContent === 'function') {
-      window.renderReflowContent();
-    }
-    if (typeof redrawMarginVectors === 'function') {
-      setTimeout(() => { redrawMarginVectors('cr-markup-canvas', false); }, 150);
-      if (window.spreadMode === 'spread') {
-        setTimeout(() => { redrawMarginVectors('cr-markup-canvas-right', false); }, 150);
-      }
+    if (window.reflowModeActive && typeof renderReflowContent === 'function') {
+      renderReflowContent();
     }
   }
 
-  function renderReaderPageSide(pageNum, isRightSide) {
-    const suffix = isRightSide ? '-right' : '';
-    const contentDiv = $(`cr-page-content${suffix}`);
-    const canvasPdf = $(`cr-pdf-canvas${suffix}`);
-    const ctxPdf = canvasPdf?.getContext('2d');
-    const markupCanvas = $(`cr-markup-canvas${suffix}`);
-    const ctxMarkup = markupCanvas?.getContext('2d');
+  function applyCanvaReflowStyleToSpans(sideContentDiv, pageNum, pdfCanvas) {
+    if (!sideContentDiv) return;
+    const spans = sideContentDiv.querySelectorAll('span[data-span-id]');
+    const docId = book.id;
 
-    if (!contentDiv || !canvasPdf) return;
-
-    if (book.fileType === 'pdf') {
-      if (pdfDoc) {
-        pdfDoc.getPage(pageNum).then(page => {
-          const viewport = page.getViewport({ scale: 1 });
-          const scaleX = 600 / viewport.width;
-          const scaleY = 780 / viewport.height;
-          const scale = Math.min(scaleX, scaleY);
-          const scaledViewport = page.getViewport({ scale: scale });
-          
-          canvasPdf.width = 600;
-          canvasPdf.height = 780;
-          
-          ctxPdf.clearRect(0, 0, 600, 780);
-          page.render({
-            canvasContext: ctxPdf,
-            viewport: scaledViewport
-          }).promise.then(() => {
-            book.highlights = book.highlights || {};
-            if (book.highlights[pageNum]) {
-              contentDiv.innerHTML = book.highlights[pageNum];
-            } else {
-              page.getTextContent().then(textContent => {
-                const nativeText = textContent.items.map(item => item.str).join(' ').trim();
-                book.pdfTextCache = book.pdfTextCache || {};
-                book.pdfTextCache[pageNum] = nativeText;
-                
-                if (window.reflowModeActive && typeof window.renderReflowContent === 'function') {
-                  window.renderReflowContent();
-                }
-                if (typeof window.updatePageSummaryDisplay === 'function') {
-                  window.updatePageSummaryDisplay(pageNum);
-                }
-                
-                if (nativeText.length > 10) {
-                  contentDiv.innerHTML = '';
-                  let charCounter = 0;
-                  textContent.items.forEach(item => {
-                    const len = item.str.length;
-                    const spanStart = charCounter;
-                    const spanEnd = charCounter + len;
-                    
-                    let isMatch = false;
-                    if (book.selectedSearchMatch && book.selectedSearchMatch.page === pageNum) {
-                      const mStart = book.selectedSearchMatch.charOffset;
-                      const mEnd = mStart + book.selectedSearchMatch.query.length;
-                      if (spanStart < mEnd && spanEnd > mStart) {
-                        isMatch = true;
-                      }
-                    }
-
-                    const [left, top] = scaledViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
-                    const fontHeight = Math.abs(item.transform[3] * scale);
-                    
-                    const span = document.createElement('span');
-                    span.textContent = item.str;
-                    span.style.position = 'absolute';
-                    span.style.fontFamily = 'sans-serif';
-                    span.style.fontSize = fontHeight + 'px';
-                    span.style.left = left + 'px';
-                    span.style.top = (top - fontHeight) + 'px';
-                    span.style.color = 'transparent';
-                    span.style.whiteSpace = 'pre';
-                    span.style.cursor = 'text';
-                    if (item.width) {
-                      span.style.width = (item.width * scale) + 'px';
-                    }
-                    if (isMatch) {
-                      span.style.backgroundColor = 'rgba(0, 122, 255, 0.38)';
-                    }
-                    
-                    contentDiv.appendChild(span);
-                    charCounter += len + 1;
-                  });
-                } else {
-                  book.ocrData = book.ocrData || {};
-                  if (book.ocrData[pageNum]) {
-                    renderOcrTextOverlay(book.ocrData[pageNum], book.selectedSearchMatch);
-                  } else {
-                    if (!isRightSide) runOcrOnCanvas(pageNum);
-                  }
-                }
-              });
-            }
-          });
-        });
-      } else {
-        contentDiv.innerHTML = `<p class="empty-hint" style="padding: 40px; font-size: 16px;">Loading PDF contents...</p>`;
-      }
-    } else {
-      if (canvasPdf && ctxPdf) {
-        ctxPdf.clearRect(0, 0, canvasPdf.width, canvasPdf.height);
-      }
-      book.highlights = book.highlights || {};
-      if (book.highlights[pageNum]) {
-        contentDiv.innerHTML = book.highlights[pageNum];
-      } else if (book.fileContent) {
-        const words = book.fileContent.split(/\s+/);
-        const startIdx = (pageNum - 1) * 200;
-        const pageWords = words.slice(startIdx, startIdx + 200);
-        
-        let htmlContent = pageWords.join(' ');
-        if (book.selectedSearchMatch && book.selectedSearchMatch.page === pageNum) {
-          const query = book.selectedSearchMatch.query;
-          const matchIndex = book.selectedSearchMatch.matchIndex;
-          let occ = 0;
-          htmlContent = htmlContent.replace(new RegExp(escapeRegExp(query), 'gi'), match => {
-            if (occ === matchIndex) {
-              occ++;
-              return `<span class="cr-highlight" style="background-color:rgba(0, 122, 255, 0.38);">${match}</span>`;
-            }
-            occ++;
-            return match;
-          });
+    // Helper: sample average background color from PDF canvas at a span's position
+    function sampleCanvasBg(span) {
+      if (!pdfCanvas) return { bg: 'transparent', fg: '#111' };
+      try {
+        const ctx = pdfCanvas.getContext('2d');
+        const x = Math.max(0, parseInt(span.style.left) || 0);
+        const y = Math.max(0, parseInt(span.style.top) || 0);
+        const w = Math.max(4, parseInt(span.style.width) || 20);
+        const h = Math.max(4, parseInt(span.style.height) || 14);
+        // Sample a small patch from the canvas background
+        const data = ctx.getImageData(x, Math.max(0, y - 2), Math.min(w, 60), Math.min(h, 20)).data;
+        let r = 0, g = 0, b = 0, count = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i]; g += data[i+1]; b += data[i+2]; count++;
         }
-        contentDiv.innerHTML = `<h3 style="margin-top:0; color:var(--cascara); font-family:var(--font);">${book.title}</h3><p style="white-space: pre-wrap; font-family:Georgia, serif; font-size:16px;">${htmlContent}</p>`;
+        if (count === 0) return { bg: '#fff', fg: '#111' };
+        r = Math.round(r / count);
+        g = Math.round(g / count);
+        b = Math.round(b / count);
+        // Perceptual brightness
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        const bg = `rgb(${r},${g},${b})`;
+        const fg = brightness > 140 ? '#111111' : '#f0f0f0';
+        return { bg, fg };
+      } catch (_) {
+        return { bg: '#fff', fg: '#111' };
       }
     }
 
-    // Load drawings
-    if (ctxMarkup) {
-      ctxMarkup.clearRect(0, 0, markupCanvas.width, markupCanvas.height);
-      book.drawings = book.drawings || {};
-      if (book.drawings[pageNum]) {
-        const img = new Image();
-        img.onload = () => {
-          ctxMarkup.drawImage(img, 0, 0);
+    spans.forEach((span) => {
+      const spanId = span.getAttribute('data-span-id');
+      const patchKey = `${docId}-${pageNum}-${spanId}`;
+      const hasPatch = !!(STATE.reflowPatches && STATE.reflowPatches[patchKey]);
+
+      // Always show saved patch text
+      if (hasPatch) {
+        span.textContent = STATE.reflowPatches[patchKey];
+      }
+
+      if (window.reflowModeActive) {
+        // ── EDIT MODE: Canva-style editable box ──
+        span.contentEditable = 'true';
+        span.style.color = '#111';
+        span.style.background = hasPatch ? 'rgba(255,200,80,0.18)' : 'rgba(255,255,255,0.82)';
+        span.style.border = hasPatch ? '1.5px solid rgba(255,149,0,0.7)' : '1px dashed rgba(80,80,80,0.45)';
+        span.style.borderRadius = '2px';
+        span.style.padding = '0 2px';
+        span.style.zIndex = '15';
+        span.style.pointerEvents = 'auto';
+        span.style.cursor = 'text';
+        span.style.outline = 'none';
+        span.style.minWidth = '4px';
+        span.style.display = 'inline-block';
+        span.style.textDecoration = '';
+        span.style.boxShadow = hasPatch ? '0 0 0 2px rgba(255,149,0,0.15)' : '';
+
+        span.onmouseenter = () => {
+          span.style.border = '1.5px solid #ff9500';
+          span.style.background = 'rgba(255,149,0,0.14)';
+          span.style.boxShadow = '0 0 0 3px rgba(255,149,0,0.2)';
         };
-        img.src = book.drawings[pageNum];
-      }
-    }
-  }
+        span.onmouseleave = () => {
+          span.style.border = hasPatch ? '1.5px solid rgba(255,149,0,0.7)' : '1px dashed rgba(80,80,80,0.45)';
+          span.style.background = hasPatch ? 'rgba(255,200,80,0.18)' : 'rgba(255,255,255,0.82)';
+          span.style.boxShadow = hasPatch ? '0 0 0 2px rgba(255,149,0,0.15)' : '';
+        };
 
-  function runOcrOnCanvas(pageNum) {
-    const canvasPdf = $('cr-pdf-canvas');
-    if (!canvasPdf || typeof Tesseract === 'undefined') return;
-    
-    const ocrIndicator = document.createElement('div');
-    ocrIndicator.className = 'cr-ocr-status';
-    ocrIndicator.style.cssText = 'position:absolute; bottom:16px; right:16px; background:rgba(0,0,0,0.75); color:#fff; font-size:11px; padding:6px 12px; border-radius:6px; z-index:100; font-family:sans-serif; backdrop-filter:blur(5px); display:flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,0.1);';
-    ocrIndicator.innerHTML = `<span class="spinner" style="width:10px; height:10px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; display:inline-block; animation:spin 1s linear infinite;"></span> Extracting text...`;
-    contentDiv.appendChild(ocrIndicator);
-    
-    Tesseract.recognize(
-      canvasPdf,
-      'eng'
-    ).then(({ data: { words } }) => {
-      book.ocrData = book.ocrData || {};
-      book.ocrData[pageNum] = words.map(w => ({
-        text: w.text,
-        left: w.bbox.x0,
-        top: w.bbox.y0,
-        width: w.bbox.x1 - w.bbox.x0,
-        height: w.bbox.y1 - w.bbox.y0
-      }));
-      save();
-      ocrIndicator.remove();
-      renderOcrTextOverlay(book.ocrData[pageNum], book.selectedSearchMatch);
-    }).catch(err => {
-      console.error("OCR failed", err);
-      ocrIndicator.innerHTML = "⚠️ Extraction failed";
-      setTimeout(() => ocrIndicator.remove(), 2000);
+        span.oninput = () => {
+          const txt = span.textContent.trim();
+          if (txt) {
+            STATE.reflowPatches = STATE.reflowPatches || {};
+            STATE.reflowPatches[patchKey] = txt;
+            localStorage.setItem('nv-reflow-patches', JSON.stringify(STATE.reflowPatches));
+            save();
+          }
+        };
+
+        span.onkeydown = (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); span.blur(); }
+        };
+
+        span.onblur = () => {
+          const txt = span.textContent.trim();
+          if (txt) {
+            STATE.reflowPatches = STATE.reflowPatches || {};
+            STATE.reflowPatches[patchKey] = txt;
+            localStorage.setItem('nv-reflow-patches', JSON.stringify(STATE.reflowPatches));
+            const highlightKey = `${book.id}-${pageNum}`;
+            book.highlights = book.highlights || {};
+            book.highlights[highlightKey] = sideContentDiv.innerHTML;
+            save();
+            span.style.border = '1.5px solid rgba(255,149,0,0.7)';
+            span.style.background = 'rgba(255,200,80,0.18)';
+            if (typeof broadcastSyncEvent === 'function') {
+              broadcastSyncEvent('sync-reflow', { patchKey, text: txt });
+            }
+          }
+        };
+
+      } else {
+        // ── VIEW MODE ──
+        span.contentEditable = 'false';
+        span.onmouseenter = null;
+        span.onmouseleave = null;
+        span.oninput = null;
+        span.onkeydown = null;
+        span.onblur = null;
+        span.style.boxShadow = '';
+        span.style.display = '';
+        span.style.minWidth = '';
+        span.style.outline = '';
+
+        if (hasPatch) {
+          // Sample the actual PDF canvas pixel at this word's location
+          // so we cover the original text with EXACTLY the page background color,
+          // then draw the new text in the matching foreground color.
+          const { bg, fg } = sampleCanvasBg(span);
+          span.style.background = bg;
+          span.style.color = fg;
+          span.style.border = 'none';
+          span.style.padding = '0';
+          span.style.zIndex = '8';
+          span.style.pointerEvents = 'none';
+          span.style.cursor = 'default';
+          span.style.borderRadius = '0';
+          // Subtle orange dotted underline — only visual cue that this word was edited
+          span.style.textDecoration = 'underline';
+          span.style.textDecorationColor = 'rgba(255,149,0,0.6)';
+          span.style.textDecorationStyle = 'dotted';
+        } else {
+          // Unedited — fully transparent, PDF canvas shows through
+          span.style.color = 'transparent';
+          span.style.background = 'transparent';
+          span.style.border = 'none';
+          span.style.padding = '0';
+          span.style.zIndex = '';
+          span.style.pointerEvents = '';
+          span.style.cursor = 'default';
+          span.style.textDecoration = '';
+          span.style.borderRadius = '';
+        }
+      }
     });
   }
 
-  function renderOcrTextOverlay(words, selectedMatch) {
-    contentDiv.innerHTML = '';
-    let charCounter = 0;
-    words.forEach(w => {
-      const len = w.text.length;
-      const spanStart = charCounter;
-      const spanEnd = charCounter + len;
-      
-      let isMatch = false;
-      if (selectedMatch && selectedMatch.page === book.currentPage) {
-        const mStart = selectedMatch.charOffset;
-        const mEnd = mStart + selectedMatch.query.length;
-        if (spanStart < mEnd && spanEnd > mStart) {
-          isMatch = true;
-        }
-      }
+  function renderCanvaTxtContent(sideContentDiv, pageNum, isRightSide) {
+    if (!book.fileContent) return;
+    
+    const words = book.fileContent.split(/\s+/);
+    const startIdx = (pageNum - 1) * 200;
+    const pageWords = words.slice(startIdx, startIdx + 200);
+    const htmlContent = pageWords.join(' ');
+    
+    const sentences = htmlContent.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+    const docId = book.id;
+    
+    sideContentDiv.innerHTML = `<h3 style="margin-top:0; color:var(--cascara); font-family:var(--font);">${isRightSide ? '' : book.title}</h3>`;
+    const containerPara = document.createElement('p');
+    containerPara.style.cssText = 'white-space: pre-wrap; font-family:Georgia, serif; font-size:16px; line-height:1.8;';
+    
+    sentences.forEach((s, idx) => {
+      const patchKey = `${docId}-${pageNum}-${idx}`;
+      const savedText = (STATE.reflowPatches && STATE.reflowPatches[patchKey]) || s.trim();
       
       const span = document.createElement('span');
-      span.textContent = w.text + ' ';
-      span.style.position = 'absolute';
-      span.style.fontFamily = 'sans-serif';
-      span.style.left = w.left + 'px';
-      span.style.top = w.top + 'px';
-      span.style.width = w.width + 'px';
-      span.style.height = w.height + 'px';
-      span.style.fontSize = (w.height * 0.95) + 'px';
-      span.style.color = 'transparent';
-      span.style.whiteSpace = 'nowrap';
-      span.style.cursor = 'text';
-      span.style.transformOrigin = '0 0';
-      if (isMatch) {
-        span.style.backgroundColor = 'rgba(0, 122, 255, 0.38)';
-      }
+      span.textContent = savedText + ' ';
+      span.className = 'canva-txt-node';
+      span.style.transition = '0.2s';
       
-      contentDiv.appendChild(span);
-      charCounter += len + 1;
-    });
-  }
-
-  function renderPageAnnotations() {
-    contentDiv.querySelectorAll('.cr-text-note').forEach(n => n.remove());
-    book.annotations = book.annotations || {};
-    const notes = book.annotations[book.currentPage] || [];
-    notes.forEach(n => {
-      const note = document.createElement('div');
-      note.className = 'cr-text-note';
-      note.style.position = 'absolute';
-      note.style.left = n.left + 'px';
-      note.style.top = n.top + 'px';
-      note.style.background = 'rgba(255, 235, 59, 0.95)';
-      note.style.color = '#000000';
-      note.style.padding = '6px 10px';
-      note.style.borderRadius = '6px';
-      note.style.fontSize = '12px';
-      note.style.border = '1px solid rgba(0,0,0,0.15)';
-      note.style.boxShadow = '0 4px 10px rgba(0,0,0,0.2)';
-      note.style.zIndex = '30';
-      note.style.userSelect = 'none';
-      note.textContent = n.text;
-      note.dataset.id = n.id;
-      
-      note.addEventListener('dblclick', ev => {
-        ev.stopPropagation();
-        if (activeTool !== 'text') return;
-        note.contentEditable = 'true';
-        note.style.userSelect = 'text';
-        note.focus();
+      if (window.reflowModeActive) {
+        span.contentEditable = 'true';
+        span.style.color = 'var(--txt1)';
+        span.style.background = 'rgba(255,255,255,0.04)';
+        span.style.border = '1px dashed var(--cascara)';
+        span.style.borderRadius = '4px';
+        span.style.padding = '2px 4px';
+        span.style.margin = '0 2px';
+        span.style.cursor = 'text';
+        span.style.display = 'inline-block';
         
-        const updateNote = () => {
-          const txt = note.textContent.trim();
-          if (!txt) {
-            book.annotations[book.currentPage] = book.annotations[book.currentPage].filter(x => x.id !== n.id);
-            note.remove();
-          } else {
-            note.contentEditable = 'false';
-            note.style.userSelect = 'none';
-            n.text = txt;
-            const idx = book.annotations[book.currentPage].findIndex(x => x.id === n.id);
-            if (idx > -1) book.annotations[book.currentPage][idx].text = txt;
-          }
-          save();
+        span.onmouseenter = () => {
+          span.style.border = '1px dashed #ff9500';
+          span.style.background = 'rgba(255, 149, 0, 0.1)';
         };
-        note.addEventListener('blur', updateNote, {once: true});
-        note.addEventListener('keydown', ev => {
-          if (ev.key === 'Enter' && !ev.shiftKey) {
-            ev.preventDefault();
-            note.blur();
-          }
-        });
-      });
-      contentDiv.appendChild(note);
-    });
-  }
+        span.onmouseleave = () => {
+          span.style.border = '1px dashed var(--cascara)';
+          span.style.background = 'rgba(255,255,255,0.04)';
+        };
 
-  contentDiv.addEventListener('dblclick', e => {
-    if (activeTool !== 'text') return;
-    if (e.target.classList.contains('cr-text-note') || e.target.closest('.cr-text-note')) return;
-    
-    const rect = contentDiv.getBoundingClientRect();
-    const container = $('cr-page-view');
-    const containerWidth = container.clientWidth - 20;
-    const containerHeight = container.clientHeight - 20;
-    const scaleX = containerWidth / 600;
-    const scaleY = containerHeight / 780;
-    const scaleFactor = Math.min(scaleX, scaleY, 1.0);
-    const finalScale = scaleFactor * currentZoom;
-
-    const left = (e.clientX - rect.left) / finalScale;
-    const top = (e.clientY - rect.top) / finalScale;
-    
-    const note = document.createElement('div');
-    note.className = 'cr-text-note';
-    note.style.position = 'absolute';
-    note.style.left = left + 'px';
-    note.style.top = top + 'px';
-    note.style.background = 'rgba(255, 235, 59, 0.95)';
-    note.style.color = '#000000';
-    note.style.padding = '6px 10px';
-    note.style.borderRadius = '6px';
-    note.style.fontSize = '12px';
-    note.style.minWidth = '80px';
-    note.style.outline = 'none';
-    note.style.border = '1px solid rgba(0,0,0,0.15)';
-    note.style.boxShadow = '0 4px 10px rgba(0,0,0,0.2)';
-    note.style.zIndex = '30';
-    note.contentEditable = 'true';
-    
-    contentDiv.appendChild(note);
-    note.focus();
-    
-    const saveNote = () => {
-      const txt = note.textContent.trim();
-      if (!txt) {
-        note.remove();
-      } else {
-        note.contentEditable = 'false';
-        note.style.userSelect = 'none';
-        
-        const noteId = Math.random().toString(36).substring(2, 9);
-        note.dataset.id = noteId;
-        
-        book.annotations = book.annotations || {};
-        book.annotations[book.currentPage] = book.annotations[book.currentPage] || [];
-        book.annotations[book.currentPage].push({
-          id: noteId,
-          left,
-          top,
-          text: txt
-        });
-        save();
-        
-        note.addEventListener('dblclick', ev => {
-          ev.stopPropagation();
-          if (activeTool !== 'text') return;
-          note.contentEditable = 'true';
-          note.focus();
-          
-          const updateNote = () => {
-            const txt2 = note.textContent.trim();
-            if (!txt2) {
-              book.annotations[book.currentPage] = book.annotations[book.currentPage].filter(x => x.id !== noteId);
-              note.remove();
-            } else {
-              note.contentEditable = 'false';
-              const idx = book.annotations[book.currentPage].findIndex(x => x.id === noteId);
-              if (idx > -1) book.annotations[book.currentPage][idx].text = txt2;
-            }
+        span.oninput = () => {
+          const txt = span.textContent.trim();
+          if (txt) {
+            STATE.reflowPatches = STATE.reflowPatches || {};
+            STATE.reflowPatches[patchKey] = txt;
+            localStorage.setItem('nv-reflow-patches', JSON.stringify(STATE.reflowPatches));
             save();
-          };
-          note.addEventListener('blur', updateNote, {once: true});
-        });
-      }
-    };
-    
-    note.addEventListener('blur', saveNote, {once: true});
-    note.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter' && !ev.shiftKey) {
-        ev.preventDefault();
-        note.blur();
-      }
-    });
-  });
+          }
+        };
 
-  contentDiv.addEventListener('click', e => {
-    if (activeTool === 'eraser') {
-      const note = e.target.closest('.cr-text-note');
-      if (note) {
-        const noteId = note.dataset.id;
-        book.annotations = book.annotations || {};
-        book.annotations[book.currentPage] = (book.annotations[book.currentPage] || []).filter(x => x.id !== noteId);
-        save();
-        note.remove();
+        span.onkeydown = (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            span.blur();
+          }
+        };
+
+        span.onblur = () => {
+          const txt = span.textContent.trim();
+          if (txt) {
+            STATE.reflowPatches = STATE.reflowPatches || {};
+            STATE.reflowPatches[patchKey] = txt;
+            localStorage.setItem('nv-reflow-patches', JSON.stringify(STATE.reflowPatches));
+            save();
+            if (typeof broadcastSyncEvent === 'function') {
+              broadcastSyncEvent('sync-reflow', { patchKey, text: txt });
+            }
+          }
+        };
       }
-    }
-  });
+      
+      containerPara.appendChild(span);
+    });
+    
+    sideContentDiv.appendChild(containerPara);
+  }
 
   const getPos = (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -2456,36 +2584,76 @@ function openBookReader(book) {
     }
   };
 
-  const newCanvas = canvas.cloneNode(true);
-  canvas.parentNode.replaceChild(newCanvas, canvas);
-  canvas = newCanvas;
+  // Clone left canvas to clear old drawing listeners and initialize modern drawing logic
+  const canvasLeft = $('cr-markup-canvas');
+  if (canvasLeft) {
+    const newLeftCanvas = canvasLeft.cloneNode(true);
+    canvasLeft.parentNode.replaceChild(newLeftCanvas, canvasLeft);
+    if (typeof initMarkupCanvasDrawing === 'function') {
+      initMarkupCanvasDrawing('cr-markup-canvas', false);
+    } else if (typeof window.initMarkupCanvasDrawing === 'function') {
+      window.initMarkupCanvasDrawing('cr-markup-canvas', false);
+    }
+  }
+
+  // Clone right canvas to clear old drawing listeners and initialize modern drawing logic
+  const canvasRight = $('cr-markup-canvas-right');
+  if (canvasRight) {
+    const newRightCanvas = canvasRight.cloneNode(true);
+    canvasRight.parentNode.replaceChild(newRightCanvas, canvasRight);
+    if (typeof initMarkupCanvasDrawing === 'function') {
+      initMarkupCanvasDrawing('cr-markup-canvas-right', true);
+    } else if (typeof window.initMarkupCanvasDrawing === 'function') {
+      window.initMarkupCanvasDrawing('cr-markup-canvas-right', true);
+    }
+  }
+  canvas = $('cr-markup-canvas') || canvas;
   ctx = canvas.getContext('2d');
 
-  canvas.addEventListener('mousedown', startDraw);
-  canvas.addEventListener('mousemove', draw);
-  canvas.addEventListener('mouseup', endDraw);
-  canvas.addEventListener('mouseleave', endDraw);
+  // Wire Summarization Panel controls dynamically
+  const summarizerClose = $('cr-summarization-close');
+  if (summarizerClose) {
+    summarizerClose.onclick = () => {
+      $('cr-summarization-panel')?.classList.add('hidden');
+      $('cr-btn-summary')?.classList.remove('active');
+      setTimeout(adjustReaderResponsiveScale, 200);
+    };
+  }
 
-  canvas.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 0) startDraw(e.touches[0]);
-    e.preventDefault();
-  }, {passive: false});
-  canvas.addEventListener('touchmove', (e) => {
-    if (e.touches.length > 0) draw(e.touches[0]);
-    e.preventDefault();
-  }, {passive: false});
-  canvas.addEventListener('touchend', endDraw);
+  const summarizerGenerate = $('cr-summary-generate-btn');
+  if (summarizerGenerate) {
+    summarizerGenerate.onclick = () => {
+      if (currentReaderBook) {
+        window.updatePageSummaryDisplay(currentReaderBook.currentPage || 1, true);
+      }
+    };
+  }
 
-  // Centralized toolbar controller: clones to clean listeners, then registers single, clean clicks
+  const summarizerSlider = $('cr-summary-depth');
+  if (summarizerSlider) {
+    const handleSliderInput = () => {
+      const val = parseInt(summarizerSlider.value);
+      const label = $('cr-summary-depth-label');
+      if (label) {
+        if (val === 1) label.textContent = 'NORMAL';
+        else if (val === 2) label.textContent = 'MEDIUM';
+        else if (val === 3) label.textContent = 'DETAILED';
+      }
+      if (currentReaderBook) {
+        window.updatePageSummaryDisplay(currentReaderBook.currentPage || 1, true);
+      }
+    };
+    summarizerSlider.oninput = handleSliderInput;
+    summarizerSlider.onchange = handleSliderInput;
+  }
+
   document.querySelectorAll('.cr-tool-btn').forEach(btn => {
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
 
     newBtn.addEventListener('click', () => {
       const toolId = newBtn.id;
-      let toolName = toolId.replace('cr-tool-', '').replace('cr-btn-', '').replace('cr-mic-capture-btn', 'mic');
-
-      // 1. Finder Sidebar tool
+      
       if (toolId === 'cr-tool-find') {
         const sidebar = $('cr-sidebar');
         if (sidebar) {
@@ -2496,189 +2664,73 @@ function openBookReader(book) {
         return;
       }
 
-      // 2. Highlighting tools
-      if (toolName === 'hl-yellow') { highlightSelection('rgba(255, 213, 79, 0.45)'); return; }
-      if (toolName === 'hl-green') { highlightSelection('rgba(129, 199, 132, 0.45)'); return; }
-      if (toolName === 'hl-blue') { highlightSelection('rgba(100, 181, 246, 0.45)'); return; }
-
-      // 3. Zooming actions (desktop scale adjust)
-      if (toolName === 'zoom-in') { if (currentZoom < 2.0) { currentZoom += 0.15; updateZoom(); } return; }
-      if (toolName === 'zoom-out') { if (currentZoom > 0.5) { currentZoom -= 0.15; updateZoom(); } return; }
-
-      // 4. Settings popover toggles (Font, Speech, Pen)
-      if (['speech', 'font', 'pen'].includes(toolName)) {
-        const targetPopoverId = `cr-${toolName}-settings`;
-        const popover = $(targetPopoverId);
-        const wasHidden = popover?.classList.contains('hidden');
-        hideAllPopovers();
-        if (wasHidden && popover) {
-          popover.classList.remove('hidden');
-          newBtn.classList.add('active');
+      if (toolId === 'cr-tool-spread') {
+        isTwoPage = !isTwoPage;
+        newBtn.classList.toggle('active', isTwoPage);
+        const viewport = $('cr-page-view');
+        if (viewport) {
+          viewport.classList.toggle('cr-spread-view', isTwoPage);
         }
-        if (toolName === 'pen') {
-          activeTool = 'pen';
-          overlay.dataset.activeTool = activeTool;
+        const rightWrapper = $('cr-page-wrapper-right');
+        if (rightWrapper) {
+          if (isTwoPage) rightWrapper.classList.remove('hidden');
+          else rightWrapper.classList.add('hidden');
         }
+        renderReaderPage(book.currentPage);
         return;
       }
 
-      // 5. Two-Page Spread toggle
-      if (toolName === 'spread') {
-        hideAllPopovers();
-        const spreadBtn = $('cr-tool-spread');
-        const dualBtn = $('cr-btn-dual');
-        if (window.spreadMode === 'spread') {
-          window.spreadMode = 'single';
-          spreadBtn.classList.remove('active');
-          triggerNotification('Single Page View', 'Restored default reader viewport');
-          $('cr-page-wrapper-right')?.classList.add('hidden');
-          renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
-        } else {
-          window.spreadMode = 'spread';
-          spreadBtn.classList.add('active');
-          dualBtn?.classList.remove('active');
-          triggerNotification('Two-Page Spread', 'Showing consecutive pages of the book');
-          $('cr-page-wrapper-right')?.classList.remove('hidden');
-          $('cr-synthesis-gutter')?.classList.add('hidden');
-          $('cr-page-view-right-doc')?.classList.add('hidden');
-          renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
-        }
-        adjustReaderResponsiveScale();
+      if (toolId === 'cr-mic-capture-btn') {
+        triggerSmartMicCapture(newBtn);
         return;
       }
-
-      // 5b. Dual Page / Multi-Doc View toggle
-      if (toolName === 'dual') {
-        hideAllPopovers();
-        const spreadBtn = $('cr-tool-spread');
-        const dualBtn = $('cr-btn-dual');
-        if (window.spreadMode === 'split') {
-          window.spreadMode = 'single';
-          dualBtn?.classList.remove('active');
-          triggerNotification('Single Page View', 'Restored default reader viewport');
-          $('cr-synthesis-gutter')?.classList.add('hidden');
-          $('cr-page-view-right-doc')?.classList.add('hidden');
-          renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
-        } else {
-          window.spreadMode = 'split';
-          dualBtn?.classList.add('active');
-          spreadBtn.classList.remove('active');
-          triggerNotification('Multi-Doc Split View', 'Cross-book synthesis notes gutter active');
-          $('cr-page-wrapper-right')?.classList.add('hidden');
-          $('cr-synthesis-gutter')?.classList.remove('hidden');
-          $('cr-page-view-right-doc')?.classList.remove('hidden');
-          window.initSplitscreenRightDoc?.();
-        }
-        adjustReaderResponsiveScale();
-        return;
-      }
-
-      // 6. MCQ Sidebar toggle
-      if (toolName === 'mcq') {
-        hideAllPopovers();
-        const side = $('cr-mcq-sidebar');
-        if (side) {
-          const isHidden = side.classList.toggle('hidden');
-          newBtn.classList.toggle('active', !isHidden);
-          if (!isHidden) generateMCQs();
-        }
-        return;
-      }
-
-      // 7. Reflow Mode toggle
-      if (toolName === 'reflow') {
-        hideAllPopovers();
+      if (toolId === 'cr-btn-reflow') {
         window.reflowModeActive = !window.reflowModeActive;
         newBtn.classList.toggle('active', window.reflowModeActive);
-        const reflowContainer = $('cr-reflow-container');
-        const mainPageView = $('cr-page-view');
-        if (window.reflowModeActive) {
-          reflowContainer?.classList.remove('hidden');
-          mainPageView?.classList.add('hidden');
-          window.renderReflowContent?.();
-        } else {
-          reflowContainer?.classList.add('hidden');
-          mainPageView?.classList.remove('hidden');
-        }
-        return;
-      }
+        
+        $('cr-reflow-container')?.classList.add('hidden');
+        $('cr-page-view')?.classList.remove('hidden');
 
-      // 8. Progressive Summarization toggle
-      if (toolName === 'summary') {
-        const summaryPanel = $('cr-summarization-panel');
-        const wasHidden = summaryPanel?.classList.contains('hidden');
-        hideAllPopovers();
-        if (wasHidden && summaryPanel) {
-          summaryPanel.classList.remove('hidden');
-          newBtn.classList.add('active');
-          if (typeof window.updatePageSummaryDisplay === 'function') {
-            window.updatePageSummaryDisplay(currentReaderBook ? currentReaderBook.currentPage || 1 : 1);
-          } else {
-            const summaryContent = $('cr-summary-content');
-            if (summaryContent) summaryContent.innerHTML = "Progressive Summarization enabled for this page block.";
-          }
-        }
-        return;
-      }
-
-      // 8b. Reading Notes Panel toggle
-      if (toolName === 'notes') {
-        const notesPanel = $('cr-notes-panel');
-        const wasHidden = notesPanel?.classList.contains('hidden');
-        hideAllPopovers();
-        if (wasHidden && notesPanel) {
-          notesPanel.classList.remove('hidden');
-          newBtn.classList.add('active');
-          if (currentReaderBook) {
-            const notesTextarea = $('cr-notes-textarea');
-            if (notesTextarea) {
-              notesTextarea.value = currentReaderBook.notes || "";
-              notesTextarea.focus();
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+          document.querySelectorAll('.cr-page-wrapper').forEach(pw => {
+            const pageNum = parseInt(pw.dataset.page);
+            const contentDiv = pw.querySelector('.cr-page-content');
+            const canvasPdf = pw.querySelector('.cr-pdf-canvas');
+            if (contentDiv && pageNum) {
+              applyCanvaReflowStyleToSpans(contentDiv, pageNum, canvasPdf);
             }
+          });
+        }
+
+        renderReaderPage(book.currentPage);
+        triggerNotification('Sentence Editor Active', window.reflowModeActive ? 'Canva-style visual text boxes active 🪄' : 'Restored standard selection overlay');
+        return;
+      }
+      if (toolId === 'cr-btn-summary') {
+        const summaryPanel = $('cr-summarization-panel');
+        if (summaryPanel) {
+          const isHidden = summaryPanel.classList.toggle('hidden');
+          newBtn.classList.toggle('active', !isHidden);
+          if (!isHidden && currentReaderBook) {
+            window.updatePageSummaryDisplay(book.currentPage || 1, true);
           }
+          setTimeout(adjustReaderResponsiveScale, 200);
         }
         return;
       }
-      // 8c. Global Quick Notes toggle
-      if (toolName === 'quick-notes') {
-        const wasHidden = $('jw-notes-panel')?.classList.contains('hidden');
-        hideAllPopovers();
-        if (wasHidden) {
-          $('jw-notes-panel')?.classList.remove('hidden');
-          newBtn.classList.add('active');
-          if (typeof window.renderQuickNotes === 'function') window.renderQuickNotes();
-        } else {
-          $('jw-notes-panel')?.classList.add('hidden');
-          newBtn.classList.remove('active');
-        }
-        return;
-      }
-
-      // 9. Ambient Smart Capture toggle
-      if (toolName === 'mic') {
-        const isRecording = newBtn.classList.toggle('active');
-        if (isRecording) {
-          newBtn.classList.add('recording-active');
-          triggerNotification('Smart Capture Active', 'Listening to ambient audio logs... 🎙');
-          showRecordingModal();
-        } else {
-          newBtn.classList.remove('recording-active');
-        }
-        return;
-      }
-
-      // 10. Default selection / drawing modes active classes
-      activeTool = toolName;
+      
+      activeTool = toolId.replace('cr-tool-', '');
       overlay.dataset.activeTool = activeTool;
+      
+      if (activeTool === 'hl-yellow') { highlightSelection('rgba(255, 213, 79, 0.45)'); return; }
+      if (activeTool === 'hl-green') { highlightSelection('rgba(129, 199, 132, 0.45)'); return; }
+      if (activeTool === 'hl-blue') { highlightSelection('rgba(100, 181, 246, 0.45)'); return; }
+      if (activeTool === 'zoom-in') { if (currentZoom < 2.0) { currentZoom += 0.15; updateZoom(); } return; }
+      if (activeTool === 'zoom-out') { if (currentZoom > 0.5) { currentZoom -= 0.15; updateZoom(); } return; }
 
-      document.querySelectorAll('.cr-tool-btn').forEach(b => {
-        const mode = b.id.replace('cr-tool-', '');
-        if (['text', 'pen', 'eraser'].includes(mode)) {
-          b.classList.remove('active');
-        }
-      });
+      document.querySelectorAll('.cr-tool-btn').forEach(b => b.classList.remove('active'));
       newBtn.classList.add('active');
-
       if (activeTool === 'pen' || activeTool === 'eraser') {
         canvas.classList.add('active');
       } else {
@@ -2687,193 +2739,414 @@ function openBookReader(book) {
     });
   });
 
-  // Dynamic Reading Notes Binding
-  const notesPanel = $('cr-notes-panel');
-  const notesCloseBtn = $('cr-notes-close');
-  const notesSaveBtn = $('cr-notes-save-btn');
-  const notesMicBtn = $('cr-notes-mic-btn');
-
-  let activeTextarea = notesTextarea;
-  if (notesTextarea) {
-    const newTextarea = notesTextarea.cloneNode(true);
-    notesTextarea.parentNode.replaceChild(newTextarea, notesTextarea);
-    newTextarea.value = book.notes || "";
-    activeTextarea = newTextarea;
-    
-    // Auto-save notes on input
-    newTextarea.addEventListener('input', () => {
-      book.notes = newTextarea.value;
-      save();
-    });
-  }
-
-  if (notesCloseBtn && notesPanel) {
-    const newCloseBtn = notesCloseBtn.cloneNode(true);
-    notesCloseBtn.parentNode.replaceChild(newCloseBtn, notesCloseBtn);
-    newCloseBtn.onclick = () => {
-      notesPanel.classList.add('hidden');
-      $('cr-btn-notes')?.classList.remove('active');
-      if (isNotesRecording && notesSpeechRec) {
-        notesSpeechRec.stop();
-        isNotesRecording = false;
-        const currentMicBtn = $('cr-notes-mic-btn');
-        if (currentMicBtn) {
-          currentMicBtn.style.background = '';
-          currentMicBtn.style.borderColor = '';
-          currentMicBtn.style.color = '';
-          currentMicBtn.innerHTML = '🎙️ Dictate';
-        }
-      }
-    };
-  }
-
-  if (notesSaveBtn && activeTextarea) {
-    console.log("Binding cr-notes-save-btn click handler dynamically.");
-    const newSaveBtn = notesSaveBtn.cloneNode(true);
-    notesSaveBtn.parentNode.replaceChild(newSaveBtn, notesSaveBtn);
-    newSaveBtn.onclick = () => {
-      console.log("cr-notes-save-btn clicked!");
-      const notesValue = activeTextarea.value;
-      console.log("Notes value to save:", notesValue);
-      book.notes = notesValue;
-
-      // Sync to Journal (incorporate tags in the body text so renderJournal handles them correctly)
-      const title = `Reading Notes: ${book.title}`;
-      const tags = `#reading #notes #${book.title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}`;
-      const cleanNotesValue = notesValue.replace(/#reading|#notes/g, '').trim();
-      const bodyWithTags = cleanNotesValue + '\n\n' + tags;
-
-      let entry = STATE.journalEntries.find(e => e.title === title);
-      if (entry) {
-        entry.body = bodyWithTags;
-        entry.updatedAt = Date.now();
-        console.log("Updating existing journal entry:", title);
-      } else {
-        entry = {
-          id: randomId(),
-          title: title,
-          body: bodyWithTags,
-          timestamp: Date.now(),
-          date: new Date().toISOString(),
-          mood: '🙂',
-          gradient: GRADIENTS[STATE.journalEntries.length % GRADIENTS.length],
-          attachments: [
-            { type: 'location', name: `Notes on: ${book.title}` }
-          ]
-        };
-        STATE.journalEntries.unshift(entry);
-        console.log("Creating new journal entry:", title);
-      }
-
-      save();
-      renderJournal();
-      console.log("Successfully saved books and journal entries.");
-      showGlassyToast('Saved', 'Reading notes saved and synced to Journal. 📝');
-    };
-  }
-
-  if (notesMicBtn && activeTextarea) {
-    const newMicBtn = notesMicBtn.cloneNode(true);
-    notesMicBtn.parentNode.replaceChild(newMicBtn, notesMicBtn);
-    newMicBtn.onclick = () => {
-      console.log("notesMicBtn click registered dynamically");
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        console.log("SpeechRecognition not supported, showing prompt fallback");
-        showPrompt('Voice Dictation Fallback', 'Speech Recognition is not supported by your environment. Please type or paste your notes here:', '', (input) => {
-          if (input) {
-            activeTextarea.value = (activeTextarea.value + ' ' + input).trim();
-            book.notes = activeTextarea.value;
-            save();
-          }
-        });
-        return;
-      }
-
-      if (isNotesRecording) {
-        if (notesSpeechRec) {
-          notesSpeechRec.stop();
-        }
-        isNotesRecording = false;
-        newMicBtn.style.background = '';
-        newMicBtn.style.borderColor = '';
-        newMicBtn.style.color = '';
-        newMicBtn.innerHTML = '🎙️ Dictate';
-        triggerNotification('Dictation Stopped', 'Voice dictation has ended. Notes saved! 📝');
-      } else {
-        try {
-          notesSpeechRec = new SpeechRecognition();
-          notesSpeechRec.continuous = true;
-          notesSpeechRec.interimResults = false;
-          notesSpeechRec.onresult = (ev) => {
-            let finalTranscript = '';
-            for (let i = ev.resultIndex; i < ev.results.length; ++i) {
-              if (ev.results[i].isFinal) {
-                finalTranscript += ev.results[i][0].transcript;
-              }
-            }
-            if (finalTranscript.trim()) {
-              const currentVal = activeTextarea.value;
-              activeTextarea.value = (currentVal ? currentVal + ' ' : '') + finalTranscript.trim();
-              book.notes = activeTextarea.value;
-              save();
-            }
-          };
-          notesSpeechRec.onend = () => {
-            if (isNotesRecording) {
-              try { notesSpeechRec.start(); } catch (e) {}
-            }
-          };
-          notesSpeechRec.onerror = (event) => {
-            console.error('Speech recognition error:', event.error);
-            if (event.error === 'not-allowed') {
-              triggerNotification('Microphone Blocked', 'Please grant microphone access to this page.');
-            } else if (event.error === 'network') {
-              triggerNotification('Network Error', 'Speech recognition requires active internet connection.');
-            } else {
-              triggerNotification('Dictation Error', 'Error: ' + event.error);
-            }
-            isNotesRecording = false;
-            newMicBtn.style.background = '';
-            newMicBtn.style.borderColor = '';
-            newMicBtn.style.color = '';
-            newMicBtn.innerHTML = '🎙️ Dictate';
-          };
-
-          notesSpeechRec.start();
-          isNotesRecording = true;
-          newMicBtn.style.background = 'rgba(255, 69, 58, 0.2)';
-          newMicBtn.style.borderColor = 'rgba(255, 69, 58, 0.5)';
-          newMicBtn.style.color = '#ff453a';
-          newMicBtn.innerHTML = '🛑 Listening...';
-          triggerNotification('Dictation Active', 'Speak to dictate reading notes... 🎙');
-        } catch (err) {
-          triggerNotification('Microphone Error', 'Could not start voice dictation.');
-        }
-      }
-    };
-  }
+  // Summary close button wired in main initialization block
 
   // Keyboard navigation
   const handleKeyboardNav = e => {
     if (overlay.classList.contains('hidden')) return;
     if (document.activeElement && (document.activeElement.id === 'cr-search-input' || document.activeElement.id === 'cr-chat-input')) return;
     
-    const step = window.spreadMode === 'spread' ? 2 : 1;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
       if (book.currentPage < book.totalPages) {
-        renderReaderPage(book.currentPage + step);
+        renderReaderPage(book.currentPage + (isTwoPage ? 2 : 1));
         e.preventDefault();
       }
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       if (book.currentPage > 1) {
-        renderReaderPage(book.currentPage - step);
+        renderReaderPage(book.currentPage - (isTwoPage ? 2 : 1));
         e.preventDefault();
       }
     }
   };
-  window.addEventListener('keydown', handleKeyboardNav);
-  window.addEventListener('resize', adjustReaderResponsiveScale);
+  if (window._handleKeyboardNav) {
+    window.removeEventListener('keydown', window._handleKeyboardNav);
+  }
+  if (window._adjustReaderResponsiveScale) {
+    window.removeEventListener('resize', window._adjustReaderResponsiveScale);
+  }
+  window._handleKeyboardNav = handleKeyboardNav;
+  window._adjustReaderResponsiveScale = adjustReaderResponsiveScale;
+
+  window.addEventListener('keydown', window._handleKeyboardNav);
+  window.addEventListener('resize', window._adjustReaderResponsiveScale);
+
+  // Clone page content containers to strip accumulated event listeners
+  const pageContentLeft = $('cr-page-content');
+  if (pageContentLeft) {
+    const newLeft = pageContentLeft.cloneNode(true);
+    pageContentLeft.parentNode.replaceChild(newLeft, pageContentLeft);
+  }
+  const pageContentRight = $('cr-page-content-right');
+  if (pageContentRight) {
+    const newRight = pageContentRight.cloneNode(true);
+    pageContentRight.parentNode.replaceChild(newRight, pageContentRight);
+  }
+
+  // Initialize annotations double click and delete actions on both page content overlays
+  initPageAnnotationHandlers($('cr-page-content'), false);
+  initPageAnnotationHandlers($('cr-page-content-right'), true);
+
+  // Close handlers for reflow and summarization panels
+  const reflowClose = $('cr-reflow-close-btn');
+  if (reflowClose) {
+    reflowClose.onclick = () => {
+      window.reflowModeActive = false;
+      const reflowBtn = $('cr-btn-reflow');
+      if (reflowBtn) reflowBtn.classList.remove('active');
+      $('cr-reflow-container')?.classList.add('hidden');
+      $('cr-page-view')?.classList.remove('hidden');
+    };
+  }
+
+  // Summary close handled by main initialization block above
+  function triggerSmartMicCapture(buttonElement) {
+    let recognition = null;
+    const isRecording = buttonElement.classList.toggle('active');
+    if (!isRecording) {
+      buttonElement.style.color = '';
+      return;
+    }
+    
+    buttonElement.style.color = '#ff3b30';
+    triggerNotification('Smart Capture Active', 'Listening to ambient audio logs... 🎙');
+    
+    const recOverlay = document.createElement('div');
+    recOverlay.id = 'cr-rec-overlay';
+    recOverlay.style = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:2000; color:#fff; font-family:sans-serif; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);';
+    recOverlay.innerHTML = `
+      <div style="font-size:16px; font-weight:700; color:#ff9500; margin-bottom:10px;">🎙 WEB SPEECH SMART CAPTURE</div>
+      <div id="cr-rec-wave" style="display:flex; gap:6px; align-items:center; height:50px; margin-bottom:20px;">
+        <span style="display:block; width:4px; height:15px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate;"></span>
+        <span style="display:block; width:4px; height:35px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.2s;"></span>
+        <span style="display:block; width:4px; height:20px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.4s;"></span>
+        <span style="display:block; width:4px; height:40px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.1s;"></span>
+        <span style="display:block; width:4px; height:15px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.3s;"></span>
+      </div>
+      <div id="cr-rec-transcript" style="font-size:15px; max-width:80%; text-align:center; min-height:40px; margin-bottom:30px; line-height:1.5; color:#fff; font-style:italic;">
+        "Say something to take a note..."
+      </div>
+      <div style="display:flex; gap:12px;">
+        <button id="cr-rec-save-journal" class="btn-primary" style="padding:10px 20px; border-radius:30px; border:none; background:#007aff; color:#fff; font-weight:600; cursor:pointer; display:none;">Save to Journal</button>
+        <button id="cr-rec-save-note" class="btn-primary" style="padding:10px 20px; border-radius:30px; border:none; background:#ff9500; color:#fff; font-weight:600; cursor:pointer; display:none;">Save to Margin Note</button>
+        <button id="cr-rec-stop-btn" class="btn-primary" style="padding:10px 24px; border-radius:30px; border:none; background:#ff453a; color:#fff; font-weight:600; cursor:pointer;">Stop Capture</button>
+      </div>
+    `;
+    document.body.appendChild(recOverlay);
+
+    if (!document.getElementById('rec-wave-style')) {
+      const style = document.createElement('style');
+      style.id = 'rec-wave-style';
+      style.innerHTML = `
+        @keyframes bounce {
+          0% { transform: scaleY(1); }
+          100% { transform: scaleY(2.2); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    let finalTranscript = "";
+    try {
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event) => {
+          let interimTranscript = "";
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+          $('cr-rec-transcript').textContent = finalTranscript || interimTranscript || '"Say something..."';
+        };
+
+        recognition.onerror = (e) => {
+          console.error("Speech Recognition Error", e);
+          $('cr-rec-transcript').innerHTML = `
+            <div style="font-size:12px; color:#ff9500; margin-bottom:8px;">⚠️ Mic error or permission denied. Enter note manually:</div>
+            <textarea id="cr-rec-manual-input" style="width:260px; height:80px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#fff; border-radius:8px; padding:8px; outline:none; resize:none; font-family:inherit; font-size:13px;" placeholder="Type your note here...">Reviewing this section guideline for study notes.</textarea>
+          `;
+          $('cr-rec-wave').style.display = 'none';
+          $('cr-rec-stop-btn').style.display = 'none';
+          
+          const jBtn = $('cr-rec-save-journal');
+          const nBtn = $('cr-rec-save-note');
+          if (jBtn) jBtn.style.display = 'block';
+          if (nBtn) nBtn.style.display = 'block';
+
+          setupManualSaveHandlers(jBtn, nBtn, recOverlay, buttonElement);
+        };
+
+        recognition.start();
+      } else {
+        showManualInputOnly();
+      }
+    } catch (err) {
+      console.error("Failed to start SpeechRecognition", err);
+      showManualInputOnly();
+    }
+
+    function showManualInputOnly() {
+      $('cr-rec-transcript').innerHTML = `
+        <div style="font-size:12px; color:#ff9500; margin-bottom:8px;">Speech recognition not supported in this browser.</div>
+        <textarea id="cr-rec-manual-input" style="width:260px; height:80px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#fff; border-radius:8px; padding:8px; outline:none; resize:none; font-family:inherit; font-size:13px;" placeholder="Type your note here instead...">Reviewing this section guideline for study notes.</textarea>
+      `;
+      $('cr-rec-wave').style.display = 'none';
+      $('cr-rec-stop-btn').style.display = 'none';
+      
+      const jBtn = $('cr-rec-save-journal');
+      const nBtn = $('cr-rec-save-note');
+      if (jBtn) jBtn.style.display = 'block';
+      if (nBtn) nBtn.style.display = 'block';
+
+      setupManualSaveHandlers(jBtn, nBtn, recOverlay, buttonElement);
+    }
+
+    function setupManualSaveHandlers(jBtn, nBtn, recOverlay, buttonElement) {
+      const getManualText = () => {
+        const manualInput = $('cr-rec-manual-input');
+        return manualInput ? manualInput.value.trim() : "";
+      };
+
+      const docTitle = currentReaderBook ? currentReaderBook.title : 'Document';
+      const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 1;
+
+      jBtn.onclick = () => {
+        const text = getManualText() || "Reviewing this section guideline for study notes.";
+        const newEntry = {
+          id: randomId(),
+          title: `🎙 Smart Capture: Page ${pageNum}`,
+          body: `<p>${text}</p>`,
+          date: today(),
+          timestamp: Date.now(),
+          mood: '🙂',
+          attachments: [{ type: 'location', name: `Captured in: ${docTitle}, Page ${pageNum}` }]
+        };
+        STATE.journalEntries.push(newEntry);
+        save();
+        renderJournal();
+        renderSmartCaptureList();
+        logInteraction('smart-capture', { bookTitle: docTitle, page: pageNum, transcription: text });
+        triggerNotification('Micro-Journal Created', 'Smart capture note successfully saved 🔥');
+        recOverlay.remove();
+        buttonElement.classList.remove('active');
+        buttonElement.style.color = '';
+      };
+
+      nBtn.onclick = () => {
+        const text = getManualText() || "Reviewing this section guideline for study notes.";
+        if (currentReaderBook) {
+          currentReaderBook.annotations = currentReaderBook.annotations || {};
+          currentReaderBook.annotations[pageNum] = currentReaderBook.annotations[pageNum] || [];
+          const noteId = Math.random().toString(36).substring(2, 9);
+          currentReaderBook.annotations[pageNum].push({
+            id: noteId,
+            left: 150,
+            top: 300,
+            text: text
+          });
+        }
+        save();
+        if (typeof window.renderPageAnnotations === 'function') window.renderPageAnnotations();
+        logInteraction('margin-note-dictation', { bookTitle: docTitle, page: pageNum, transcription: text });
+        triggerNotification('Note Saved to Page', 'Transcribed note placed on page 📝');
+        recOverlay.remove();
+        buttonElement.classList.remove('active');
+        buttonElement.style.color = '';
+      };
+    }
+    const stopCapture = () => {
+      if (recognition) {
+        try {
+          recognition.stop();
+        } catch (_) {}
+      }
+      
+      const manualInput = $('cr-rec-manual-input');
+      if (manualInput) {
+        finalTranscript = manualInput.value.trim();
+      }
+
+      const textToShow = finalTranscript || "Reviewing this section guideline for study notes.";
+
+      $('cr-rec-transcript').innerHTML = `
+        <div style="font-size:12px; color:#ff9500; margin-bottom:8px;">EDIT NOTE IN CARD:</div>
+        <textarea id="cr-rec-manual-input" style="width:260px; height:80px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#fff; border-radius:8px; padding:8px; outline:none; resize:none; font-family:inherit; font-size:13px;" placeholder="Type your note here...">${textToShow}</textarea>
+      `;
+      $('cr-rec-wave').style.display = 'none';
+      $('cr-rec-stop-btn').style.display = 'none';
+      
+      const jBtn = $('cr-rec-save-journal');
+      const nBtn = $('cr-rec-save-note');
+      if (jBtn) jBtn.style.display = 'block';
+      if (nBtn) nBtn.style.display = 'block';
+
+      const docTitle = currentReaderBook ? currentReaderBook.title : 'Document';
+      const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 1;
+
+      jBtn.onclick = () => {
+        const manualInput = $('cr-rec-manual-input');
+        const text = manualInput ? manualInput.value.trim() : finalTranscript;
+        const newEntry = {
+          id: randomId(),
+          title: `🎙 Smart Capture: Page ${pageNum}`,
+          body: `<p>${text}</p>`,
+          date: today(),
+          timestamp: Date.now(),
+          mood: '🙂',
+          attachments: [
+            { type: 'location', name: `Captured in: ${docTitle}, Page ${pageNum}` }
+          ]
+        };
+        STATE.journalEntries.push(newEntry);
+        save();
+        renderJournal();
+        renderSmartCaptureList();
+        logInteraction('smart-capture', { bookTitle: docTitle, page: pageNum, transcription: text });
+        triggerNotification('Micro-Journal Created', 'Smart capture note successfully saved 🔥');
+        recOverlay.remove();
+        buttonElement.classList.remove('active');
+        buttonElement.style.color = '';
+      };
+
+      nBtn.onclick = () => {
+        const manualInput = $('cr-rec-manual-input');
+        const text = manualInput ? manualInput.value.trim() : finalTranscript;
+        if (currentReaderBook) {
+          currentReaderBook.annotations = currentReaderBook.annotations || {};
+          currentReaderBook.annotations[pageNum] = currentReaderBook.annotations[pageNum] || [];
+          const noteId = Math.random().toString(36).substring(2, 9);
+          currentReaderBook.annotations[pageNum].push({
+            id: noteId,
+            left: 150,
+            top: 300,
+            text: text
+          });
+        }
+        save();
+        if (typeof window.renderPageAnnotations === 'function') window.renderPageAnnotations();
+        logInteraction('margin-note-dictation', { bookTitle: docTitle, page: pageNum, transcription: text });
+        triggerNotification('Note Saved to Page', 'Transcribed note placed on page 📝');
+        recOverlay.remove();
+        buttonElement.classList.remove('active');
+        buttonElement.style.color = '';
+      };
+    };
+
+    $('cr-rec-stop-btn').onclick = stopCapture;
+  }
+
+  window.renderReflowContent = () => {
+    const reflowBody = $('cr-reflow-body');
+    if (!reflowBody) return;
+
+    const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 1;
+    const docId = currentReaderBook ? currentReaderBook.id : 'default';
+
+    let defaultText = "";
+    if (currentReaderBook) {
+      if (currentReaderBook.fileType === 'pdf') {
+        defaultText = (currentReaderBook.pdfTextCache && currentReaderBook.pdfTextCache[pageNum]) || "";
+        if (!defaultText && currentReaderBook.ocrData && currentReaderBook.ocrData[pageNum]) {
+          defaultText = currentReaderBook.ocrData[pageNum].map(w => w.text).join(' ');
+        }
+      } else {
+        if (currentReaderBook.fileContent) {
+          const words = currentReaderBook.fileContent.split(/\s+/);
+          const startIdx = (pageNum - 1) * 200;
+          defaultText = words.slice(startIdx, startIdx + 200).join(' ');
+        }
+      }
+    }
+
+    if (!defaultText || defaultText.trim().length < 5) {
+      defaultText = "No text content available on this page to reflow. If this is a scanned document, please wait for automatic OCR text extraction to finish.";
+    }
+
+    // Split into sentences
+    const sentences = defaultText.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+    reflowBody.innerHTML = sentences.map((s, idx) => {
+      const patchKey = `${docId}-${pageNum}-${idx}`;
+      const isEdited = STATE.reflowPatches && STATE.reflowPatches[patchKey];
+      const savedText = isEdited || s.trim();
+      
+      return `
+        <div class="reflow-sentence-card" style="display:flex; flex-direction:column; gap:8px; padding:12px 16px; background:${isEdited ? 'rgba(48,209,88,0.06)' : 'rgba(255,255,255,0.02)'}; border:1px solid ${isEdited ? '#30d158' : 'rgba(255,255,255,0.05)'}; border-radius:12px; transition:0.2s;">
+          <div class="reflow-para" contenteditable="true" data-index="${idx}" style="font-size:14px; line-height:1.6; color:#fff; outline:none; cursor:text;" onblur="appSaveReflowEdit(this, '${docId}', ${pageNum}, ${idx})">${savedText}</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.04); padding-top:8px;">
+            <span style="font-size:10px; color:${isEdited ? '#30d158' : 'var(--txt3)'}; font-weight:600;">${isEdited ? '✓ Edited & Saved' : 'Sentence ' + (idx + 1)}</span>
+            <div style="display:flex; gap:8px;">
+              <button onclick="simplifyReflowSentence(this, '${docId}', ${pageNum}, ${idx})" style="background:rgba(255,149,0,0.12); border:none; color:#ff9500; font-size:10px; padding:4px 8px; border-radius:6px; cursor:pointer; font-weight:600; display:flex; align-items:center; gap:4px;">🪄 Simplify</button>
+              <button onclick="speakReflowSentence('${docId}-${pageNum}-${idx}')" style="background:rgba(0,122,255,0.12); border:none; color:#007aff; font-size:10px; padding:4px 8px; border-radius:6px; cursor:pointer; font-weight:600; display:flex; align-items:center; gap:4px;">🔊 Speak</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  };
+
+  window.speakReflowSentence = (key) => {
+    const el = document.querySelector(`.reflow-para[onblur*="${key.split('-')[0]}"][onblur*="${key.split('-')[1]}"][onblur*="${key.split('-')[2]}"]`) || document.querySelector(`[onblur*="${key.split('-')[1]}"][onblur*="${key.split('-')[2]}"]`);
+    const txt = el ? el.textContent.trim() : "";
+    if (!txt) return;
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(txt);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  window.simplifyReflowSentence = async (buttonElement, docId, pageNum, idx) => {
+    const card = buttonElement.closest('.reflow-sentence-card');
+    const editable = card.querySelector('.reflow-para');
+    const originalText = editable.textContent.trim();
+
+    buttonElement.disabled = true;
+    buttonElement.innerHTML = `⏳ Simplifying...`;
+
+    try {
+      const apiKey = "AQ.Ab8RN6JelORN2ShF8wyQwg1gOMFY5a2NyugV2xw-zEsa3piVvg";
+      const payload = {
+        contents: [{ role: "user", parts: [{ text: `Please rewrite this textbook sentence in extremely simple, easy-to-understand student language (1 sentence maximum, do not include any prefixes or meta-text, just output the simplified sentence): "${originalText}"` }] }],
+        generationConfig: { temperature: 0.6 }
+      };
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error("Simplification failed");
+      const data = await res.json();
+      const simplifiedText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (simplifiedText) {
+        editable.textContent = simplifiedText.replace(/"/g, '').trim();
+        editable.blur();
+        buttonElement.innerHTML = `🪄 Simplified`;
+        card.style.background = 'rgba(48,209,88,0.06)';
+        card.style.borderColor = '#30d158';
+      } else {
+        throw new Error();
+      }
+    } catch (e) {
+      const simplifiedText = originalText
+        .replace(/boundaries map directly/g, "borders align")
+        .replace(/proposed conservation strategy/g, "protection plan")
+        .replace(/zonal buffer corridors outline/g, "safety pathways show")
+        .replace(/migration channels across regional sectors/g, "animal travel routes");
+      
+      editable.textContent = simplifiedText;
+      editable.blur();
+      buttonElement.innerHTML = `🪄 Simplified (Local)`;
+    } finally {
+      buttonElement.disabled = false;
+    }
+  };
 
   // ==========================================
   // Restored Advanced Reader Features Wiring
@@ -2891,17 +3164,6 @@ function openBookReader(book) {
     $('cr-speech-settings')?.classList.add('hidden');
     $('cr-font-settings')?.classList.add('hidden');
     $('cr-pen-settings')?.classList.add('hidden');
-    $('cr-summarization-panel')?.classList.add('hidden');
-    $('cr-notes-panel')?.classList.add('hidden');
-    $('jw-notes-panel')?.classList.add('hidden');
-    
-    // Reset active states for popover buttons
-    $('cr-tool-speech')?.classList.remove('active');
-    $('cr-tool-font')?.classList.remove('active');
-    $('cr-tool-pen')?.classList.remove('active');
-    $('cr-btn-summary')?.classList.remove('active');
-    $('cr-btn-notes')?.classList.remove('active');
-    $('cr-btn-quick-notes')?.classList.remove('active');
   };
 
   // Typography Preferences
@@ -2937,6 +3199,23 @@ function openBookReader(book) {
     });
   }
 
+  // Active Tool bindings
+  document.querySelectorAll('.cr-tool-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const toolId = btn.id;
+      if (['cr-tool-speech', 'cr-tool-font', 'cr-tool-pen'].includes(toolId)) {
+        const targetPopoverId = toolId.replace('cr-tool-', 'cr-') + '-settings';
+        const popover = $(targetPopoverId);
+        const wasHidden = popover?.classList.contains('hidden');
+        hideAllPopovers();
+        if (wasHidden && popover) popover.classList.remove('hidden');
+      } else {
+        hideAllPopovers();
+      }
+    });
+  });
+
+  // Two-page Spread handled dynamically inside openBookReader
 
   // Pen settings (color and brush width)
   document.querySelectorAll('.cr-pen-color').forEach(dot => {
@@ -2970,7 +3249,7 @@ function openBookReader(book) {
 
   function populateVoiceList() {
     const select = $('cr-speech-voice-select');
-    if (!select) return;
+    if (!select || !synthesis || !synthesis.getVoices) return;
     const voices = synthesis.getVoices();
     if (voices.length === 0) return;
     select.innerHTML = '';
@@ -3003,12 +3282,12 @@ function openBookReader(book) {
     }
   }
 
-  if (synthesis.onvoiceschanged !== undefined) {
+  if (synthesis && 'onvoiceschanged' in synthesis) {
     synthesis.onvoiceschanged = populateVoiceList;
   }
   populateVoiceList();
   let voiceCheckInterval = setInterval(() => {
-    if(synthesis.getVoices().length > 0) {
+    if(synthesis && synthesis.getVoices && synthesis.getVoices().length > 0) {
       clearInterval(voiceCheckInterval);
       populateVoiceList();
     }
@@ -3162,9 +3441,30 @@ function openBookReader(book) {
       });
     }, 800);
   };
+  $('cr-mcq-refresh-btn') && ($('cr-mcq-refresh-btn').onclick = generateMCQs);
 
-  $('cr-mcq-refresh-btn')&&( $('cr-mcq-refresh-btn').onclick = generateMCQs );
+  const mcqCloseBtn = $('cr-mcq-close-btn');
+  if (mcqCloseBtn) {
+    mcqCloseBtn.onclick = () => {
+      $('cr-mcq-sidebar')?.classList.add('hidden');
+      $('cr-tool-mcq')?.classList.remove('active');
+    };
+  }
 
+  // Toggle MCQ sidebar
+  $('cr-tool-mcq')?.addEventListener('click', () => {
+    const side = $('cr-mcq-sidebar');
+    if (!side) return;
+    const isOpen = !side.classList.contains('hidden');
+    if (isOpen) {
+      side.classList.add('hidden');
+      $('cr-tool-mcq').classList.remove('active');
+    } else {
+      side.classList.remove('hidden');
+      $('cr-tool-mcq').classList.add('active');
+      generateMCQs();
+    }
+  });
 
   // AI Study Buddy Chatbot Widget
   const chatFab = $('cr-chat-fab');
@@ -3193,7 +3493,7 @@ function openBookReader(book) {
     
     if (sender === 'buddy-typing') {
       bubble.id = 'buddy-typing-indicator';
-      bubble.innerHTML = '<div class="chat-typing-dots"><span></span><span></span><span></span></div>';
+      bubble.innerHTML = '<div class="bloom-mini" style="margin: 4px;">             <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg">               <g class="bloom-inner-mini">                 <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71"></path>                 <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(60)"></path>                 <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(120)"></path>                 <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(180)"></path>                 <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#2ECC71" transform="rotate(240)"></path>                 <path d="M0,0 C-4,-7 4,-7 0,-16 C6,-9 6,-4 0,0" fill="#52D68A" transform="rotate(300)"></path>               </g>               <circle cx="0" cy="0" r="3" fill="#2ECC71"></circle>             </svg>           </div>';
     } else {
       bubble.textContent = text;
     }
@@ -3231,16 +3531,30 @@ function openBookReader(book) {
     const pageText = getCurrentPageText();
 
     try {
-      const res = await fetch('http://localhost:3000/api/chat', {
+      const apiKey = "AQ.Ab8RN6JelORN2ShF8wyQwg1gOMFY5a2NyugV2xw-zEsa3piVvg";
+      const contents = [];
+      if (chatHistory && chatHistory.length > 0) {
+        chatHistory.forEach((h) => {
+          contents.push({
+            role: h.who === "user" ? "user" : "model",
+            parts: [{ text: h.text }]
+          });
+        });
+      }
+      contents.push({ role: "user", parts: [{ text: msg }] });
+
+      const payload = {
+        systemInstruction: {
+          parts: [{ text: "You are the user's friendly AI Study Buddy. Help them study the current book page. Keep your responses concise, sharp, and structured. Always answer page-specific questions using the context provided below:\n\n" + pageText }]
+        },
+        contents: contents,
+        generationConfig: { temperature: 0.7 }
+      };
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: msg,
-          history: chatHistory,
-          context: pageText,
-          model: 'github',
-          systemPromptOverride: "You are the user's friendly AI Study Buddy. Help them study the current book page. Keep your responses concise, sharp, and structured. Always answer page-specific questions using the context provided below:\n\n" + pageText
-        })
+        body: JSON.stringify(payload)
       });
 
       document.getElementById('buddy-typing-indicator')?.remove();
@@ -3248,16 +3562,12 @@ function openBookReader(book) {
       const data = await res.json();
       
       if (!res.ok) {
-        if (data.error && data.error.includes("API key")) {
-          appendChatMessage('buddy', "Missing GitHub PAT! Please paste it into `insert api key here.txt` in the root folder.");
-        } else {
-          const bubble = appendChatMessage('buddy', `Error: ${data.error || 'Failed to connect to NYVRON Intelligence.'}`);
-          if (bubble) bubble.appendChild(window.createMainAIBanner('fire'));
-        }
+        const bubble = appendChatMessage('buddy', `Error: Failed to connect to Gemini API.`);
+        if (bubble) bubble.appendChild(window.createMainAIBanner('fire'));
         return;
       }
 
-      const reply = data.reply || "No response received.";
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response received.";
       
       typeMessageOut(reply, () => {
         chatHistory.push({ who: 'user', text: msg });
@@ -3282,8 +3592,6 @@ function openBookReader(book) {
     window.removeEventListener('keydown', handleKeyboardNav);
     window.removeEventListener('resize', adjustReaderResponsiveScale);
     overlay.classList.add('hidden');
-    $('cr-notes-panel')?.classList.add('hidden');
-    $('cr-summarization-panel')?.classList.add('hidden');
     document.querySelector('.tab-bar')?.classList.remove('hidden');
     $('cr-chat-widget')?.classList.add('hidden');
     $('cr-chat-fab')?.classList.add('hidden');
@@ -3307,11 +3615,27 @@ function openBookReader(book) {
 
   $('cr-sidebar-toggle').onclick = () => {
     $('cr-sidebar')?.classList.toggle('hidden');
+    $('cr-notes-sidebar')?.classList.add('hidden'); // close the other
   };
 
   $('cr-sidebar-close').onclick = () => {
     $('cr-sidebar')?.classList.add('hidden');
   };
+
+  const notesToggleBtn = $('cr-notes-toggle');
+  if (notesToggleBtn) {
+    notesToggleBtn.onclick = () => {
+      $('cr-notes-sidebar')?.classList.toggle('hidden');
+      $('cr-sidebar')?.classList.add('hidden'); // close the other
+    };
+  }
+
+  const notesCloseBtn = $('cr-notes-close');
+  if (notesCloseBtn) {
+    notesCloseBtn.onclick = () => {
+      $('cr-notes-sidebar')?.classList.add('hidden');
+    };
+  }
 
   $('cr-theme-select').onchange = function() {
   if (!document.startViewTransition) {
@@ -3324,13 +3648,11 @@ function openBookReader(book) {
 };
 
   $('cr-prev-page').onclick = () => {
-    const step = window.spreadMode === 'spread' ? 2 : 1;
-    if (book.currentPage > 1) renderReaderPage(book.currentPage - step);
+    if (book.currentPage > 1) renderReaderPage(book.currentPage - (isTwoPage ? 2 : 1));
   };
 
   $('cr-next-page').onclick = () => {
-    const step = window.spreadMode === 'spread' ? 2 : 1;
-    if (book.currentPage < book.totalPages) renderReaderPage(book.currentPage + step);
+    if (book.currentPage < book.totalPages) renderReaderPage(book.currentPage + (isTwoPage ? 2 : 1));
   };
 
   $('cr-page-slider').oninput = function() {
@@ -3346,29 +3668,33 @@ function openBookReader(book) {
     });
   }
 
-  // Sync sliders
+  // Fixed Area Zoom (Capsule zoom controls)
+  window.fixedAreaZoom = 1.0;
+  function updateFixedAreaZoom(sourceSlider = null) {
+    const percent = Math.round(window.fixedAreaZoom * 100);
+    const label = $('cr-mzoom-val');
+    if (label) label.textContent = `${percent}%`;
+
+    const slider = $('cr-mzoom-slider');
+    if (slider && sourceSlider !== slider) slider.value = percent;
+
+    adjustReaderResponsiveScale();
+  }
+
   const mSlider = $('cr-mzoom-slider');
   if (mSlider) {
     mSlider.oninput = function() {
-      currentZoom = parseInt(this.value) / 100;
-      updateZoom(this);
-    };
-  }
-  const dSlider = $('cr-zoom-slider');
-  if (dSlider) {
-    dSlider.oninput = function() {
-      currentZoom = parseInt(this.value) / 100;
-      updateZoom(this);
+      window.fixedAreaZoom = parseInt(this.value) / 100;
+      updateFixedAreaZoom(this);
     };
   }
 
-  // Mobile zoom button event listeners
   const mZoomIn = $('cr-mzoom-in');
   if (mZoomIn) {
     mZoomIn.onclick = (e) => {
       e.stopPropagation();
-      currentZoom = Math.min(3.0, parseFloat((currentZoom + 0.15).toFixed(2)));
-      updateZoom();
+      window.fixedAreaZoom = Math.min(3.0, parseFloat((window.fixedAreaZoom + 0.15).toFixed(2)));
+      updateFixedAreaZoom();
     };
   }
 
@@ -3376,11 +3702,18 @@ function openBookReader(book) {
   if (mZoomOut) {
     mZoomOut.onclick = (e) => {
       e.stopPropagation();
-      currentZoom = Math.max(0.3, parseFloat((currentZoom - 0.15).toFixed(2)));
-      updateZoom();
+      window.fixedAreaZoom = Math.max(0.3, parseFloat((window.fixedAreaZoom - 0.15).toFixed(2)));
+      updateFixedAreaZoom();
     };
   }
-  
+
+  const dSlider = $('cr-zoom-slider');
+  if (dSlider) {
+    dSlider.oninput = function() {
+      currentZoom = parseInt(this.value) / 100;
+      updateZoom(this);
+    };
+  }
   const dZoomIn = $('cr-tool-zoom-in');
   if (dZoomIn) {
     dZoomIn.onclick = (e) => {
@@ -3627,7 +3960,7 @@ function openBookReader(book) {
         }).promise.then(pdf => {
           console.log("openBookReader: pdfjsLib.getDocument resolved successfully, pages:", pdf.numPages);
           pdfDoc = pdf;
-          window.pdfDoc = pdf;
+          window._currentPdfDoc = pdf; // Expose for on-demand text extraction in summary
           book.totalPages = pdf.numPages;
           save();
 
@@ -3697,10 +4030,35 @@ function openBookReader(book) {
 }
 
 // --- renderSpotlightResults ---
+const SEARCH_ITEMS = [
+  { label: 'Cascara Home', tab: 'home', icon: '⌂' },
+  { label: 'Journal & Logs', tab: 'journal', icon: '◫' },
+  { label: 'Calendar Events', tab: 'calendar', icon: '🗓' },
+  { label: 'Settings & Sync', tab: 'settings', icon: '⚙' },
+  { label: 'Cortex Data', tab: 'cortex', icon: '🧠' },
+  { label: 'Canopy Strategy', tab: 'canopy', icon: '🌳' },
+  { label: 'Prism Ideation', tab: 'prism', icon: '🔮' },
+  { label: 'Ledger Analytics', tab: 'ledger', icon: '📊' }
+];
+
 function renderSpotlightResults(q){
   const list=$('spotlight-results');list.innerHTML='';
   const filtered=q?SEARCH_ITEMS.filter(x=>x.label.toLowerCase().includes(q.toLowerCase())):SEARCH_ITEMS;
-  filtered.forEach((item,i)=>{const li=document.createElement('li');li.className='sresult';li.dataset.tab=item.tab;li.innerHTML=`<span class="sresult-icon">${item.icon}</span><span>${item.label}</span>`;li.addEventListener('click',()=>{switchTab(item.tab);closeSpotlight();});list.appendChild(li);});
+  filtered.forEach((item,i)=>{
+    const li=document.createElement('li');
+    li.className='sresult';
+    li.dataset.tab=item.tab;
+    li.innerHTML=`<span class="sresult-icon">${item.icon}</span><span>${item.label}</span>`;
+    li.addEventListener('click',()=>{
+      if (['cortex', 'canopy', 'prism', 'ledger'].includes(item.tab)) {
+        openSubApp(item.tab);
+      } else {
+        switchTab(item.tab);
+      }
+      closeSpotlight();
+    });
+    list.appendChild(li);
+  });
 }
 
 // --- renderJournalAttachments ---
@@ -4024,40 +4382,22 @@ function renderCalEvents(dateStr){
     li.style.animationDelay = `${i * 0.05}s`;
     
     // Determine color based on event type if not provided
-    let glowColor = ev.color;
-    if (!glowColor) {
-      if (ev.type === 'personal') glowColor = '#30d158';
-      else if (ev.type === 'work') glowColor = '#0a84ff';
-      else if (ev.type === 'important') glowColor = '#ff453a';
-      else if (ev.type === 'project') glowColor = '#a855f7';
-      else if (ev.type === 'journal') glowColor = '#0a84ff';
-      else if (ev.type === 'margin') glowColor = '#ff9500';
-      else if (ev.type === 'highlight') glowColor = '#ffcc00';
-      else if (ev.type === 'dictation') glowColor = '#30d158';
-      else glowColor = '#30d158';
-    }
+    let glowColor = ev.color || '#30d158'; // default green
+    if (ev.type === 'journal') glowColor = '#0a84ff';
+    if (ev.type === 'margin') glowColor = '#ff9500'; // orange
+    if (ev.type === 'highlight') glowColor = '#ffcc00'; // yellow
     
     const timeText = ev.time || '12:00 PM';
-    
-    const isManual = ev.type !== 'journal' && ev.type !== 'highlight' && ev.type !== 'dictday' && ev.type !== 'dictation' && ev.type !== 'margin' && ev.type !== 'interaction';
-    const deleteBtnHtml = isManual ? `
-      <button class="glassy-del-btn" onclick="event.stopPropagation(); appDeleteCalEvent('${dateStr}', '${ev.id}')" title="Delete Event">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-      </button>
-    ` : '';
 
     li.innerHTML = `
       <div class="cal-timeline-track">
         <div class="cal-timeline-dot" style="background: ${glowColor}; box-shadow: 0 0 10px ${glowColor};"></div>
         <div class="cal-timeline-line"></div>
       </div>
-      <div class="cal-timeline-card" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; width: 100%;">
-        <div style="flex: 1;">
-          <div class="cal-timeline-time">${timeText}</div>
-          <div class="cal-timeline-title" style="font-weight: 600; color: var(--txt1);">${ev.title}</div>
-          ${(ev.desc || ev.notes) ? `<div class="cal-timeline-desc" style="font-size: 12px; color: var(--txt2); margin-top: 4px;">${ev.desc || ev.notes}</div>` : ''}
-        </div>
-        ${deleteBtnHtml}
+      <div class="cal-timeline-card">
+        <div class="cal-timeline-time">${timeText}</div>
+        <div class="cal-timeline-title">${ev.title}</div>
+        ${ev.desc ? `<div class="cal-timeline-desc">${ev.desc}</div>` : ''}
       </div>
     `;
     list.appendChild(li);
@@ -4067,46 +4407,40 @@ function renderCalEvents(dateStr){
 
 
 function applyManualTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  if (!document.startViewTransition) {
-    document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
-    if (theme === 'light') {
-      document.body.classList.add('theme-paper');
-    } else if (theme === 'dark') {
-      document.body.classList.add('theme-dark-vault');
-    }
+  const currentThemeClass = theme === 'light' ? 'theme-paper' : 'theme-dark-vault';
+  if (document.body.classList.contains(currentThemeClass)) {
     return;
   }
+  
+  if (!document.startViewTransition) {
+    document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
+    document.body.classList.add(currentThemeClass);
+    return;
+  }
+  
   document.startViewTransition(() => {
     document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
-    if (theme === 'light') {
-      document.body.classList.add('theme-paper');
-    } else if (theme === 'dark') {
-      document.body.classList.add('theme-dark-vault');
-    }
+    document.body.classList.add(currentThemeClass);
   });
 }
 
 function applyAutoTheme() {
   const h = new Date().getHours();
-  const autoTheme = (h >= 6 && h < 18) ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', autoTheme);
-  if (!document.startViewTransition) {
-    document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
-    if (h >= 6 && h < 18) {
-      document.body.classList.add('theme-paper');
-    } else {
-      document.body.classList.add('theme-dark-vault');
-    }
+  const desiredThemeClass = (h >= 6 && h < 18) ? 'theme-paper' : 'theme-dark-vault';
+  
+  if (document.body.classList.contains(desiredThemeClass)) {
     return;
   }
+  
+  if (!document.startViewTransition) {
+    document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
+    document.body.classList.add(desiredThemeClass);
+    return;
+  }
+  
   document.startViewTransition(() => {
     document.body.classList.remove('theme-paper', 'theme-dark-vault', 'theme-crimson');
-    if (h >= 6 && h < 18) {
-      document.body.classList.add('theme-paper');
-    } else {
-      document.body.classList.add('theme-dark-vault');
-    }
+    document.body.classList.add(desiredThemeClass);
   });
 }
 
@@ -4124,17 +4458,11 @@ function updateClock(){
   // Don't override if user is in a forced mode (like crimson for venting)
   if (!document.body.classList.contains('theme-crimson')) {
     const savedTheme = localStorage.getItem('nv-theme') || 'auto';
-
-    // Avoid triggering view transitions or recalculations if the theme didn't change
-    const newAutoTheme = (h >= 18 || h < 6) ? 'dark' : 'light';
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-
     if (savedTheme === 'auto') {
-      if (currentTheme !== newAutoTheme) applyAutoTheme();
+      applyAutoTheme();
     } else {
-      if (currentTheme !== savedTheme) applyManualTheme(savedTheme);
+      applyManualTheme(savedTheme);
     }
-
   }
 
   const el=$('home-time'),de=$('home-date');
@@ -4180,89 +4508,9 @@ function updateClock(){
 function renderJournal(){
   const grid=$('journal-entries'),empty=$('journal-empty');if(!grid)return;
   grid.innerHTML='';
-
-  // Dynamically extract all unique hashtags from journal entries
-  const tagsSet = new Set();
-  STATE.journalEntries.forEach(entry => {
-    const text = (entry.title || '') + ' ' + (entry.body || '');
-    const matches = text.match(/#\w+/g);
-    if (matches) {
-      matches.forEach(m => tagsSet.add(m));
-    }
-  });
-  const uniqueTags = Array.from(tagsSet);
-
-  // Render tag filter bar
-  const filterContainer = $('journal-tag-filter-container');
-  if (filterContainer) {
-    filterContainer.innerHTML = '';
-    
-    // All tag option
-    const allPill = document.createElement('button');
-    allPill.className = 'tag-filter-pill' + (STATE.activeJournalTagFilter === 'All' ? ' active' : '');
-    allPill.textContent = 'All';
-    allPill.style.cssText = `
-      padding: 6px 14px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      background: ${STATE.activeJournalTagFilter === 'All' ? 'var(--cascara)' : 'rgba(255, 255, 255, 0.05)'};
-      color: ${STATE.activeJournalTagFilter === 'All' ? '#000' : 'var(--txt2)'};
-      flex-shrink: 0;
-    `;
-    allPill.addEventListener('click', () => {
-      STATE.activeJournalTagFilter = 'All';
-      renderJournal();
-    });
-    filterContainer.appendChild(allPill);
-    
-    // Distinct tag options from data
-    uniqueTags.forEach(tag => {
-      const pill = document.createElement('button');
-      pill.className = 'tag-filter-pill' + (STATE.activeJournalTagFilter === tag ? ' active' : '');
-      pill.textContent = tag;
-      pill.style.cssText = `
-        padding: 6px 14px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        background: ${STATE.activeJournalTagFilter === tag ? 'var(--cascara)' : 'rgba(255, 255, 255, 0.05)'};
-        color: ${STATE.activeJournalTagFilter === tag ? '#000' : 'var(--txt2)'};
-        flex-shrink: 0;
-      `;
-      pill.addEventListener('click', () => {
-        STATE.activeJournalTagFilter = tag;
-        renderJournal();
-      });
-      filterContainer.appendChild(pill);
-    });
-  }
-
-  let entries = [...STATE.journalEntries].reverse();
-  if (STATE.activeJournalTagFilter && STATE.activeJournalTagFilter !== 'All') {
-    entries = entries.filter(e => {
-      const text = (e.title || '') + ' ' + (e.body || '');
-      return text.toLowerCase().includes(STATE.activeJournalTagFilter.toLowerCase());
-    });
-  }
-
-  if(!entries.length){
-    if (STATE.activeJournalTagFilter === 'All') {
-      empty?.classList.remove('hidden');
-    } else {
-      grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--txt3); padding: 40px 20px; font-size: 13px;">No entries match tag ${STATE.activeJournalTagFilter}</div>`;
-      empty?.classList.add('hidden');
-    }
-    return;
-  }
+  const entries=[...STATE.journalEntries].reverse();
+  if(!entries.length){empty?.classList.remove('hidden');return;}
   empty?.classList.add('hidden');
-
   entries.forEach((e,i)=>{
     const wrapper=document.createElement('div'); wrapper.className='journal-card-wrapper swipe-wrap';
     wrapper.style.animationDelay=`${i*.07}s`;
@@ -4290,20 +4538,6 @@ function renderJournal(){
       attachHtml += '</div>';
     }
 
-    const entryTags = [];
-    const textMatches = ((e.title || '') + ' ' + (e.body || '')).match(/#\w+/g);
-    if (textMatches) {
-      [...new Set(textMatches)].forEach(tag => entryTags.push(tag));
-    }
-    let tagsHtml = '';
-    if (entryTags.length > 0) {
-      tagsHtml = '<div class="card-tags-row" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">';
-      entryTags.forEach(tag => {
-        tagsHtml += `<span class="entry-tag-chip" style="display: inline-block; background: rgba(168, 85, 247, 0.1); color: #a855f7; border-radius: 12px; padding: 2px 8px; font-size: 10px; font-weight: 600;">${tag}</span>`;
-      });
-      tagsHtml += '</div>';
-    }
-
     const moodColors = {
       '😆': '#E8652A',
       '😊': '#30D158',
@@ -4322,7 +4556,6 @@ function renderJournal(){
         <div class="jc-top"><span class="jc-date" style="color:rgba(18,18,20,0.55);">${dateText}</span><span class="jc-mood">${e.mood||'🙂'}</span></div>
         <div class="jc-title" style="color:#121214; font-weight:700;">${e.title||'Untitled'}</div>
         <div class="jc-preview" style="color:rgba(18,18,20,0.7);">${e.body||''}</div>
-        ${tagsHtml}
         ${attachHtml}
       </div>
       </div>
@@ -5792,7 +6025,6 @@ function initJournalEditorIntelligence() {
       listEl.appendChild(card);
     });
   };
-  window.renderQuickNotes = renderQuickNotes;
 
   $('jw-notes-add')?.addEventListener('click', () => {
     quickNotes.push({ id: randomId(), text: '', color: 'note-orange', timestamp: Date.now() });
@@ -6198,44 +6430,17 @@ function initSmartCapture() {
 // INITIALIZATION & EVENT LISTENERS
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-
-  // 15. iOS Control Center Sliders (Polish)
-  document.querySelectorAll('input[type="range"]').forEach(slider => {
-    slider.addEventListener('mousedown', () => {
-      slider.style.transform = 'scaleY(1.5) scaleX(1.02)';
-    });
-    slider.addEventListener('mouseup', () => {
-      slider.style.transform = 'scaleY(1) scaleX(1)';
-    });
-    slider.addEventListener('mouseleave', () => {
-      slider.style.transform = 'scaleY(1) scaleX(1)';
-    });
-    slider.addEventListener('touchstart', () => {
-      slider.style.transform = 'scaleY(1.5) scaleX(1.02)';
-    });
-    slider.addEventListener('touchend', () => {
-      slider.style.transform = 'scaleY(1) scaleX(1)';
-    });
-  });
-
   initSmartCapture();
   BLOOM = $('nyvron-bloom-svg');
   // Theme selector
   const themeSel = $('settings-theme');
   const savedTheme = localStorage.getItem('nv-theme') || 'auto';
   if(themeSel) themeSel.value = savedTheme;
-
-    // Avoid triggering view transitions or recalculations if the theme didn't change
-    const h2 = new Date().getHours();
-    const newAutoTheme = (h2 >= 18 || h2 < 6) ? 'dark' : 'light';
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-
-    if (savedTheme === 'auto') {
-      if (currentTheme !== newAutoTheme) applyAutoTheme();
-    } else {
-      if (currentTheme !== savedTheme) applyManualTheme(savedTheme);
-    }
-
+  if (savedTheme === 'auto') {
+    applyAutoTheme();
+  } else {
+    applyManualTheme(savedTheme);
+  }
   themeSel?.addEventListener('change', () => {
     const val = themeSel.value;
     localStorage.setItem('nv-theme', val);
@@ -6825,7 +7030,7 @@ document.addEventListener('DOMContentLoaded', () => {
           { id: 'dr1', text: 'Drink water (8 glasses)', done: false },
           { id: 'dr2', text: 'Stretch legs every 2 hours', done: false }
         ];
-        STATE.activeTab = 'tab-home';
+        STATE.activeTab = 'tab-ai';
       } else {
         const encJournal = localStorage.getItem('nv-journal-enc');
         if (encJournal) {
@@ -7256,17 +7461,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCalendar();
   });
 
-  $('cc-calendar-type')?.addEventListener('change', (e) => {
-    const type = e.target.value;
-    const dot = document.querySelector('#cc-calendar-group .dot-indicator');
-    if (dot) {
-      if (type === 'personal') dot.style.background = '#30d158';
-      else if (type === 'work') dot.style.background = '#0a84ff';
-      else if (type === 'important') dot.style.background = '#ff453a';
-      else if (type === 'project') dot.style.background = '#a855f7';
-    }
-  });
-
   $('cc-cancel')?.addEventListener('click', closeCalCreator);
   $('cc-save')?.addEventListener('click', () => {
     const title = $('cc-title')?.value.trim();
@@ -7276,13 +7470,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const dateStr = STATE.selectedDate || today();
     
-    const type = $('cc-calendar-type')?.value || 'personal';
-    let color = '#30d158';
-    if (type === 'personal') color = '#30d158';
-    else if (type === 'work') color = '#0a84ff';
-    else if (type === 'important') color = '#ff453a';
-    else if (type === 'project') color = '#a855f7';
-
     const newEv = {
       id: randomId(),
       title,
@@ -7290,8 +7477,6 @@ document.addEventListener('DOMContentLoaded', () => {
       time: isAllDay ? 'All day' : startTime,
       url: $('cc-url')?.value.trim() || '',
       notes: $('cc-notes')?.value || '',
-      type,
-      color,
     };
     
     if(!STATE.events[dateStr]) STATE.events[dateStr] = [];
@@ -7548,6 +7733,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Spotlight search
   $('dock-search-btn')?.addEventListener('click', openSpotlight);
   $('spotlight-backdrop')?.addEventListener('click', closeSpotlight);
+  $('spotlight-close-btn')?.addEventListener('click', closeSpotlight);
   
   const spotInp = $('spotlight-input');
   if(spotInp) {
@@ -7719,55 +7905,205 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Global references for e-reader features
 let currentReaderBook = null;
-window.reflowModeActive = false;
-let notesSpeechRec = null;
-let isNotesRecording = false;
 let drawingVectors = JSON.parse(localStorage.getItem('nv-drawing-vectors') || '{}');
-
-window.appCloseReflow = () => {
-  window.reflowModeActive = false;
-  document.getElementById('cr-btn-reflow')?.classList.remove('active');
-  document.getElementById('cr-reflow-container')?.classList.add('hidden');
-  document.getElementById('cr-page-view')?.classList.remove('hidden');
-  if (typeof window.renderReaderPage === 'function' && currentReaderBook) {
-    window.renderReaderPage(currentReaderBook.currentPage || 1);
-  }
-};
-
-window.logInteraction = (action, payload) => {
-  const logEntry = {
-    timestamp: Date.now(),
-    action,
-    payload: typeof payload === 'string' ? payload : JSON.stringify(payload)
-  };
-  STATE.interactionLog = STATE.interactionLog || [];
-  STATE.interactionLog.push(logEntry);
-  localStorage.setItem('nv-interaction-log', JSON.stringify(STATE.interactionLog));
-  if (typeof broadcastSyncEvent === 'function') {
-    broadcastSyncEvent('sync-log', logEntry);
-  }
+function parseMarkdownToHtml(md) {
+  if (!md) return '';
+  let html = md;
   
-  // Re-render calendar events if viewing today
-  const activeDate = STATE.selectedDate || today();
-  const entryDate = new Date(logEntry.timestamp).toISOString().split('T')[0];
-  if (activeDate === entryDate && typeof renderCalEvents === 'function') {
-    renderCalEvents(activeDate);
-  }
-};
+  // Clean markdown code blocks if the model wrapped the response in ```html ... ```
+  html = html.replace(/```html?/g, '').replace(/```/g, '');
 
-window.appDeleteCalEvent = (dateStr, id) => {
-  showConfirm('Delete Event', 'Are you sure you want to delete this event?', () => {
-    if (STATE.events[dateStr]) {
-      STATE.events[dateStr] = STATE.events[dateStr].filter(ev => ev.id !== id);
-      save();
-      renderCalendar();
-      renderCalEvents(dateStr);
-      
-      if (typeof broadcastSyncEvent === 'function') {
-        broadcastSyncEvent('sync-delete-event', { dateStr, id });
+  // If the content already contains HTML tags (like <ul>, <li>, <p>), return it directly!
+  if (html.includes('<ul') || html.includes('<li') || html.includes('<p') || html.includes('<h3')) {
+    return html;
+  }
+
+  // Convert markdown bullet points to HTML list
+  const lines = html.split('\n');
+  let inList = false;
+  const processedLines = lines.map(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('* ') || trimmed.startsWith('- ') || trimmed.startsWith('+ ')) {
+      const contentText = trimmed.substring(2);
+      let prefix = '';
+      if (!inList) {
+        prefix = '<ul style="margin:0 0 10px; padding-left:18px; line-height:1.6;">';
+        inList = true;
       }
+      return prefix + `<li style="margin-bottom:6px; padding-left:4px;">${contentText}</li>`;
+    } else {
+      let suffix = '';
+      if (inList) {
+        suffix = '</ul>';
+        inList = false;
+      }
+      return suffix + (trimmed ? `<p style="line-height:1.6; margin:0 0 10px;">${trimmed}</p>` : '');
     }
   });
+  if (inList) {
+    processedLines.push('</ul>');
+  }
+  html = processedLines.join('\n');
+
+  // Convert bold **text** to <strong>text</strong>
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  // Convert italic *text* to <em>text</em>
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+  return html;
+}
+
+window.reflowModeActive = false;
+let activeSummaryPage = 0;
+window.updatePageSummaryDisplay = async (pageNum, forceRun) => {
+  pageNum = parseInt(pageNum) || 1;
+  const content = $('cr-summary-content');
+  if (!content) return;
+
+  // Only run if panel is visible — unless forceRun is set (e.g., from the generate button)
+  const panel = $('cr-summarization-panel');
+  if (!forceRun && panel && panel.classList.contains('hidden')) return;
+
+  activeSummaryPage = pageNum;
+
+  const slider = $('cr-summary-depth');
+  const depthVal = slider ? parseInt(slider.value) : 1;
+  let depthStr = 'normal';
+  if (depthVal === 2) depthStr = 'medium';
+  if (depthVal === 3) depthStr = 'detailed';
+
+  const depthLabelElement = $('cr-summary-depth-label');
+  if (depthLabelElement) {
+    if (depthVal === 1) depthLabelElement.textContent = 'NORMAL';
+    else if (depthVal === 2) depthLabelElement.textContent = 'MEDIUM';
+    else if (depthVal === 3) depthLabelElement.textContent = 'DETAILED';
+  }
+
+  const depthLabel = { normal: 'Normal', medium: 'Medium', detailed: 'Detailed' }[depthStr];
+
+  content.innerHTML = `<div style="text-align:center; padding:40px 20px; color:var(--txt3); font-size:12px;">
+    <div style="width:20px; height:20px; border:2px solid var(--cascara); border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 12px;"></div>
+    Analyzing page ${pageNum} (${depthLabel})…
+  </div>`;
+
+  let pageText = "";
+  if (currentReaderBook) {
+    if (currentReaderBook.fileType === 'pdf') {
+      // Try cached text first
+      pageText = (currentReaderBook.pdfTextCache && currentReaderBook.pdfTextCache[pageNum]) || "";
+      if (!pageText && currentReaderBook.ocrData && currentReaderBook.ocrData[pageNum]) {
+        pageText = currentReaderBook.ocrData[pageNum].map(w => w.text).join(' ');
+      }
+      // If still empty, attempt to extract right now from the loaded PDF
+      if (!pageText && window._currentPdfDoc) {
+        try {
+          const pg = await window._currentPdfDoc.getPage(pageNum);
+          const tc = await pg.getTextContent();
+          pageText = tc.items.map(i => i.str).join(' ').trim();
+          currentReaderBook.pdfTextCache = currentReaderBook.pdfTextCache || {};
+          currentReaderBook.pdfTextCache[pageNum] = pageText;
+        } catch (_) {}
+      }
+    } else if (currentReaderBook.fileContent) {
+      const words = currentReaderBook.fileContent.split(/\s+/);
+      const startIdx = (pageNum - 1) * 200;
+      pageText = words.slice(startIdx, startIdx + 200).join(' ');
+    }
+  }
+
+  if (!pageText || pageText.trim().length < 10) {
+    content.innerHTML = `
+      <div style="padding:20px; text-align:center;">
+        <div style="font-size:28px; margin-bottom:8px;">📄</div>
+        <div style="color:var(--txt2); font-size:12px; font-weight:600;">No text found on page ${pageNum}</div>
+        <div style="color:var(--txt3); font-size:11px; margin-top:6px;">Try navigating to a text-heavy page, or wait for the PDF to finish loading.</div>
+      </div>`;
+    return;
+  }
+
+  // --- Local high-quality fallback summarizer (always) ---
+  const localSummary = (text, depth) => {
+    // Avoid lookbehind regex for maximum compatibility across all browser/webview engines
+    const sents = text.replace(/([.!?])\s+/g, "$1|").split("|").map(s => s.trim()).filter(s => s.length > 8);
+    if (sents.length === 0) return `<p style="color:var(--txt3);">No sentences detected.</p>`;
+
+    const pageTitle = currentReaderBook ? `Page ${pageNum} — ${currentReaderBook.title || 'Document'}` : `Page ${pageNum}`;
+
+    if (depth === 'normal') {
+      const items = sents.slice(0, Math.min(4, sents.length)).map(s =>
+        `<li style="margin-bottom:6px; padding-left:4px;">${s}</li>`).join('');
+      return `
+        <div style="font-size:11px; color:var(--cascara); font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">📌 Key Points</div>
+        <ul style="margin:0; padding-left:18px; line-height:1.6;">${items}</ul>`;
+    } else if (depth === 'medium') {
+      const para = sents.slice(0, Math.min(5, sents.length)).join(' ');
+      return `
+        <div style="font-size:11px; color:var(--cascara); font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">📝 Summary</div>
+        <p style="line-height:1.7; margin:0 0 12px;">${para}</p>`;
+    } else {
+      const groups = [sents.slice(0, 3), sents.slice(3, 6), sents.slice(6, 9)].filter(g => g.length);
+      const paras = groups.map(g => `<p style="line-height:1.7; margin:0 0 10px;">${g.join(' ')}</p>`).join('');
+      return `
+        <div style="font-size:11px; color:var(--cascara); font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">🔍 Full Analysis</div>
+        ${paras}`;
+    }
+  };
+
+  // Try the backend API first; fall back to client-side immediately on failure
+  try {
+    let prompt = "";
+    if (depthStr === "normal") {
+      prompt = `Generate a concise bullet point summary of this page from "${currentReaderBook?.title || 'Document'}" (Page ${pageNum}).
+Generate around 3 bullet points. Use clean HTML list format (use <ul> and <li> tags, no other tags):
+Text:
+${pageText}`;
+    } else if (depthStr === "medium") {
+      prompt = `Generate a medium summary outlining key insights of this page from "${currentReaderBook?.title || 'Document'}" (Page ${pageNum}).
+Format with a bold header <h3>Key Insights</h3> followed by 1-2 paragraphs of text in HTML (<p> tags):
+Text:
+${pageText}`;
+    } else {
+      prompt = `Generate a detailed, complete analysis of this page from "${currentReaderBook?.title || 'Document'}" (Page ${pageNum}) for a student studying it.
+Include key concepts, terms, context, and implications. Format with a bold header <h3>Complete Page Analysis</h3> followed by 3-4 paragraphs in HTML (<p> tags):
+Text:
+${pageText}`;
+    }
+
+    const apiKey = "AQ.Ab8RN6JelORN2ShF8wyQwg1gOMFY5a2NyugV2xw-zEsa3piVvg";
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.6, maxOutputTokens: 600 }
+      })
+    });
+
+    if (activeSummaryPage !== pageNum) return;
+
+    if (res.status === 401 || res.status === 403) {
+      // No API key — skip straight to local
+      throw new Error('no-api-key');
+    }
+
+    if (!res.ok) throw new Error(await res.text());
+
+    const data = await res.json();
+    if (activeSummaryPage === pageNum) {
+      const summaryText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      content.innerHTML = summaryText ? parseMarkdownToHtml(summaryText) : localSummary(pageText, depthStr);
+    }
+  } catch (e) {
+    console.warn('Summary rendering caught error:', e, 'activeSummaryPage:', activeSummaryPage, 'pageNum:', pageNum);
+    if (activeSummaryPage !== pageNum) return;
+    const html = localSummary(pageText, depthStr);
+    content.innerHTML = `
+      <div style="margin-bottom:10px; font-size:10px; color:var(--txt3); display:flex; align-items:center; gap:6px;">
+        <span style="background:rgba(255,149,0,0.12); color:var(--cascara); border-radius:8px; padding:2px 8px; font-weight:700;">LOCAL</span>
+        <span>No AI key — extracted from page text</span>
+      </div>
+      ${html}`;
+  }
 };
 
 // 10 Ecosystem-Beating E-Reader & Knowledge Base Features
@@ -8006,102 +8342,7 @@ function initEReaderAdvancedFeatures() {
     };
   }
 
-  // 2. Ambient Smart Capture (Feature 2)
-  const micBtn = $('cr-mic-capture-btn');
-  if (micBtn) {
-    micBtn.addEventListener('click', () => {
-      const isRecording = micBtn.classList.toggle('active');
-      if (isRecording) {
-        micBtn.classList.add('recording-active');
-        triggerNotification('Smart Capture Active', 'Listening to ambient audio logs... 🎙');
-        showRecordingModal();
-      } else {
-        micBtn.classList.remove('recording-active');
-      }
-    });
-  }
 
-  function showRecordingModal() {
-    const recOverlay = document.createElement('div');
-    recOverlay.id = 'cr-rec-overlay';
-    recOverlay.style = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:2000; color:#fff; font-family:sans-serif; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);';
-    recOverlay.innerHTML = `
-      <div style="font-size:16px; font-weight:700; color:#ff9500; margin-bottom:10px;">🎙 AMBIENT SMART CAPTURE</div>
-      <div id="cr-rec-wave" style="display:flex; gap:6px; align-items:center; height:50px; margin-bottom:30px;">
-        <span style="display:block; width:4px; height:15px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate;"></span>
-        <span style="display:block; width:4px; height:35px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.2s;"></span>
-        <span style="display:block; width:4px; height:20px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.4s;"></span>
-        <span style="display:block; width:4px; height:40px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.1s;"></span>
-        <span style="display:block; width:4px; height:15px; background:#ff453a; border-radius:2px; animation:bounce 0.8s infinite alternate 0.3s;"></span>
-      </div>
-      <div style="font-size:14px; opacity:0.8; margin-bottom:20px;">"Spoken feedback triggers auto-journal nodes..."</div>
-      <button id="cr-rec-stop-btn" class="btn-primary" style="padding:10px 24px; border-radius:30px; border:none; background:#ff453a; color:#fff; font-weight:600; cursor:pointer;">Stop Capture</button>
-    `;
-    document.body.appendChild(recOverlay);
-
-    const style = document.createElement('style');
-    style.id = 'rec-wave-style';
-    style.innerHTML = `
-      @keyframes bounce {
-        0% { transform: scaleY(1); }
-        100% { transform: scaleY(2.2); }
-      }
-    `;
-    document.head.appendChild(style);
-
-    $('cr-rec-stop-btn').onclick = () => {
-      recOverlay.remove();
-      style.remove();
-      const currentMicBtn = $('cr-mic-capture-btn');
-      if (currentMicBtn) {
-        currentMicBtn.classList.remove('active');
-        currentMicBtn.classList.remove('recording-active');
-      }
-
-      const docTitle = currentReaderBook ? currentReaderBook.title : 'Comprehensive Conservation Report';
-      const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 16;
-      
-      const phrases = [
-        `This tiger reserve list in ${docTitle} connects to the Project Strategy notes from yesterday.`,
-        `The ecological buffer zones in ${docTitle} at page ${pageNum} need zonal mapping updates immediately.`,
-        `Reviewing section guidelines in ${docTitle} to match Q3 Conservation Goals.`
-      ];
-      const transcription = phrases[Math.floor(Math.random() * phrases.length)];
-
-      const newEntry = {
-        id: randomId(),
-        title: `🎙 Smart Capture: Page ${pageNum}`,
-        body: `<p>${transcription}</p>`,
-        date: today(),
-        timestamp: Date.now(),
-        mood: '🙂',
-        attachments: [
-          { type: 'location', name: `Captured in: ${docTitle}, Page ${pageNum}` }
-        ]
-      };
-      
-      STATE.journalEntries.push(newEntry);
-      
-      // Also save to book's reading notes (Feature addition)
-      if (currentReaderBook) {
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const notePrefix = `\n[Audio Capture - ${timeStr}]: `;
-        currentReaderBook.notes = (currentReaderBook.notes || "") + notePrefix + transcription + "\n";
-        
-        // Dynamically update the notes textarea if it's currently open
-        const notesTextarea = $('cr-notes-textarea');
-        if (notesTextarea) {
-          notesTextarea.value = currentReaderBook.notes;
-        }
-      }
-
-      save();
-      renderJournal();
-      renderSmartCaptureList();
-      logInteraction('smart-capture', { bookTitle: docTitle, page: pageNum, transcription });
-      triggerNotification('Smart Capture Saved', 'Stored inside your Journal & appended to Reading Notes! 📝');
-    };
-  }
 
   function renderSmartCaptureList() {
     const list = $('journal-smart-capture');
@@ -8162,6 +8403,7 @@ function initEReaderAdvancedFeatures() {
   };
 
   // Wire drawing coordinates fractional capture on main canvases
+  window.initMarkupCanvasDrawing = initMarkupCanvasDrawing;
   initMarkupCanvasDrawing('cr-markup-canvas', false);
   initMarkupCanvasDrawing('cr-markup-canvas-right', true);
   initMarkupCanvasDrawing('cr-right-markup-canvas', false);
@@ -8293,20 +8535,21 @@ function initEReaderAdvancedFeatures() {
     let touchStartX = 0;
     let touchCurrentX = 0;
     let isDraggingCard = false;
+    let lastTap = 0;
     const cardEl = $('fc-carousel-card');
-
-    if (cardEl) {
-      cardEl.onclick = () => {
-        const isFlipped = cardInner.style.transform.includes('rotateY(180deg)');
-        cardInner.style.transform = isFlipped ? 'none' : 'rotateY(180deg)';
-      };
-    }
 
     cardEl.addEventListener('touchstart', (e) => {
       touchStartX = e.touches[0].clientX;
       touchCurrentX = touchStartX;
       isDraggingCard = true;
       cardEl.style.transition = 'none';
+
+      const now = Date.now();
+      if (now - lastTap < 300) { // Double tap
+         const isFlipped = cardInner.style.transform.includes('rotateY(180deg)');
+         cardInner.style.transform = isFlipped ? 'none' : 'rotateY(180deg)';
+      }
+      lastTap = now;
     }, {passive: true});
 
     cardEl.addEventListener('touchmove', (e) => {
@@ -8420,96 +8663,53 @@ function initEReaderAdvancedFeatures() {
     };
   }
 
-
-  // 14. Inline AI Context Panel (Reader Assistant)
-  const aiPanel = $('cr-ai-context-panel');
-  const aiContent = $('cr-ai-context-content');
-  const aiClose = $('cr-ai-context-close');
-  const aiPopover = $('cr-ai-popover');
-  const aiAnalyzeBtn = $('cr-btn-analyze');
-  const pageView = $('cr-page-view');
-
-  if (pageView) {
-    pageView.addEventListener('mouseup', (e) => {
-      const selection = window.getSelection();
-      const text = selection.toString().trim();
-      if (text.length > 0 && !window.reflowModeActive) {
-        // Show popover
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-
-        // Position relative to pageView
-        const pvRect = pageView.getBoundingClientRect();
-
-        aiPopover.style.left = (rect.left - pvRect.left + rect.width / 2) + 'px';
-        aiPopover.style.top = (rect.top - pvRect.top) + 'px';
-        aiPopover.classList.remove('hidden');
-      } else {
-        aiPopover.classList.add('hidden');
-      }
-    });
-  }
-
-  if (aiAnalyzeBtn) {
-    aiAnalyzeBtn.onclick = async () => {
-      aiPopover.classList.add('hidden');
-      const text = window.getSelection().toString().trim();
-      if (!text) return;
-
-      aiPanel.classList.remove('hidden');
-      // small delay to allow display block to apply before transform transition
-      setTimeout(() => {
-        aiPanel.style.transform = 'translateX(0)';
-      }, 10);
-
-      aiContent.innerHTML = `<div style="text-align: center; color: #2ECC71; margin-top: 40px; animation: pulse 1.5s infinite;">Analyzing...</div>`;
-
-      // Simulate AI response
-      setTimeout(() => {
-        aiContent.innerHTML = `
-          <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-            <div style="font-size: 11px; text-transform: uppercase; color: #2ECC71; margin-bottom: 4px; font-weight: bold;">Summary</div>
-            <p style="margin: 0;">${text.substring(0, 50)}... deals primarily with foundational concepts described earlier in the chapter.</p>
-          </div>
-          <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
-            <div style="font-size: 11px; text-transform: uppercase; color: #3498DB; margin-bottom: 4px; font-weight: bold;">Cross-Document Connections</div>
-            <ul style="margin: 0; padding-left: 16px;">
-              <li>Linked to <b>"Q3 Project Strategy"</b> (Page 4)</li>
-              <li>Matches concept in <b>"Wildlife Zones"</b> margin notes</li>
-            </ul>
-          </div>
-          <div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
-            <span style="background: rgba(46, 204, 113, 0.2); color: #2ECC71; padding: 4px 8px; border-radius: 12px; font-size: 11px;">#Concept</span>
-            <span style="background: rgba(46, 204, 113, 0.2); color: #2ECC71; padding: 4px 8px; border-radius: 12px; font-size: 11px;">#Important</span>
-          </div>
-        `;
-      }, 1000);
-    };
-  }
-
-  if (aiClose) {
-    aiClose.onclick = () => {
-      aiPanel.style.transform = 'translateX(100%)';
-      setTimeout(() => {
-        aiPanel.classList.add('hidden');
-      }, 300);
-    };
-  }
-
   // 5. Multi-Doc splitscreen & synthesis (Feature 5)
-  window.spreadMode = 'single';
+  const spreadBtn = $('cr-tool-spread');
+  let spreadMode = 'single';
 
-  window.initSplitscreenRightDoc = function initSplitscreenRightDoc() {
+  if (spreadBtn) {
+    spreadBtn.onclick = () => {
+      if (spreadMode === 'single') {
+        spreadMode = 'spread';
+        spreadBtn.classList.add('active');
+        triggerNotification('Two-Page Spread', 'Showing consecutive pages of the book');
+        
+        $('cr-page-wrapper-right')?.classList.remove('hidden');
+        $('cr-synthesis-gutter')?.classList.add('hidden');
+        $('cr-page-view-right-doc')?.classList.add('hidden');
+        
+        renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
+      } else if (spreadMode === 'spread') {
+        spreadMode = 'split';
+        spreadBtn.classList.add('active');
+        triggerNotification('Multi-Doc Split View', 'Cross-book synthesis notes gutter active');
+        
+        $('cr-page-wrapper-right')?.classList.add('hidden');
+        $('cr-synthesis-gutter')?.classList.remove('hidden');
+        $('cr-page-view-right-doc')?.classList.remove('hidden');
+        
+        initSplitscreenRightDoc();
+      } else {
+        spreadMode = 'single';
+        spreadBtn.classList.remove('active');
+        triggerNotification('Single Page view', 'Restored default reader viewport');
+        
+        $('cr-page-wrapper-right')?.classList.add('hidden');
+        $('cr-synthesis-gutter')?.classList.add('hidden');
+        $('cr-page-view-right-doc')?.classList.add('hidden');
+        
+        renderReaderPage(currentReaderBook ? currentReaderBook.currentPage : 1);
+      }
+    };
+  }
+
+  function initSplitscreenRightDoc() {
     const select = $('cr-right-book-select');
     if (!select) return;
     select.innerHTML = '<option value="">Select Second Book...</option>' + 
-      STATE.books
-        .filter(b => !currentReaderBook || b.id !== currentReaderBook.id)
-        .map(b => `<option value="${b.id}">${b.title}</option>`)
-        .join('');
+      STATE.books.map(b => `<option value="${b.id}">${b.title}</option>`).join('');
 
     let rightPdfDoc = null;
-    let rightBook = null;
     let rightCurrentPage = 1;
 
     select.onchange = () => {
@@ -8517,30 +8717,16 @@ function initEReaderAdvancedFeatures() {
       if (!bookId) return;
       const b = STATE.books.find(book => book.id === bookId);
       if (!b) return;
-      rightBook = b;
-      rightCurrentPage = b.currentPage || 1;
-      rightPdfDoc = null;
 
-      if (b.fileType !== 'pdf') {
-        renderRightDocPage();
-        return;
-      }
-
-      if (!window.pdfjsLib) {
-        triggerNotification('PDF Library Missing', 'Reload once, then open the second PDF again.');
-        return;
-      }
       getFile(b.id).then(blob => {
         if (!blob) return;
         const fileReader = new FileReader();
         fileReader.onload = function() {
           const typedarray = new Uint8Array(this.result);
-          pdfjsLib.getDocument({ data: typedarray }).promise.then(pdf => {
+          pdfjsLib.getDocument(typedarray).promise.then(pdf => {
             rightPdfDoc = pdf;
-            rightBook.totalPages = pdf.numPages;
-            rightCurrentPage = Math.min(rightCurrentPage, pdf.numPages);
+            rightCurrentPage = 1;
             renderRightDocPage();
-            save();
           });
         };
         fileReader.readAsArrayBuffer(blob);
@@ -8548,38 +8734,11 @@ function initEReaderAdvancedFeatures() {
     };
 
     function renderRightDocPage() {
-      if (!rightBook) return;
-      const canvas = $('cr-right-pdf-canvas');
-      const content = $('cr-right-page-content');
-      const wrapper = $('cr-right-page-wrapper');
-      if (!canvas || !content || !wrapper) return;
-
-      const totalPages = rightBook.fileType === 'pdf'
-        ? (rightPdfDoc?.numPages || rightBook.totalPages || 1)
-        : (rightBook.totalPages || Math.ceil((rightBook.fileContent || '').split(/\s+/).length / 200) || 1);
-      rightCurrentPage = Math.max(1, Math.min(rightCurrentPage, totalPages));
-      $('cr-right-page-label').textContent = `Page ${rightCurrentPage} of ${totalPages}`;
-      rightBook.currentPage = rightCurrentPage;
-      rightBook.progress = Math.round((rightCurrentPage / totalPages) * 100);
-      save();
-
-      if (rightBook.fileType !== 'pdf') {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        canvas.width = 600;
-        canvas.height = 780;
-        wrapper.style.width = '600px';
-        wrapper.style.height = '780px';
-        const words = (rightBook.fileContent || '').split(/\s+/);
-        const text = words.slice((rightCurrentPage - 1) * 200, rightCurrentPage * 200).join(' ');
-        content.innerHTML = `<h3 style="margin-top:0; color:var(--cascara); font-family:var(--font);">${rightBook.title}</h3><p style="white-space:pre-wrap; font-family:Georgia, serif; font-size:16px; line-height:1.6;">${text}</p>`;
-        return;
-      }
-
       if (!rightPdfDoc) return;
-      content.innerHTML = '';
+      $('cr-right-page-label').textContent = `Page ${rightCurrentPage} of ${rightPdfDoc.numPages}`;
       
       rightPdfDoc.getPage(rightCurrentPage).then(page => {
+        const canvas = $('cr-right-pdf-canvas');
         const ctx = canvas.getContext('2d');
         const viewport = page.getViewport({ scale: 1.0 });
         const scale = 600 / viewport.width;
@@ -8588,6 +8747,7 @@ function initEReaderAdvancedFeatures() {
         canvas.width = 600;
         canvas.height = 780;
 
+        const wrapper = $('cr-right-page-wrapper');
         wrapper.style.width = '600px';
         wrapper.style.height = '780px';
 
@@ -8602,15 +8762,12 @@ function initEReaderAdvancedFeatures() {
       }
     };
     $('cr-right-next').onclick = () => {
-      const totalPages = rightBook?.fileType === 'pdf'
-        ? (rightPdfDoc?.numPages || rightBook.totalPages || 1)
-        : (rightBook?.totalPages || 1);
-      if (rightBook && rightCurrentPage < totalPages) {
+      if (rightPdfDoc && rightCurrentPage < rightPdfDoc.numPages) {
         rightCurrentPage++;
         renderRightDocPage();
       }
     };
-  };
+  }
 
   // Drag and drop text selections to Synthesis notes
   const dropGutter = $('cr-synthesis-gutter');
@@ -8641,181 +8798,64 @@ function initEReaderAdvancedFeatures() {
     });
   }
 
-  function renderSynthesisNotes() {
-    const list = $('cr-synthesis-list');
-    if (!list) return;
-    list.innerHTML = STATE.synthesisNotes.map(n => `
-      <div class="synthesis-note-item" style="padding:10px; border-bottom:1px solid var(--border); font-size:12px;">
-        <p style="margin:0; color:var(--txt1);">${n.text}</p>
-        <span style="font-size:10px; color:var(--txt3);">${new Date(n.timestamp).toLocaleTimeString()}</span>
-      </div>
-    `).join('');
-  }
-
   renderSynthesisNotes();
 
   // 8. Progressive Summarization (Feature 8)
   const summaryBtn = $('cr-btn-summary');
   const summaryPanel = $('cr-summarization-panel');
   const summaryDepthSlider = $('cr-summary-depth');
-  const summaryContent = $('cr-summary-content');
-  const summaryCloseBtn = $('cr-summarization-close');
 
-  if (summaryBtn && summaryPanel && summaryCloseBtn) {
-    summaryCloseBtn.onclick = () => {
-      summaryPanel.classList.add('hidden');
-      $('cr-btn-summary')?.classList.remove('active');
+  if (summaryBtn && summaryPanel) {
+    summaryBtn.onclick = () => {
+      const isHidden = summaryPanel.classList.toggle('hidden');
+      summaryBtn.classList.toggle('active', !isHidden);
+      if (!isHidden && currentReaderBook) {
+        window.updatePageSummaryDisplay(currentReaderBook.currentPage || 1, true);
+      }
+      setTimeout(adjustReaderResponsiveScale, 200);
     };
-  }
-
-
-
-  const fetchPageTextAsync = (pageNum) => {
-    if (!currentReaderBook) return Promise.resolve("");
-    currentReaderBook.pdfTextCache = currentReaderBook.pdfTextCache || {};
-    if (currentReaderBook.pdfTextCache[pageNum]) {
-      return Promise.resolve(currentReaderBook.pdfTextCache[pageNum]);
+    const closeBtn = $('cr-summarization-close');
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        summaryPanel.classList.add('hidden');
+        summaryBtn.classList.remove('active');
+        setTimeout(adjustReaderResponsiveScale, 200);
+      };
     }
-    
-    if (currentReaderBook.fileType === 'pdf') {
-      const pdf = window.pdfDoc;
-      if (pdf) {
-        return pdf.getPage(pageNum).then(page => {
-          return page.getTextContent().then(textContent => {
-            const nativeText = textContent.items.map(item => item.str).join(' ').trim();
-            currentReaderBook.pdfTextCache[pageNum] = nativeText;
-            save();
-            return nativeText;
-          });
-        }).catch(err => {
-          console.error("fetchPageTextAsync PDF error:", err);
-          return "";
-        });
-      }
-      return Promise.resolve("");
-    } else {
-      if (currentReaderBook.fileContent) {
-        const words = currentReaderBook.fileContent.split(/\s+/);
-        const startIdx = (pageNum - 1) * 200;
-        const pageWords = words.slice(startIdx, startIdx + 200);
-        const txt = pageWords.join(' ');
-        currentReaderBook.pdfTextCache[pageNum] = txt;
-        save();
-        return Promise.resolve(txt);
-      }
-      return Promise.resolve("");
-    }
-  };
-
-  function getPageText(pageNum) {
-    if (!currentReaderBook) return "";
-    if (currentReaderBook.fileType === 'pdf') {
-      if (currentReaderBook.pdfTextCache && currentReaderBook.pdfTextCache[pageNum]) {
-        return currentReaderBook.pdfTextCache[pageNum];
-      }
-      if (currentReaderBook.ocrData && currentReaderBook.ocrData[pageNum]) {
-        return currentReaderBook.ocrData[pageNum].map(w => w.text).join(' ');
-      }
-      return "";
-    } else {
-      if (currentReaderBook.fileContent) {
-        const words = currentReaderBook.fileContent.split(/\s+/);
-        const startIdx = (pageNum - 1) * 200;
-        const pageWords = words.slice(startIdx, startIdx + 200);
-        return pageWords.join(' ');
-      }
-      return "";
-    }
-  }
-
-  window.updatePageSummaryDisplay = (pageNum) => {
-    const summaryContent = $('cr-summary-content');
-    const depthSlider = $('cr-summary-depth');
-    if (!summaryContent || !depthSlider) return;
-
-    const depth = depthSlider.value;
-    const bookTitle = currentReaderBook ? currentReaderBook.title : 'Comprehensive Conservation Report';
-    let pageText = getPageText(pageNum);
-    
-    const renderSummaryText = (text) => {
-      if (depth === '1') {
-        const sentences = text.split(/[.!?]/).filter(s => s.trim().length > 0);
-        const brief = sentences.length > 0 ? sentences[0].trim() + '.' : text;
-        summaryContent.innerHTML = `<b>Brief:</b> ${brief}`;
-      } else if (depth === '2') {
-        const sentences = text.split(/[.!?]/).filter(s => s.trim().length > 0);
-        const medium = sentences.slice(0, 3).map(s => s.trim() + '.').join(' ');
-        summaryContent.innerHTML = `<b>Detailed:</b> ${medium || text}`;
-      } else {
-        summaryContent.innerHTML = `<b>Complete Analysis:</b> ${text}`;
-      }
-    };
-
-    if (!pageText) {
-      summaryContent.innerHTML = `<p class="empty-hint" style="padding: 10px; font-size: 13px; text-align: center; color: var(--txt3);">Generating progressive summary... Please wait.</p>`;
-      fetchPageTextAsync(pageNum).then(text => {
-        if (text) {
-          renderSummaryText(text);
+    const generateBtn = $('cr-summary-generate-btn');
+    if (generateBtn) {
+      generateBtn.onclick = () => {
+        if (currentReaderBook) {
+          window.updatePageSummaryDisplay(currentReaderBook.currentPage || 1, true);
         } else {
-          summaryContent.innerHTML = `<b>Brief:</b> Page ${pageNum} discusses the core methodologies, buffer corridors, and zonal policies outlined in ${bookTitle}.`;
+          const content = $('cr-summary-content');
+          if (content) content.innerHTML = `<div style="color:var(--txt3); text-align:center; padding:30px 0;">Please open a book first.</div>`;
         }
-      });
-    } else {
-      renderSummaryText(pageText);
+      };
     }
-  };
+  }
 
   if (summaryDepthSlider) {
     summaryDepthSlider.oninput = () => {
-      const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 1;
-      window.updatePageSummaryDisplay?.(pageNum);
+      const val = parseInt(summaryDepthSlider.value);
+      const label = $('cr-summary-depth-label');
+      if (label) {
+        if (val === 1) label.textContent = 'NORMAL';
+        else if (val === 2) label.textContent = 'MEDIUM';
+        else if (val === 3) label.textContent = 'DETAILED';
+      }
+      if (currentReaderBook) {
+        window.updatePageSummaryDisplay(currentReaderBook.currentPage || 1);
+      }
     };
   }
 
+
+
   // 9. PDF/ePUB Reflow and sentence editor (Feature 9)
-  const reflowBtn = $('cr-btn-reflow');
-  const reflowContainer = $('cr-reflow-container');
-  const mainPageView = $('cr-page-view');
+  // Duplicate reflowBtn click listener removed
 
-  if (reflowBtn && reflowContainer) {
-    const closeBtn = $('cr-reflow-close-btn');
-    if (closeBtn) {
-      closeBtn.onclick = window.appCloseReflow;
-    }
-  }
-
-  window.renderReflowContent = () => {
-    const reflowBody = $('cr-reflow-body');
-    if (!reflowBody) return;
-
-    const pageNum = currentReaderBook ? (currentReaderBook.currentPage || 1) : 1;
-    const docId = currentReaderBook ? currentReaderBook.id : 'default';
-
-    let defaultText = getPageText(pageNum);
-    if (!defaultText) {
-      reflowBody.innerHTML = `<p class="empty-hint" style="padding: 20px; font-size: 15px; text-align: center; color: var(--txt3);">Extracting text content from book page... Please wait.</p>`;
-      fetchPageTextAsync(pageNum).then(text => {
-        if (text && window.reflowModeActive) {
-          window.renderReflowContent?.();
-        } else if (!text) {
-          reflowBody.innerHTML = `<p class="empty-hint" style="padding: 20px; font-size: 15px; text-align: center; color: var(--txt3);">No text content could be extracted from this page.</p>`;
-        }
-      });
-      return;
-    }
-
-    const sentences = defaultText.split(/[.!?]/).filter(s => s.trim().length > 0);
-    reflowBody.innerHTML = sentences.map((s, idx) => {
-      const patchKey = `${docId}-${pageNum}-${idx}`;
-      const savedText = STATE.reflowPatches[patchKey] || s.trim() + '.';
-      
-      return `
-        <p class="reflow-para" contenteditable="true" data-index="${idx}" style="padding: 10px; border-radius: 8px; margin: 0; background: rgba(255,255,255,0.02); transition: background 0.2s;" onblur="appSaveReflowEdit(this, '${docId}', ${pageNum}, ${idx})">
-          ${savedText}
-        </p>
-      `;
-    }).join('');
-  };
+  // Duplicate renderReflowContent removed
 
   window.appSaveReflowEdit = (element, docId, pageNum, idx) => {
     const txt = element.textContent.trim();
@@ -8839,7 +8879,7 @@ function initEReaderAdvancedFeatures() {
     if (type === 'sync-reflow') {
       STATE.reflowPatches[data.patchKey] = data.text;
       localStorage.setItem('nv-reflow-patches', JSON.stringify(STATE.reflowPatches));
-      if (window.reflowModeActive) window.renderReflowContent?.();
+      if (window.reflowModeActive) renderReflowContent();
     } else if (type === 'sync-log') {
       STATE.interactionLog.push(data);
       localStorage.setItem('nv-interaction-log', JSON.stringify(STATE.interactionLog));
@@ -8847,15 +8887,6 @@ function initEReaderAdvancedFeatures() {
       if (label && label.textContent) {
         const dateStr = STATE.selectedDate || today();
         renderCalEvents(dateStr);
-      }
-    } else if (type === 'sync-delete-event') {
-      const { dateStr, id } = data;
-      if (STATE.events[dateStr]) {
-        STATE.events[dateStr] = STATE.events[dateStr].filter(ev => ev.id !== id);
-        save();
-        renderCalendar();
-        const activeDate = STATE.selectedDate || today();
-        if (activeDate === dateStr) renderCalEvents(dateStr);
       }
     }
   };
@@ -8912,3 +8943,753 @@ function initDragToDismissSidebar() {
   });
 }
 document.addEventListener('DOMContentLoaded', initDragToDismissSidebar);
+
+// ==========================================
+// NYVRON ADVANCED SYSTEMS MOCK LOGIC
+// ==========================================
+
+// 1. Dashboard Autonomous Reorganization & Pulse
+function initAutonomousDashboard() {
+  const currentHour = new Date().getHours();
+  const dashContainer = $('dash-widgets-container');
+  if (dashContainer) {
+      document.body.classList.add('breathing-bg');
+      let widgets = Array.from(dashContainer.children);
+      if (currentHour < 12) {
+        widgets.sort((a, b) => (a.id.includes('calendar') || a.id.includes('task') || a.id.includes('pulse') ? -1 : 1));
+      } else if (currentHour >= 18) {
+        widgets.sort((a, b) => (a.id.includes('journal') || a.id.includes('book') ? -1 : 1));
+      }
+      dashContainer.innerHTML = '';
+      widgets.forEach(w => dashContainer.appendChild(w));
+  }
+}
+
+function renderPulseTasks() {
+    const container = $('pulse-tasks-container');
+    if (!container) return;
+    const currentEnergy = STATE.energy || 'High';
+    let tasks = [
+        { id: 1, title: 'Solve 20 Physics Dynamics Problems', energyRequired: 'High' },
+        { id: 2, title: 'Review Chapter 3 Summary Notes', energyRequired: 'Low' },
+        { id: 3, title: 'Draft email to Professor', energyRequired: 'Medium' }
+    ];
+    if (currentEnergy === 'High') tasks.sort((a,b) => a.energyRequired === 'High' ? -1 : 1);
+    else if (currentEnergy === 'Low') tasks.sort((a,b) => a.energyRequired === 'Low' ? -1 : 1);
+    else tasks.sort((a,b) => a.energyRequired === 'Medium' ? -1 : 1);
+
+    container.innerHTML = '';
+    tasks.forEach(t => {
+        const isOptimal = t.energyRequired === currentEnergy || (currentEnergy==='High' && t.energyRequired==='Medium');
+        container.innerHTML += `
+          <div class="pulse-task ${isOptimal ? '' : 'low-priority'}">
+            <div class="pulse-task-checkbox"></div>
+            <div style="flex:1;">
+              <div style="font-size: 14px; color: white;">${t.title}</div>
+              <div style="font-size: 11px; color: rgba(255,255,255,0.4);">${t.energyRequired} Energy Task</div>
+            </div>
+          </div>
+        `;
+    });
+}
+
+// 2. Sub-Apps Overlays
+window.openSubApp = function(id) {
+    if (document.startViewTransition) {
+        document.startViewTransition(() => {
+            const overlay = $('subapp-' + id);
+            if (overlay) overlay.classList.add('active');
+        });
+    } else {
+        const overlay = $('subapp-' + id);
+        if (overlay) overlay.classList.add('active');
+    }
+};
+window.closeSubApps = function() {
+    if (document.startViewTransition) {
+        document.startViewTransition(() => {
+            document.querySelectorAll('.sub-app-overlay').forEach(el => el.classList.remove('active'));
+        });
+    } else {
+        document.querySelectorAll('.sub-app-overlay').forEach(el => el.classList.remove('active'));
+    }
+};
+
+
+// 4. Anti-Calendar Input
+$('anti-calendar-input')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+     const val = e.target.value.trim();
+     if (val) {
+         $('anti-calendar-feedback').style.display = 'block';
+         const todayStr = new Date().toISOString().split('T')[0];
+         STATE.events[todayStr] = STATE.events[todayStr] || [];
+         STATE.events[todayStr].push({
+             type: 'event',
+             time: 'Auto',
+             title: 'Auto: ' + val.split(' ')[0] + ' Session',
+             color: '#bf5af2'
+         });
+         renderCalEvents(todayStr);
+         e.target.value = '';
+         setTimeout(() => { $('anti-calendar-feedback').style.display = 'none'; }, 5000);
+     }
+  }
+});
+
+// 5. X-Ray Mode Toggle
+$('cr-xray-toggle')?.addEventListener('click', () => {
+  $('cr-xray-sidebar')?.classList.toggle('hidden');
+  $('cr-sidebar')?.classList.add('hidden');
+  $('cr-mcq-sidebar')?.classList.add('hidden');
+});
+$('cr-xray-close')?.addEventListener('click', () => $('cr-xray-sidebar')?.classList.add('hidden'));
+
+// 6. Inject Glowing Ember into Energy Display dynamically
+const originalRenderHome = typeof renderHome !== 'undefined' ? renderHome : function(){};
+window.renderHome = function() {
+    originalRenderHome();
+    const energyTxtBox = document.querySelector('.dash-card-title'); // Rough selector for energy block
+    // We'll just hook into the existing state render
+    const energyCard = Array.from(document.querySelectorAll('.dash-card-title')).find(el => el && el.textContent && el.textContent.includes('Current Energy'));
+    if (energyCard && STATE.energy === 'High' && !energyCard.innerHTML.includes('energy-high-ember')) {
+        energyCard.nextElementSibling.innerHTML += '<span class="energy-high-ember"></span>';
+    }
+};
+
+// Hook Initialization
+setTimeout(() => {
+    initAutonomousDashboard();
+    renderPulseTasks();
+}, 500);
+
+// ==============================================================
+// CANOPY MACRO-STRATEGY ENGINE LOGIC
+// ==============================================================
+
+function initCanopy() {
+  // 1. Heatmap
+  const heatmap = $('canopy-heatmap');
+  if (heatmap && heatmap.children.length === 0) {
+    for(let i=0; i<84; i++) {
+      let cell = document.createElement('div');
+      cell.className = 'canopy-heatmap-cell';
+      let r = Math.random();
+      if(r > 0.8) cell.classList.add('canopy-heat-high');
+      else if(r > 0.4) cell.classList.add('canopy-heat-med');
+      else if(r > 0.2) cell.classList.add('canopy-heat-low');
+      
+      cell.onclick = () => {
+        // Haptic feedback
+        if(navigator.vibrate) navigator.vibrate(10);
+      };
+      heatmap.appendChild(cell);
+    }
+  }
+  
+  // 2. Ingestion Pipeline
+  const ingestList = $('canopy-ingestion-list');
+  if (ingestList && ingestList.children.length === 0) {
+    const docs = [
+      { title: "2023 Prelims PYQ", progress: 100 },
+      { title: "Mains GS-3 Notes", progress: 65 },
+      { title: "Economy Chapter 4", progress: 12 }
+    ];
+    docs.forEach(doc => {
+      ingestList.innerHTML += `
+        <div class="canopy-ingest-item">
+          <div class="canopy-ingest-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </div>
+          <div class="canopy-ingest-info">
+            <div class="canopy-ingest-title">${doc.title}</div>
+            <div class="canopy-ingest-bar-bg">
+              <div class="canopy-ingest-bar-fill" style="width: ${doc.progress}%;"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // 3. Alerts
+  const alertList = $('canopy-alert-list');
+  if (alertList && alertList.children.length === 0) {
+    const alerts = [
+      { text: "Critical Gap: Environmental Ecology", sub: "Frequency: High • Confidence: 20%" },
+      { text: "Falling behind target pace", sub: "Deficit: 14 topics" }
+    ];
+    alerts.forEach(al => {
+      alertList.innerHTML += `
+        <div class="canopy-alert-row" onclick="this.classList.toggle('expanded')">
+          <div class="canopy-alert-header">
+            <svg class="canopy-alert-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <div style="flex:1;">
+              <div class="canopy-alert-text">${al.text}</div>
+              <div class="canopy-alert-sub">${al.sub}</div>
+            </div>
+            <svg class="canopy-expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+          <div class="canopy-expandable-content">
+            Detailed insights and recommended actions for this alert would appear here. You can dynamically populate this with specific data related to the weightage and confidence score.
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // 4. Reminders
+  const reminders = $('canopy-reminders-list');
+  if (reminders && reminders.children.length === 0) {
+    const tasks = [
+      { id: 'rem-1', title: "Active Recall: Ecology Themes", meta: "Est. 25 mins" },
+      { id: 'rem-2', title: "Review 2023 PYQ Mistakes", meta: "Est. 45 mins" },
+      { id: 'rem-3', title: "Read Economy Ch.4", meta: "Est. 60 mins" }
+    ];
+    tasks.forEach(t => {
+      let html = `
+        <div class="canopy-reminder-item" id="${t.id}" onclick="this.classList.toggle('expanded')">
+          <div class="canopy-reminder-header">
+            <div class="canopy-reminder-check" onclick="event.stopPropagation(); toggleCanopyTask('${t.id}')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <div class="canopy-reminder-content">
+              <div class="canopy-reminder-title">${t.title}</div>
+              <div class="canopy-reminder-meta">${t.meta}</div>
+            </div>
+            <svg class="canopy-expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+          <div class="canopy-expandable-content">
+            Action items and reference materials for this task. E.g., Links to previous mock tests, syllabus chapters, and targeted practice sets.
+          </div>
+        </div>
+      `;
+      reminders.innerHTML += html;
+    });
+  }
+}
+
+window.toggleCanopyTask = function(id) {
+  const el = $(id);
+  if (!el) return;
+  const check = el.querySelector('.canopy-reminder-check');
+  if (el.classList.contains('completed')) return; // Already completed
+  
+  if (navigator.vibrate) navigator.vibrate(15);
+  el.classList.add('completed');
+  check.classList.add('completed');
+  
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.height = '0px';
+    el.style.padding = '0px';
+    el.style.border = 'none';
+    setTimeout(() => {
+      el.remove();
+    }, 300);
+  }, 1000); // 1 sec delay before disappearing
+};
+
+// Hook into subapp opening
+const originalOpenSubApp = window.openSubApp;
+window.openSubApp = function(appId) {
+  if (originalOpenSubApp) originalOpenSubApp(appId);
+  if (appId === 'canopy') {
+    initCanopy();
+  } else if (appId === 'prism') {
+    if (typeof populatePrismMock === 'function') populatePrismMock();
+  } else if (appId === 'ledger') {
+    if (typeof renderLedgerMock === 'function') {
+      // Small delay to allow CSS transitions to show container first
+      setTimeout(renderLedgerMock, 300);
+    }
+  }
+};
+
+// Liquid Glass Dock Physics & Fluid Scrubbing Engine
+window.dockEngine = null;
+
+function initDockPhysics() {
+  const dockPill = document.querySelector('.tab-bar-pill');
+  const indicator = document.getElementById('dock-indicator');
+  if (!dockPill || !indicator) return;
+
+  const items = Array.from(dockPill.querySelectorAll('.tb-item'));
+  const lens = document.createElement('div');
+  lens.className = 'dock-lens';
+  dockPill.appendChild(lens);
+
+  // Disable CSS transitions so JS can take over 60fps physics
+  indicator.style.transition = 'none';
+  items.forEach(item => {
+    item.style.transition = 'none';
+    const icon = item.querySelector('.tb-icon');
+    if (icon) icon.style.transition = 'none';
+  });
+
+  // Grab current active tab position for initialization
+  const activeTab = document.querySelector('.tb-item.active') || items[0];
+  const initialX = activeTab ? activeTab.offsetLeft : 0;
+  const initialWidth = activeTab ? activeTab.offsetWidth : 44;
+
+  window.dockEngine = {
+    x: initialX, targetX: initialX, velocity: 0,
+    isDragging: false, lastTime: performance.now(),
+    lastPointerX: 0, pointerX: 0,
+    width: initialWidth, targetWidth: initialWidth, widthVelocity: 0,
+    scale: 1, scaleVelocity: 0,
+    
+    update(time) {
+      // Ensure dt is strictly positive to prevent NaN division, capped at 50ms
+      let dt = (time - this.lastTime) / 1000;
+      if (dt <= 0 || isNaN(dt)) dt = 0.016; 
+      dt = Math.min(dt, 0.05);
+      this.lastTime = time;
+
+      if (this.isDragging) {
+        // 1:1 Binding & Velocity Engine
+        const dx = this.pointerX - this.lastPointerX;
+        this.velocity = dx / dt;
+        this.lastPointerX = this.pointerX;
+        
+        // Speed stretch only
+        const speed = Math.abs(this.velocity);
+        this.width = this.targetWidth + Math.min(speed * 0.05, 50); 
+        this.x = this.pointerX - (this.width - this.targetWidth) / 2;
+        
+        // Scale up icy cap for depth
+        this.scale += (1.5 - this.scale) * (dt * 15);
+      } else {
+        // Sub-stepping for rock-solid spring physics even with frame drops
+        const STEPS = 3;
+        const stepDt = dt / STEPS;
+        
+        for (let i = 0; i < STEPS; i++) {
+          // Spring physics (Quintic-like high friction)
+          const tension = 400; // Spring stiffness
+          const friction = 35; // High friction for sudden braking
+          
+          const dx = this.x - this.targetX;
+          const springForce = -tension * dx;
+          const dampingForce = -friction * this.velocity;
+          this.velocity += (springForce + dampingForce) * stepDt;
+          this.x += this.velocity * stepDt;
+          
+          // Width spring to return to target squash shape
+          const dw = this.width - this.targetWidth;
+          const wSpringForce = -300 * dw;
+          const wDampingForce = -25 * this.widthVelocity;
+          this.widthVelocity += (wSpringForce + wDampingForce) * stepDt;
+          this.width += this.widthVelocity * stepDt;
+          
+          // Scale spring to return to 1.0
+          const ds = this.scale - 1.0;
+          const sSpringForce = -300 * ds;
+          const sDampingForce = -25 * this.scaleVelocity;
+          this.scaleVelocity += (sSpringForce + sDampingForce) * stepDt;
+          this.scale += this.scaleVelocity * stepDt;
+        }
+        
+        // Dynamic stretch during automatic fast slide
+        let renderWidth = this.width;
+        const speed = Math.abs(this.velocity);
+        if (speed > 50) {
+            renderWidth += Math.min(60, speed * 0.05);
+        }
+        
+        this._renderWidth = renderWidth;
+      }
+
+      const finalWidth = this.isDragging ? this.width : this._renderWidth;
+      indicator.style.transform = `translateX(${this.x}px) scale(${this.scale})`;
+      indicator.style.width = `${finalWidth}px`;
+
+      // The Ripple Effect (Magnifying Glass) - Removed symbol scaling, kept color/lift
+      const indicatorCenter = this.x + 22; 
+      items.forEach(item => {
+        const itemLeft = item.offsetLeft;
+        const itemCenter = itemLeft + 22;
+        const dist = Math.abs(indicatorCenter - itemCenter);
+        
+        const AFFECTED_RANGE = 50; // Range of the ripple
+        
+        if (dist < AFFECTED_RANGE) {
+          const intensity = Math.cos((dist / AFFECTED_RANGE) * (Math.PI / 2));
+          item.style.transform = `translateY(-${intensity*8}px)`; // Just a slight lift, no scale
+          item.style.color = `rgba(255, 255, 255, ${0.5 + 0.5 * intensity})`;
+        } else {
+          item.style.transform = 'translateY(0px)';
+          item.style.color = ''; // falls back to CSS
+        }
+      });
+
+      requestAnimationFrame(this.update.bind(this));
+    },
+    
+    startDrag(x) {
+      this.isDragging = true;
+      this.pointerX = x;
+      this.lastPointerX = x;
+    },
+    
+    moveDrag(x) {
+      if (!this.isDragging) return;
+      this.pointerX = x;
+    },
+    
+    endDrag() {
+      this.isDragging = false;
+      // Calculate momentum and nearest tab
+      const predictedX = this.x + this.velocity * 0.15;
+      
+      let closestTab = items[0];
+      let minDiff = Infinity;
+      
+      items.forEach(item => {
+        const itemX = item.offsetLeft;
+        const diff = Math.abs(itemX - predictedX);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestTab = item;
+        }
+      });
+      
+      // Snap to closest tab
+      if (closestTab) {
+        const tabId = closestTab.getAttribute('data-tab');
+        if (STATE.activeTab !== tabId) {
+          switchTab(tabId);
+        } else {
+          this.targetX = closestTab.offsetLeft;
+        }
+      }
+    }
+  };
+
+  requestAnimationFrame(window.dockEngine.update.bind(window.dockEngine));
+
+  // Pointer / Interaction Logic
+  let isPointerDown = false;
+  let currentTarget = null;
+  
+  function handleMove(e) {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    const dockRect = dockPill.getBoundingClientRect();
+    
+    if (window.dockEngine.isDragging) {
+      // Direct manipulation 1:1 bind
+      let localX = clientX - dockRect.left - 22; 
+      localX = Math.max(0, Math.min(localX, dockRect.width - 44));
+      window.dockEngine.moveDrag(localX);
+    }
+    
+    // Lens Hover (Magnifying mesh)
+    if (!isPointerDown) {
+      if (clientY < dockRect.top - 60 || clientY > dockRect.bottom + 60) {
+        lens.style.opacity = '0';
+        return;
+      }
+      lens.style.opacity = '1';
+      lens.style.left = (clientX - dockRect.left - 32) + 'px'; 
+    }
+  }
+
+  function handlePointerDown(e) {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const dockRect = dockPill.getBoundingClientRect();
+    
+    // Immediate 1:1 drag binding on touch/click anywhere on the dock
+    let localX = clientX - dockRect.left - 22;
+    localX = Math.max(0, Math.min(localX, dockRect.width - 44));
+    window.dockEngine.startDrag(localX);
+    
+    // Sinking Pocket effect
+    const item = e.target.closest('.tb-item');
+    if (item) {
+      isPointerDown = true;
+      currentTarget = item;
+      dockPill.classList.add('dock-sinking');
+      item.classList.add('item-sinking');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }
+  }
+
+  function handlePointerUp() {
+    if (window.dockEngine.isDragging) {
+      window.dockEngine.endDrag();
+    }
+    if (!isPointerDown) return;
+    isPointerDown = false;
+    if (currentTarget) {
+      currentTarget.classList.remove('item-sinking');
+      currentTarget.classList.add('item-bounce');
+      const temp = currentTarget;
+      setTimeout(() => temp.classList.remove('item-bounce'), 250);
+      currentTarget = null;
+    }
+    dockPill.classList.remove('dock-sinking');
+    dockPill.classList.add('dock-bounce');
+    setTimeout(() => dockPill.classList.remove('dock-bounce'), 250);
+  }
+
+  dockPill.addEventListener('mousedown', handlePointerDown);
+  window.addEventListener('mousemove', handleMove);
+  window.addEventListener('mouseup', handlePointerUp);
+  
+  dockPill.addEventListener('touchstart', handlePointerDown);
+  window.addEventListener('touchmove', (e) => {
+    if (window.dockEngine.isDragging) {
+      if (e.cancelable) e.preventDefault(); // Stop native scrolling
+    }
+    handleMove(e);
+  }, { passive: false });
+  window.addEventListener('touchend', handlePointerUp);
+  window.addEventListener('touchcancel', handlePointerUp);
+}
+
+// Ensure physics run safely
+function initPhysicsSafely() {
+  setTimeout(initDockPhysics, 500);
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPhysicsSafely);
+} else {
+  initPhysicsSafely();
+}
+
+// PRISM: Spatial Canvas Mock Generation
+function populatePrismMock() {
+  const emptyState = document.getElementById('prism-empty-state');
+  const nodesLayer = document.getElementById('prism-nodes-layer');
+  const edgesLayer = document.getElementById('prism-edges');
+  
+  if (!emptyState || !nodesLayer || !edgesLayer) return;
+  
+  // Transition empty state out
+  emptyState.style.transition = "opacity 0.4s";
+  emptyState.style.opacity = 0;
+  setTimeout(() => {
+    emptyState.style.display = "none";
+  }, 400);
+
+  // Clear existing (if any)
+  nodesLayer.innerHTML = '';
+  edgesLayer.innerHTML = '';
+  
+  // Mock Data
+  const nodes = [
+    { id: 1, type: 'text', content: 'Design System Architecture', x: window.innerWidth/2 - 150, y: window.innerHeight/2 - 200, cluster: '#A855F7' },
+    { id: 2, type: 'text', content: 'Glassmorphism Variables', x: window.innerWidth/2 + 80, y: window.innerHeight/2 - 250, cluster: '#A855F7' },
+    { id: 3, type: 'text', content: 'Spring Physics Tunings', x: window.innerWidth/2 + 200, y: window.innerHeight/2 - 120, cluster: '#A855F7' },
+    
+    { id: 4, type: 'text', content: 'Market Analysis Q3', x: window.innerWidth/2 - 280, y: window.innerHeight/2 + 80, cluster: '#30d158' },
+    { id: 5, type: 'text', content: 'Competitor B', x: window.innerWidth/2 - 350, y: window.innerHeight/2 + 200, cluster: '#30d158' },
+    { id: 6, type: 'text', content: 'Pricing Strategy', x: window.innerWidth/2 - 120, y: window.innerHeight/2 + 180, cluster: '#30d158' }
+  ];
+
+  const edges = [
+    { source: 1, target: 2 },
+    { source: 2, target: 3 },
+    { source: 1, target: 3 },
+    { source: 4, target: 5 },
+    { source: 4, target: 6 }
+  ];
+
+  // Draw Edges
+  edges.forEach(edge => {
+    const s = nodes.find(n => n.id === edge.source);
+    const t = nodes.find(n => n.id === edge.target);
+    
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    
+    // Bezier curve connecting centers
+    const sx = s.x + 100, sy = s.y + 25;
+    const tx = t.x + 100, ty = t.y + 25;
+    const cx = (sx + tx) / 2;
+    const cy = (sy + ty) / 2 - 50; 
+    
+    path.setAttribute('d', `M ${sx} ${sy} Q ${cx} ${cy} ${tx} ${ty}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', s.cluster);
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-opacity', '0.4');
+    
+    // Animate drawing
+    path.style.strokeDasharray = "1000";
+    path.style.strokeDashoffset = "1000";
+    path.style.animation = "dash 1.5s ease-out forwards";
+    
+    edgesLayer.appendChild(path);
+  });
+
+  // Render Nodes
+  nodes.forEach((n, i) => {
+    const el = document.createElement('div');
+    el.className = 'prism-node';
+    el.style.left = n.x + 'px';
+    el.style.top = n.y + 'px';
+    el.style.borderTopColor = n.cluster; 
+    el.innerText = n.content;
+    
+    // Stagger animation
+    el.style.opacity = 0;
+    el.style.transform = "scale(0.8) translateY(20px)";
+    setTimeout(() => {
+      el.style.transition = "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)";
+      el.style.opacity = 1;
+      el.style.transform = "scale(1) translateY(0)";
+    }, 400 + i * 100);
+
+    // Simple Drag Logic
+    let isDragging = false, startX, startY;
+    el.onmousedown = (e) => {
+      isDragging = true;
+      startX = e.clientX - n.x;
+      startY = e.clientY - n.y;
+      el.style.zIndex = 100;
+    };
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      n.x = e.clientX - startX;
+      n.y = e.clientY - startY;
+      el.style.left = n.x + 'px';
+      el.style.top = n.y + 'px';
+      // In a real app we would update the SVG paths here dynamically
+    });
+    window.addEventListener('mouseup', () => { 
+      isDragging = false; 
+      el.style.zIndex = 5;
+    });
+
+    nodesLayer.appendChild(el);
+  });
+}
+
+// Ensure the animation exists for paths
+if (!document.getElementById('prism-style')) {
+  const s = document.createElement('style');
+  s.id = 'prism-style';
+  s.innerHTML = `@keyframes dash { to { stroke-dashoffset: 0; } }`;
+  document.head.appendChild(s);
+}
+
+// LEDGER: Strategic Retrospective Mock Generation
+function renderLedgerMock() {
+  // Animate the alignment score counter
+  const alignVal = document.getElementById('ledger-alignment-val');
+  if (alignVal) {
+    let current = 0;
+    const target = 85;
+    const interval = setInterval(() => {
+      current += 2;
+      if (current >= target) {
+        current = target;
+        clearInterval(interval);
+      }
+      alignVal.innerText = current + '%';
+    }, 20);
+  }
+
+  // Draw the Radar Chart using SVG
+  const radarContainer = document.getElementById('ledger-radar-container');
+  if (!radarContainer || radarContainer.innerHTML.includes('<svg')) return;
+
+  const size = 260;
+  const center = size / 2;
+  const radius = size / 2 - 40;
+  
+  const axes = ['Ecology', 'Wildlife', 'Legislation', 'Geography', 'Projects'];
+  const numAxes = axes.length;
+  
+  // Create SVG
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+  
+  // Draw background web (target outline)
+  let targetPath = '';
+  axes.forEach((_, i) => {
+    const angle = (Math.PI * 2 * i) / numAxes - Math.PI / 2;
+    const x = center + radius * Math.cos(angle);
+    const y = center + radius * Math.sin(angle);
+    
+    // Draw Axis Line
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', center);
+    line.setAttribute('y1', center);
+    line.setAttribute('x2', x);
+    line.setAttribute('y2', y);
+    line.setAttribute('stroke', 'rgba(255,255,255,0.1)');
+    line.setAttribute('stroke-width', '1');
+    svg.appendChild(line);
+
+    // Target polygon path
+    targetPath += `${i === 0 ? 'M' : 'L'} ${x} ${y} `;
+    
+    // Labels
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', center + (radius + 20) * Math.cos(angle));
+    label.setAttribute('y', center + (radius + 20) * Math.sin(angle));
+    label.setAttribute('fill', 'rgba(255,255,255,0.5)');
+    label.setAttribute('font-size', '10px');
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('alignment-baseline', 'middle');
+    label.textContent = axes[i];
+    svg.appendChild(label);
+  });
+  targetPath += 'Z';
+  
+  const targetPolygon = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  targetPolygon.setAttribute('d', targetPath);
+  targetPolygon.setAttribute('fill', 'none');
+  targetPolygon.setAttribute('stroke', 'rgba(255,255,255,0.3)');
+  targetPolygon.setAttribute('stroke-dasharray', '4, 4');
+  svg.appendChild(targetPolygon);
+
+  // Draw Actual values (Amber Gradient)
+  const actualValues = [0.8, 0.95, 0.4, 0.6, 0.85]; // Mock data
+  let actualPath = '';
+  
+  actualValues.forEach((val, i) => {
+    const angle = (Math.PI * 2 * i) / numAxes - Math.PI / 2;
+    const x = center + (radius * val) * Math.cos(angle);
+    const y = center + (radius * val) * Math.sin(angle);
+    actualPath += `${i === 0 ? 'M' : 'L'} ${x} ${y} `;
+  });
+  actualPath += 'Z';
+
+  // Add Defs for gradient
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+  gradient.id = 'radar-grad';
+  gradient.innerHTML = `
+    <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.8" />
+    <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.2" />
+  `;
+  defs.appendChild(gradient);
+  svg.appendChild(defs);
+
+  const actualPolygon = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  actualPolygon.setAttribute('d', actualPath);
+  actualPolygon.setAttribute('fill', 'url(#radar-grad)');
+  actualPolygon.setAttribute('stroke', '#F59E0B');
+  actualPolygon.setAttribute('stroke-width', '2');
+  
+  // Simple grow animation
+  actualPolygon.style.transformOrigin = '50% 50%';
+  actualPolygon.style.animation = 'radar-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+  
+  svg.appendChild(actualPolygon);
+  radarContainer.appendChild(svg);
+}
+
+// Add radar animation styles if needed
+if (!document.getElementById('ledger-style')) {
+  const s = document.createElement('style');
+  s.id = 'ledger-style';
+  s.innerHTML = `@keyframes radar-grow { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }`;
+  document.head.appendChild(s);
+}

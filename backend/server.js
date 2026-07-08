@@ -31,10 +31,18 @@ app.use((req, res, next) => {
 // Serve static frontend files on '/' with no-cache headers to prevent stale loads
 const frontendPath = path.join(__dirname, "..", "frontend");
 app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  
   // Disable caching for all responses so Electron always loads fresh files
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
   next();
 });
 app.use(express.static(frontendPath, { etag: false, lastModified: false }));
@@ -593,6 +601,111 @@ Write the briefing now:`;
     } catch (err) {
       console.error("Insights endpoint error:", err);
       return res.status(500).json({ error: "Failed to generate insights." });
+    }
+  }
+});
+
+// Summary API endpoint (Feature 8: Progressive Summarizer)
+app.post("/api/summary", async (req, res) => {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    return res.status(401).json({
+      error: "API key is missing. Please open the 'insert api key here' file in the project root and paste your API key on Line 3.",
+    });
+  }
+
+  const { text, depth, docTitle, pageNum } = req.body || {};
+  if (!text) {
+    return res.status(400).json({ error: "Missing 'text' parameter." });
+  }
+
+  let prompt = "";
+  if (depth === "normal") {
+    prompt = `Generate a concise bullet point summary of this page from "${docTitle}" (Page ${pageNum}).
+Generate around 3 bullet points. Use clean HTML list format (use <ul> and <li> tags, no other tags):
+Text:
+${text}`;
+  } else if (depth === "medium") {
+    prompt = `Generate a medium summary outlining key insights of this page from "${docTitle}" (Page ${pageNum}).
+Format with a bold header <h3>Key Insights</h3> followed by 1-2 paragraphs of text in HTML (<p> tags):
+Text:
+${text}`;
+  } else {
+    prompt = `Generate a detailed, complete analysis of this page from "${docTitle}" (Page ${pageNum}) for a student studying it.
+Include key concepts, terms, context, and implications. Format with a bold header <h3>Complete Page Analysis</h3> followed by 3-4 paragraphs in HTML (<p> tags):
+Text:
+${text}`;
+  }
+
+  const isKeyGemini = apiKey.startsWith("AIzaSy") || apiKey.startsWith("AQ.");
+  if (isKeyGemini) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const payload = {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.6, maxOutputTokens: 600 }
+    };
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(response.status).json({ error: errorText });
+      }
+      const data = await response.json();
+      const summary = data.candidates?.[0]?.content?.parts?.[0]?.text || "No summary generated.";
+      return res.status(200).json({ summary });
+    } catch (err) {
+      console.error("Gemini summary endpoint error:", err);
+      return res.status(500).json({ error: "Gemini summary generation failed." });
+    }
+  } else {
+    const isOpenAI = apiKey.startsWith("sk-");
+    const isGroq = apiKey.startsWith("gsk_");
+    
+    let apiUrl = "";
+    let modelName = "";
+    if (isOpenAI) {
+      apiUrl = "https://api.openai.com/v1/chat/completions";
+      modelName = "gpt-4o-mini";
+    } else if (isGroq) {
+      apiUrl = "https://api.groq.com/openai/v1/chat/completions";
+      modelName = "llama-3.1-8b-instant";
+    } else {
+      apiUrl = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct/v1/chat/completions";
+      modelName = "meta-llama/Meta-Llama-3-8B-Instruct";
+    }
+
+    const payload = {
+      model: modelName,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.6,
+      max_tokens: 600,
+    };
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(response.status).json({ error: errorText });
+      }
+
+      const data = await response.json();
+      const summary = data.choices?.[0]?.message?.content || "No summary generated.";
+      return res.status(200).json({ summary });
+    } catch (err) {
+      console.error("Summary endpoint error:", err);
+      return res.status(500).json({ error: "Failed to generate summary." });
     }
   }
 });

@@ -1,0 +1,49 @@
+LEDGER - STRATEGIC RETROSPECTIVE
+Visual Design & UI Layout Blueprint (Image Substitute)
+Theme: Apple HIG / Glassmorphism / Dark Mode (Amber Accents)
+
+========================================================================
+GLOBAL CANVAS
+========================================================================
+* Background: Absolute true black (#000000).
+* Accent Color: Subtle amber/gold (#F59E0B) to signify historical data and gold-standard metrics.
+* Navigation: The standard floating global dock remains at the bottom center.
+
+========================================================================
+SCROLL 1: HIGH-LEVEL METRICS & ALIGNMENT
+========================================================================
+[ HEADER SECTION ]
+Top Left: "LEDGER" (SF Pro Display, Heavy, White) | "Strategic Retrospective" (SF Pro Text, Regular, Gray).
+Top Right: [ This Week ] Dropdown Pill (Frosted glass, trailing chevron).
+
+[ WEEKLY EXECUTION METRICS - BENTO GRID ] (Top Half of Screen)
+- Layout: 3 distinct cards (1 large span, 2 small side-by-side below).
+- Card 1 (Wide): "North Star Alignment" 
+  > Massive typography: "85%" (Glowing amber).
+  > Sub-label: "Velocity is matching target exam trajectory."
+- Card 2 (Square): "Deep Focus Hours"
+  > Typography: "32h 15m" (White, SF Pro Rounded).
+- Card 3 (Square): "Focus Integrity"
+  > Typography: "92%" (White).
+  > Chart: A tiny circular Apple Fitness-style activity ring filling up to 92%.
+
+========================================================================
+SCROLL 2: LEAK DETECTION & RADAR
+========================================================================
+[ TIME LEAK ALERT BANNER ] (Full Width)
+- UI: iOS System Alert style banner, sitting horizontally across the view.
+- Background: Very dark, muted red (.systemRed with 10% opacity) + frosted glass.
+- Icon: SF Symbol 'exclamationmark.triangle.fill' in amber.
+- Text: "Time Leak Detected: Thursday evening (social media). Autonomously adjusting next week's schedule to block that window."
+- Action: A trailing button "Accept Adjustment".
+
+[ STRATEGIC ALIGNMENT RADAR ] (Left Aligned, 50% Width)
+- UI: A dark, minimalist Spider/Radar chart.
+- Axes Labels: "Ecology", "Wildlife", "Legislation", "Geography", "Projects".
+- Visuals: The intended target area is outlined in thin dashed white. The actual time spent is filled with a soft amber/orange gradient, instantly showing over/under-indexing in specific subjects.
+
+[ NYVRON RETROSPECTIVE SYNTHESIS ] (Right Aligned, 50% Width)
+- UI: A vertical card resembling an iOS native Notes or Mail rendering.
+- Content:
+  > Header: "Weekly Synthesis" (SF Symbol 'sparkles').
+  > Body: "You executed 32 hours of deep focus, outperforming last week by 14%. Your highest alignment was in Wildlife (12h). However, Journal logs indicate a spike in stress on Thursday, correlating directly with the identified time leak. Recommendation: Enforce strict downtime this upcoming Thursday evening."

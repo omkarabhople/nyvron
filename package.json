@@ -2,14 +2,58 @@
   "name": "nyvron",
   "version": "1.0.0",
   "description": "NYVRON — Personal command center. iOS-inspired productivity dashboard.",
-  "main": "backend/server.js",
+  "main": "main.js",
   "author": "Antigravity",
   "license": "MIT",
   "scripts": {
-    "start": "node backend/server.js"
+    "start": "cd backend && node server.js",
+    "dist": "electron-builder"
   },
   "dependencies": {
+    "@capacitor/core": "^8.4.1",
     "express": "^4.19.0",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "puppeteer": "^25.3.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "electron": "^42.5.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.nyvron.app",
+    "productName": "NYVRON",
+    "files": [
+      "main.js",
+      "frontend/**/*",
+      "backend/**/*"
+    ],
+    "extraResources": [
+      "insert api key here"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg"
+      ]
+    },
+    "dmg": {
+      "background": null,
+      "iconSize": 100,
+      "contents": [
+        {
+          "x": 130,
+          "y": 150,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
   }
 }

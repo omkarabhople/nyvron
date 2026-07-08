@@ -1,0 +1,47 @@
+LEDGER - STRATEGIC RETROSPECTIVE
+Core UI/UX Architecture & iOS HIG Component Mapping
+(Strictly Unseeded - Structural & Functional Logic Only)
+
+=========================================
+SYSTEM CONCEPT: RETROSPECTIVE & ANALYTICS
+=========================================
+Ledger is the ultimate reconciliation engine. It analyzes the delta between intended strategy (Canopy), actual execution (Cascara), and emotional states (Journal) to provide an automated strategic retrospective.
+
+=========================================
+1. ARCHITECTURE & FUNCTIONAL SPECIFICATION
+=========================================
+[Core Metrics Aggregator]
+- Functioning: Pulls aggregated time-series data from Cascara logs, Canopy task completions, and Journal emotional tags over a selected timeframe.
+- Data Bindings:
+  > Date Range: [DateRange Object]
+  > North Star Alignment Score: [Float Percentage]
+  > Total Deep Focus: [Integer Hours/Minutes]
+
+[Time Leak & Anomaly Detection]
+- Functioning: Compares scheduled calendar blocks against actual timer sessions. Flags continuous blocks of unaccounted time as "Time Leaks."
+- Data Bindings: [Array of Anomaly Objects] (timestamp, estimated_duration, suggested_cause).
+- Interaction: 1-click "Auto-Adjust Next Week" button to dynamically block out historical leak windows.
+
+[Strategic Alignment Radar]
+- Functioning: Maps actual time spent across different syllabus/project categories against their targeted weightage.
+- Data Bindings: [Array of Data Points] (Category String, Target Float, Actual Float).
+
+=========================================
+2. iOS / Apple HIG Component Architecture
+=========================================
+* Global Controls (Timeframe Selector):
+  - iOS Component: `UIDatePicker` configured with `.compact` or a custom `UISegmentedControl` (W / M / Q / Y).
+  - Design Implementation: Pinned to the top right of the navigation bar as a frosted glass pill.
+
+* Execution Metrics (Bento Layout):
+  - iOS Component: `UICollectionView` using a Compositional Layout.
+  - Design Implementation: Large numeric counters utilizing `UIFont.systemFont(ofSize: weight: .heavy, design: .rounded)`. Number values animate dynamically via `CADisplayLink` counting up on view load.
+  - Material: `.systemThickMaterialDark` with subtle inner drop shadows to create a debossed look.
+
+* Strategic Alignment Chart:
+  - iOS Component: `SwiftUI.Charts` (Spider/Radar chart variant) or custom `CGContext` drawing.
+  - Design Implementation: Two overlapping polygons. The "Target" polygon is a dashed gray outline. The "Actual" polygon is a solid fill with an amber/gold gradient (`.systemOrange` to `.systemYellow` at 30% opacity).
+
+* Nyvron Retrospective Synthesis:
+  - iOS Component: `UITextView` (Read-only) wrapped in a `UIVisualEffectView`.
+  - Design Implementation: Formatted like an executive summary. Text uses standard SF Pro Text, with key metrics automatically highlighted using `.systemOrange` foreground colors.
