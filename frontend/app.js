@@ -9527,9 +9527,9 @@ function initDockPhysics() {
       window.dockEngine.startDrag(localX);
     }
     
-    // Sinking Pocket effect
+    // Sinking Pocket effect (Desktop only to prevent mobile touch drops)
     const item = e.target.closest('.tb-item');
-    if (item) {
+    if (item && window.innerWidth > 768) {
       isPointerDown = true;
       currentTarget = item;
       dockPill.classList.add('dock-sinking');

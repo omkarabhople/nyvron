@@ -646,12 +646,13 @@ ul { list-style: none; }
     padding: 2px; 
     gap: 2px;
   }
-  /* Hide desktop zoom slider — mobile has floating pill */
-  #cr-tool-zoom-out, #cr-zoom-slider, #cr-zoom-val, #cr-tool-zoom-in { display: none !important; }
-  .cr-tools-panel > div[style*="width:1px"] { display: none !important; }
-  .cr-settings-group { gap: 6px; }
-  #cr-build-info { display: none !important; }
-  .cr-tool-btn { width: 26px; height: 26px; padding: 4px; }
+  /* Mobile zoom controls can be scrollable in the tools panel */
+  #cr-tool-zoom-out, #cr-zoom-slider, #cr-zoom-val, #cr-tool-zoom-in { display: flex; }
+  .cr-tools-panel > div[style*="width:1px"] { display: block; }
+  .cr-settings-group { gap: 6px; overflow-x: auto; max-width: 50vw; scrollbar-width: none; }
+  .cr-settings-group::-webkit-scrollbar { display: none; }
+  #cr-build-info { display: flex; white-space: nowrap; }
+  .cr-tool-btn { width: 26px; height: 26px; padding: 4px; flex-shrink: 0; }
   /* Mobile Outline drawer overlay */
   #cr-sidebar {
     display: flex !important;
@@ -3620,7 +3621,7 @@ body.theme-light, body.theme-dark-vault {
   .tab-bar-pill {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    touch-action: auto !important;
+    touch-action: pan-x !important;
     pointer-events: auto !important;
   }
 }
